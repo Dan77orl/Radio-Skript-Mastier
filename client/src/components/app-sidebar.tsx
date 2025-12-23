@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, Mic, Calendar, Settings, Radio, Newspaper, Megaphone, Users } from "lucide-react";
+import { LayoutDashboard, Mic, Calendar, Settings, Radio, Newspaper, Megaphone, Users, Podcast } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -33,6 +33,11 @@ const menuItems = [
     title: "Источники новостей",
     url: "/news-sources",
     icon: Newspaper,
+  },
+  {
+    title: "Передачи",
+    url: "/shows",
+    icon: Podcast,
   },
   {
     title: "Реклама",

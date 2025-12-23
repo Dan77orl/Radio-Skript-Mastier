@@ -974,17 +974,14 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Program type not found" });
       }
 
-      const settings = await storage.getSettings();
       const prompt = program.prompt || programType.defaultPrompt;
-
       let scriptText: string;
 
-      if (settings?.anthropicApiKey) {
-        const Anthropic = (await import("@anthropic-ai/sdk")).default;
-        const anthropic = new Anthropic({ apiKey: settings.anthropicApiKey });
-        
+      const anthropic = await getAnthropicClient();
+      
+      if (anthropic) {
         const message = await anthropic.messages.create({
-          model: "claude-sonnet-4-20250514",
+          model: CLAUDE_MODEL,
           max_tokens: 1024,
           messages: [{ role: "user", content: prompt }],
         });
@@ -992,9 +989,6 @@ export async function registerRoutes(
         const textContent = message.content.find(c => c.type === "text");
         scriptText = textContent?.text || "";
       } else {
-        const OpenAI = (await import("openai")).default;
-        const openai = new OpenAI();
-        
         const response = await openai.chat.completions.create({
           model: "gpt-4o",
           messages: [{ role: "user", content: prompt }],
