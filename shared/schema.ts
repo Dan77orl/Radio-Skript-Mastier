@@ -1,7 +1,7 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { sql } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -16,3 +16,84 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export const settings = pgTable("settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  elevenLabsApiKey: text("eleven_labs_api_key"),
+  yandexDiskToken: text("yandex_disk_token"),
+  maleVoiceId: text("male_voice_id").default("onwK4e9ZLuTAKqWW03F9"),
+  femaleVoiceId: text("female_voice_id").default("EXAVITQu4vr4xnSDxMaL"),
+  dailyDialogsCount: integer("daily_dialogs_count").default(12),
+  defaultPrompt: text("default_prompt").default(`Создай короткий диалог между ведущими радио "Алания FM" (мужчина и женщина). 
+Тема: жизнь экспатов в Аланье, Турция. 
+Стиль: дружелюбный, непринужденный, с юмором.
+Длительность: 30-50 секунд при чтении.
+Обязательно включи: приветствие слушателей, интересный факт или совет про жизнь в Турции.`),
+});
+
+export const insertSettingsSchema = createInsertSchema(settings).omit({
+  id: true,
+});
+
+export type InsertSettings = z.infer<typeof insertSettingsSchema>;
+export type Settings = typeof settings.$inferSelect;
+
+export const dialogs = pgTable("dialogs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  prompt: text("prompt").notNull(),
+  scriptText: text("script_text"),
+  maleText: text("male_text"),
+  femaleText: text("female_text"),
+  audioUrl: text("audio_url"),
+  duration: integer("duration"),
+  status: text("status").notNull().default("pending"),
+  scheduledDate: text("scheduled_date"),
+  slotNumber: integer("slot_number"),
+  uploadedToYandex: boolean("uploaded_to_yandex").default(false),
+  yandexPath: text("yandex_path"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertDialogSchema = createInsertSchema(dialogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDialog = z.infer<typeof insertDialogSchema>;
+export type Dialog = typeof dialogs.$inferSelect;
+
+export const promptTemplates = pgTable("prompt_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  content: text("content").notNull(),
+  category: text("category").default("general"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertPromptTemplateSchema = createInsertSchema(promptTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPromptTemplate = z.infer<typeof insertPromptTemplateSchema>;
+export type PromptTemplate = typeof promptTemplates.$inferSelect;
+
+export const topicSuggestionSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  category: z.enum(["expat_life", "weather", "culture", "food", "travel", "tips"]),
+});
+
+export type TopicSuggestion = z.infer<typeof topicSuggestionSchema>;
+
+export const dialogGenerationRequestSchema = z.object({
+  prompt: z.string().min(10, "Промпт должен быть не менее 10 символов"),
+  topic: z.string().optional(),
+  scheduledDate: z.string().optional(),
+  slotNumber: z.number().optional(),
+});
+
+export type DialogGenerationRequest = z.infer<typeof dialogGenerationRequestSchema>;
