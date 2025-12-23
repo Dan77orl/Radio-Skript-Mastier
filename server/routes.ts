@@ -852,5 +852,229 @@ export async function registerRoutes(
     }
   });
 
+  // Program Types routes
+  app.get("/api/program-types", async (req, res) => {
+    try {
+      const types = await storage.getProgramTypes();
+      res.json(types);
+    } catch (error) {
+      console.error("Error fetching program types:", error);
+      res.status(500).json({ error: "Failed to fetch program types" });
+    }
+  });
+
+  app.post("/api/program-types", async (req, res) => {
+    try {
+      const programType = await storage.createProgramType(req.body);
+      res.json(programType);
+    } catch (error) {
+      console.error("Error creating program type:", error);
+      res.status(500).json({ error: "Failed to create program type" });
+    }
+  });
+
+  app.patch("/api/program-types/:id", async (req, res) => {
+    try {
+      const updated = await storage.updateProgramType(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "Program type not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating program type:", error);
+      res.status(500).json({ error: "Failed to update program type" });
+    }
+  });
+
+  app.delete("/api/program-types/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteProgramType(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Program type not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting program type:", error);
+      res.status(500).json({ error: "Failed to delete program type" });
+    }
+  });
+
+  // Programs routes
+  app.get("/api/programs", async (req, res) => {
+    try {
+      const typeId = req.query.typeId as string | undefined;
+      const programsList = typeId 
+        ? await storage.getProgramsByType(typeId)
+        : await storage.getPrograms();
+      res.json(programsList);
+    } catch (error) {
+      console.error("Error fetching programs:", error);
+      res.status(500).json({ error: "Failed to fetch programs" });
+    }
+  });
+
+  app.get("/api/programs/:id", async (req, res) => {
+    try {
+      const program = await storage.getProgram(req.params.id);
+      if (!program) {
+        return res.status(404).json({ error: "Program not found" });
+      }
+      res.json(program);
+    } catch (error) {
+      console.error("Error fetching program:", error);
+      res.status(500).json({ error: "Failed to fetch program" });
+    }
+  });
+
+  app.post("/api/programs", async (req, res) => {
+    try {
+      const program = await storage.createProgram(req.body);
+      res.json(program);
+    } catch (error) {
+      console.error("Error creating program:", error);
+      res.status(500).json({ error: "Failed to create program" });
+    }
+  });
+
+  app.patch("/api/programs/:id", async (req, res) => {
+    try {
+      const updated = await storage.updateProgram(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "Program not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating program:", error);
+      res.status(500).json({ error: "Failed to update program" });
+    }
+  });
+
+  app.delete("/api/programs/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteProgram(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Program not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting program:", error);
+      res.status(500).json({ error: "Failed to delete program" });
+    }
+  });
+
+  app.post("/api/programs/:id/generate", async (req, res) => {
+    try {
+      const program = await storage.getProgram(req.params.id);
+      if (!program) {
+        return res.status(404).json({ error: "Program not found" });
+      }
+
+      const programType = await storage.getProgramType(program.programTypeId);
+      if (!programType) {
+        return res.status(404).json({ error: "Program type not found" });
+      }
+
+      const settings = await storage.getSettings();
+      const prompt = program.prompt || programType.defaultPrompt;
+
+      let scriptText: string;
+
+      if (settings?.anthropicApiKey) {
+        const Anthropic = (await import("@anthropic-ai/sdk")).default;
+        const anthropic = new Anthropic({ apiKey: settings.anthropicApiKey });
+        
+        const message = await anthropic.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1024,
+          messages: [{ role: "user", content: prompt }],
+        });
+        
+        const textContent = message.content.find(c => c.type === "text");
+        scriptText = textContent?.text || "";
+      } else {
+        const OpenAI = (await import("openai")).default;
+        const openai = new OpenAI();
+        
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [{ role: "user", content: prompt }],
+        });
+        
+        scriptText = response.choices[0]?.message?.content || "";
+      }
+
+      const updated = await storage.updateProgram(program.id, {
+        scriptText,
+        status: "script_ready",
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error generating program script:", error);
+      res.status(500).json({ error: "Failed to generate program script" });
+    }
+  });
+
+  app.post("/api/programs/:id/generate-audio", async (req, res) => {
+    try {
+      const program = await storage.getProgram(req.params.id);
+      if (!program) {
+        return res.status(404).json({ error: "Program not found" });
+      }
+
+      if (!program.scriptText) {
+        return res.status(400).json({ error: "No script to generate audio from" });
+      }
+
+      const settings = await storage.getSettings();
+      if (!settings?.elevenLabsApiKey) {
+        return res.status(400).json({ error: "ElevenLabs API key not configured" });
+      }
+
+      const voicesList = await storage.getVoices();
+      const activeVoice = voicesList.find(v => v.isActive);
+      
+      if (!activeVoice) {
+        return res.status(400).json({ error: "No active voice configured" });
+      }
+
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${activeVoice.elevenLabsVoiceId}`, {
+        method: "POST",
+        headers: {
+          "xi-api-key": settings.elevenLabsApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: program.scriptText,
+          model_id: "eleven_multilingual_v2",
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error("ElevenLabs error:", error);
+        return res.status(500).json({ error: "Failed to generate audio" });
+      }
+
+      const audioBuffer = await response.arrayBuffer();
+      const base64Audio = Buffer.from(audioBuffer).toString("base64");
+      const audioUrl = `data:audio/mpeg;base64,${base64Audio}`;
+
+      const updated = await storage.updateProgram(program.id, {
+        audioUrl,
+        status: "ready",
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error generating program audio:", error);
+      res.status(500).json({ error: "Failed to generate program audio" });
+    }
+  });
+
   return httpServer;
 }
