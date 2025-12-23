@@ -1,0 +1,395 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Newspaper, Plus, Trash2, Edit2, Globe, Loader2, RefreshCw } from "lucide-react";
+import type { NewsSource } from "@shared/schema";
+
+const sourceFormSchema = z.object({
+  name: z.string().min(1, "Введите название"),
+  url: z.string().url("Введите корректный URL"),
+  type: z.string().default("rss"),
+  language: z.string().default("ru"),
+  description: z.string().optional(),
+  isActive: z.boolean().default(true),
+});
+
+type SourceFormValues = z.infer<typeof sourceFormSchema>;
+
+export default function NewsSources() {
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingSource, setEditingSource] = useState<NewsSource | null>(null);
+
+  const { data: sources = [], isLoading } = useQuery<NewsSource[]>({
+    queryKey: ["/api/news-sources"],
+  });
+
+  const form = useForm<SourceFormValues>({
+    resolver: zodResolver(sourceFormSchema),
+    defaultValues: {
+      name: "",
+      url: "",
+      type: "rss",
+      language: "ru",
+      description: "",
+      isActive: true,
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: SourceFormValues) => {
+      const response = await apiRequest("POST", "/api/news-sources", data);
+      return response.json() as Promise<NewsSource>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/news-sources"] });
+      setIsDialogOpen(false);
+      form.reset();
+      toast({ title: "Источник добавлен", description: "Новый источник новостей сохранён" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<SourceFormValues> }) => {
+      const response = await apiRequest("PATCH", `/api/news-sources/${id}`, data);
+      return response.json() as Promise<NewsSource>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/news-sources"] });
+      setIsDialogOpen(false);
+      setEditingSource(null);
+      form.reset();
+      toast({ title: "Источник обновлён" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/news-sources/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/news-sources"] });
+      toast({ title: "Источник удалён" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const fetchNewsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/fetch-news", {});
+      return response.json() as Promise<{ topics: Array<{ title: string; description: string; category: string }> }>;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Темы получены",
+        description: `Найдено ${data.topics?.length || 0} тем для подводок`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const openEditDialog = (source: NewsSource) => {
+    setEditingSource(source);
+    form.reset({
+      name: source.name,
+      url: source.url,
+      type: source.type,
+      language: source.language || "ru",
+      description: source.description || "",
+      isActive: source.isActive ?? true,
+    });
+    setIsDialogOpen(true);
+  };
+
+  const openCreateDialog = () => {
+    setEditingSource(null);
+    form.reset({
+      name: "",
+      url: "",
+      type: "rss",
+      language: "ru",
+      description: "",
+      isActive: true,
+    });
+    setIsDialogOpen(true);
+  };
+
+  const onSubmit = (data: SourceFormValues) => {
+    if (editingSource) {
+      updateMutation.mutate({ id: editingSource.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const toggleActive = (source: NewsSource) => {
+    updateMutation.mutate({ id: source.id, data: { isActive: !source.isActive } });
+  };
+
+  return (
+    <div className="flex-1 space-y-6 p-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Источники новостей</h1>
+          <p className="text-muted-foreground">Управление RSS и новостными источниками</p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => fetchNewsMutation.mutate()}
+            disabled={fetchNewsMutation.isPending || sources.length === 0}
+            data-testid="button-fetch-news"
+          >
+            {fetchNewsMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            Получить темы
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={openCreateDialog} data-testid="button-add-source">
+                <Plus className="mr-2 h-4 w-4" />
+                Добавить источник
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingSource ? "Редактировать источник" : "Добавить источник"}</DialogTitle>
+                <DialogDescription>
+                  {editingSource ? "Измените данные источника" : "Добавьте новый источник новостей"}
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Название</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Alanya News" {...field} data-testid="input-source-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="url"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>URL</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://example.com/rss" {...field} data-testid="input-source-url" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Тип</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-source-type">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="rss">RSS</SelectItem>
+                              <SelectItem value="api">API</SelectItem>
+                              <SelectItem value="web">Web</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="language"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Язык</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-source-language">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="ru">Русский</SelectItem>
+                              <SelectItem value="en">English</SelectItem>
+                              <SelectItem value="tr">Turkce</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Описание</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Краткое описание источника" {...field} data-testid="input-source-description" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between">
+                        <FormLabel>Активен</FormLabel>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-source-active" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                      Отмена
+                    </Button>
+                    <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-source">
+                      {(createMutation.isPending || updateMutation.isPending) && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Сохранить
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : sources.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Newspaper className="h-12 w-12 text-muted-foreground/50 mb-4" />
+            <p className="text-muted-foreground text-center">
+              Нет источников новостей. Добавьте первый источник.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {sources.map((source) => (
+            <Card key={source.id} data-testid={`card-source-${source.id}`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <CardTitle className="text-lg truncate">{source.name}</CardTitle>
+                    <CardDescription className="truncate">{source.url}</CardDescription>
+                  </div>
+                  <Badge variant={source.isActive ? "default" : "secondary"}>
+                    {source.isActive ? "Активен" : "Неактивен"}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline">
+                    <Globe className="mr-1 h-3 w-3" />
+                    {source.type?.toUpperCase()}
+                  </Badge>
+                  <Badge variant="outline">{source.language?.toUpperCase()}</Badge>
+                </div>
+                {source.description && (
+                  <p className="text-sm text-muted-foreground">{source.description}</p>
+                )}
+                <div className="flex items-center justify-between gap-2">
+                  <Switch
+                    checked={source.isActive ?? false}
+                    onCheckedChange={() => toggleActive(source)}
+                    data-testid={`switch-toggle-${source.id}`}
+                  />
+                  <div className="flex gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => openEditDialog(source)}
+                      data-testid={`button-edit-${source.id}`}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => deleteMutation.mutate(source.id)}
+                      disabled={deleteMutation.isPending}
+                      data-testid={`button-delete-${source.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {fetchNewsMutation.data?.topics && fetchNewsMutation.data.topics.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Рекомендуемые темы</CardTitle>
+            <CardDescription>Темы на основе источников новостей</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {fetchNewsMutation.data.topics.map((topic, idx) => (
+                <div key={idx} className="p-3 rounded-lg border space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{topic.title}</span>
+                    <Badge variant="secondary" className="text-xs">{topic.category}</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{topic.description}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}

@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import OpenAI from "openai";
-import { insertSettingsSchema, insertDialogSchema } from "@shared/schema";
+import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema } from "@shared/schema";
 import { z } from "zod";
 import { promises as fs } from "fs";
 import path from "path";
@@ -261,6 +261,164 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting dialog:", error);
       res.status(500).json({ error: "Failed to delete dialog" });
+    }
+  });
+
+  app.get("/api/news-sources", async (req, res) => {
+    try {
+      const sources = await storage.getNewsSources();
+      res.json(sources);
+    } catch (error) {
+      console.error("Error getting news sources:", error);
+      res.status(500).json({ error: "Failed to get news sources" });
+    }
+  });
+
+  app.post("/api/news-sources", async (req, res) => {
+    try {
+      const parsed = insertNewsSourceSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const source = await storage.createNewsSource(parsed.data);
+      res.json(source);
+    } catch (error) {
+      console.error("Error creating news source:", error);
+      res.status(500).json({ error: "Failed to create news source" });
+    }
+  });
+
+  app.patch("/api/news-sources/:id", async (req, res) => {
+    try {
+      const updated = await storage.updateNewsSource(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "News source not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating news source:", error);
+      res.status(500).json({ error: "Failed to update news source" });
+    }
+  });
+
+  app.delete("/api/news-sources/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteNewsSource(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "News source not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting news source:", error);
+      res.status(500).json({ error: "Failed to delete news source" });
+    }
+  });
+
+  app.post("/api/moderate-script", async (req, res) => {
+    try {
+      const { maleText, femaleText, dialogId } = req.body;
+      
+      if (!maleText && !femaleText) {
+        return res.status(400).json({ error: "Script text is required" });
+      }
+
+      const fullScript = `Мужской голос: ${maleText || ""}\n\nЖенский голос: ${femaleText || ""}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.1",
+        messages: [
+          {
+            role: "system",
+            content: `Ты - модератор контента для радиостанции "Алания FM". 
+Твоя задача - проверить радио-скрипт на соответствие следующим правилам:
+1. Нет оскорбительного или неуместного контента
+2. Нет политических или религиозных высказываний
+3. Нет рекламы конкурентов
+4. Язык подходит для семейной аудитории
+5. Контент соответствует формату радио
+
+Ответь в формате JSON:
+{
+  "approved": true/false,
+  "notes": "краткое описание проблем или 'Контент одобрен'",
+  "suggestions": ["список предложений по улучшению, если есть"]
+}`
+          },
+          { role: "user", content: fullScript }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 512,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "No response from AI moderator" });
+      }
+
+      const result = JSON.parse(content);
+
+      if (dialogId) {
+        await storage.updateDialog(dialogId, {
+          moderationStatus: result.approved ? "approved" : "flagged",
+          moderationNotes: result.notes,
+        });
+      }
+
+      res.json({
+        approved: result.approved,
+        notes: result.notes,
+        suggestions: result.suggestions || [],
+      });
+    } catch (error) {
+      console.error("Error moderating script:", error);
+      res.status(500).json({ error: "Failed to moderate script" });
+    }
+  });
+
+  app.post("/api/fetch-news", async (req, res) => {
+    try {
+      const { sourceId } = req.body;
+      const sources = sourceId 
+        ? [await storage.getNewsSource(sourceId)].filter(Boolean)
+        : await storage.getNewsSources();
+      
+      const activeSources = sources.filter(s => s?.isActive);
+      
+      if (activeSources.length === 0) {
+        return res.status(400).json({ error: "No active news sources found" });
+      }
+
+      const newsPrompt = `На основе источников новостей для экспатов в Аланье, Турция, 
+сгенерируй 3-5 актуальных тем для радио-подводок.
+Источники: ${activeSources.map(s => s?.name).join(", ")}
+
+Ответь в формате JSON:
+{
+  "topics": [
+    {"title": "заголовок темы", "description": "краткое описание", "category": "категория"}
+  ]
+}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.1",
+        messages: [
+          { role: "system", content: "Ты помогаешь находить интересные темы для радио-подводок из новостей." },
+          { role: "user", content: newsPrompt }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 1024,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "No response from AI" });
+      }
+
+      const result = JSON.parse(content);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching news:", error);
+      res.status(500).json({ error: "Failed to fetch news topics" });
     }
   });
 

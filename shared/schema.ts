@@ -52,8 +52,31 @@ export const dialogs = pgTable("dialogs", {
   slotNumber: integer("slot_number"),
   uploadedToYandex: boolean("uploaded_to_yandex").default(false),
   yandexPath: text("yandex_path"),
+  moderationStatus: text("moderation_status").default("pending"),
+  moderationNotes: text("moderation_notes"),
+  moderatedAt: timestamp("moderated_at"),
+  newsSourceIds: text("news_source_ids").array(),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
+
+export const newsSources = pgTable("news_sources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  type: text("type").notNull().default("rss"),
+  language: text("language").default("ru"),
+  isActive: boolean("is_active").default(true),
+  description: text("description"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertNewsSourceSchema = createInsertSchema(newsSources).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNewsSource = z.infer<typeof insertNewsSourceSchema>;
+export type NewsSource = typeof newsSources.$inferSelect;
 
 export const insertDialogSchema = createInsertSchema(dialogs).omit({
   id: true,

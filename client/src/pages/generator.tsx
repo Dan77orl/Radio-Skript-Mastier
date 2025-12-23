@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,8 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Wand2, Mic, User, Loader2, Sparkles, Sun, Palmtree, Coffee, MapPin, Utensils, Lightbulb, PlayCircle, Download } from "lucide-react";
+import { Wand2, Mic, MicOff, User, Loader2, Sparkles, Sun, Palmtree, Coffee, MapPin, Utensils, Lightbulb, PlayCircle, Download, Shield, CheckCircle, AlertTriangle } from "lucide-react";
 import type { Settings, Dialog } from "@shared/schema";
+
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
 
 const topicSuggestions = [
   { id: "weather", title: "Погода в Аланье", icon: Sun, category: "weather" },
@@ -37,6 +44,9 @@ export default function Generator() {
   const { toast } = useToast();
   const [generatedScript, setGeneratedScript] = useState<{ male: string; female: string } | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [moderationResult, setModerationResult] = useState<{ approved: boolean; notes: string; suggestions: string[] } | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const { data: settings, isSuccess: settingsLoaded } = useQuery<Settings>({
     queryKey: ["/api/settings"],
@@ -66,7 +76,7 @@ export default function Generator() {
   const generateScriptMutation = useMutation({
     mutationFn: async (data: { prompt: string }) => {
       const response = await apiRequest("POST", "/api/generate-script", data);
-      return response as { maleText: string; femaleText: string };
+      return response.json() as Promise<{ maleText: string; femaleText: string }>;
     },
     onSuccess: (data) => {
       setGeneratedScript({ male: data.maleText, female: data.femaleText });
@@ -87,7 +97,7 @@ export default function Generator() {
   const generateAudioMutation = useMutation({
     mutationFn: async (data: { maleText: string; femaleText: string; title: string; scheduledDate?: string; slotNumber?: number }) => {
       const response = await apiRequest("POST", "/api/generate-audio", data);
-      return response as Dialog;
+      return response.json() as Promise<Dialog>;
     },
     onSuccess: (data) => {
       setAudioUrl(data.audioUrl || null);
@@ -139,7 +149,7 @@ export default function Generator() {
   const improvePromptMutation = useMutation({
     mutationFn: async (data: { prompt: string }) => {
       const response = await apiRequest("POST", "/api/improve-prompt", data);
-      return response as { improvedPrompt: string };
+      return response.json() as Promise<{ improvedPrompt: string }>;
     },
     onSuccess: (data) => {
       form.setValue("prompt", data.improvedPrompt);
@@ -156,6 +166,101 @@ export default function Generator() {
       });
     },
   });
+
+  const moderateMutation = useMutation({
+    mutationFn: async (data: { maleText: string; femaleText: string }) => {
+      const response = await apiRequest("POST", "/api/moderate-script", data);
+      return response.json() as Promise<{ approved: boolean; notes: string; suggestions: string[] }>;
+    },
+    onSuccess: (data) => {
+      setModerationResult(data);
+      toast({
+        title: data.approved ? "Контент одобрен" : "Требуется проверка",
+        description: data.notes,
+        variant: data.approved ? "default" : "destructive",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка модерации",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onModerateScript = () => {
+    if (!generatedScript) return;
+    moderateMutation.mutate({
+      maleText: generatedScript.male,
+      femaleText: generatedScript.female,
+    });
+  };
+
+  const startVoiceInput = () => {
+    const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionClass) {
+      toast({
+        title: "Не поддерживается",
+        description: "Голосовой ввод не поддерживается вашим браузером",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const recognition = new SpeechRecognitionClass();
+    recognition.lang = "ru-RU";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      const currentPrompt = form.getValues("prompt");
+      if (event.results[event.results.length - 1].isFinal) {
+        form.setValue("prompt", currentPrompt + " " + transcript);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+      toast({
+        title: "Ошибка записи",
+        description: "Не удалось распознать речь",
+        variant: "destructive",
+      });
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const stopVoiceInput = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+  };
+
+  const toggleVoiceInput = () => {
+    if (isListening) {
+      stopVoiceInput();
+    } else {
+      startVoiceInput();
+    }
+  };
 
   return (
     <div className="flex-1 space-y-6 p-6">
@@ -217,6 +322,25 @@ export default function Generator() {
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
+                      variant={isListening ? "destructive" : "outline"}
+                      size="sm"
+                      onClick={toggleVoiceInput}
+                      data-testid="button-voice-input"
+                    >
+                      {isListening ? (
+                        <>
+                          <MicOff className="mr-2 h-4 w-4" />
+                          Остановить
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="mr-2 h-4 w-4" />
+                          Голосовой ввод
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
                       variant="outline"
                       size="sm"
                       onClick={() => improvePromptMutation.mutate({ prompt: form.getValues("prompt") })}
@@ -240,6 +364,12 @@ export default function Generator() {
                       Сбросить
                     </Button>
                   </div>
+                  {isListening && (
+                    <div className="flex items-center gap-2 text-sm text-destructive">
+                      <div className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+                      Запись... Говорите в микрофон
+                    </div>
+                  )}
                 </form>
               </Form>
             </CardContent>
@@ -375,6 +505,72 @@ export default function Generator() {
               )}
             </CardContent>
           </Card>
+
+          {generatedScript && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Shield className="h-5 w-5" />
+                      ИИ Модератор
+                    </CardTitle>
+                    <CardDescription>Проверка контента перед публикацией</CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={onModerateScript}
+                    disabled={moderateMutation.isPending}
+                    data-testid="button-moderate"
+                  >
+                    {moderateMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Shield className="mr-2 h-4 w-4" />
+                    )}
+                    Проверить контент
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {moderateMutation.isPending ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : moderationResult ? (
+                  <div className="space-y-3">
+                    <div className={`flex items-center gap-2 p-3 rounded-lg ${moderationResult.approved ? "bg-green-500/10" : "bg-yellow-500/10"}`}>
+                      {moderationResult.approved ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                      )}
+                      <span className={moderationResult.approved ? "text-green-700 dark:text-green-400" : "text-yellow-700 dark:text-yellow-400"}>
+                        {moderationResult.notes}
+                      </span>
+                    </div>
+                    {moderationResult.suggestions && moderationResult.suggestions.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Рекомендации:</p>
+                        <ul className="text-sm text-muted-foreground space-y-1">
+                          {moderationResult.suggestions.map((s, i) => (
+                            <li key={i} className="flex items-start gap-2">
+                              <span className="text-muted-foreground">-</span>
+                              {s}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Нажмите "Проверить контент" для модерации скрипта
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {generatedScript && (
             <Card>

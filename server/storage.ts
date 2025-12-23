@@ -1,4 +1,4 @@
-import { users, settings, dialogs, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog } from "@shared/schema";
+import { users, settings, dialogs, newsSources, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 
@@ -15,6 +15,12 @@ export interface IStorage {
   createDialog(dialog: InsertDialog): Promise<Dialog>;
   updateDialog(id: string, dialog: Partial<InsertDialog>): Promise<Dialog | undefined>;
   deleteDialog(id: string): Promise<boolean>;
+  
+  getNewsSources(): Promise<NewsSource[]>;
+  getNewsSource(id: string): Promise<NewsSource | undefined>;
+  createNewsSource(source: InsertNewsSource): Promise<NewsSource>;
+  updateNewsSource(id: string, source: Partial<InsertNewsSource>): Promise<NewsSource | undefined>;
+  deleteNewsSource(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -96,6 +102,33 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDialog(id: string): Promise<boolean> {
     const result = await db.delete(dialogs).where(eq(dialogs.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getNewsSources(): Promise<NewsSource[]> {
+    return db.select().from(newsSources).orderBy(desc(newsSources.createdAt));
+  }
+
+  async getNewsSource(id: string): Promise<NewsSource | undefined> {
+    const [source] = await db.select().from(newsSources).where(eq(newsSources.id, id));
+    return source || undefined;
+  }
+
+  async createNewsSource(insertSource: InsertNewsSource): Promise<NewsSource> {
+    const [source] = await db.insert(newsSources).values(insertSource).returning();
+    return source;
+  }
+
+  async updateNewsSource(id: string, updates: Partial<InsertNewsSource>): Promise<NewsSource | undefined> {
+    const [updated] = await db.update(newsSources)
+      .set(updates)
+      .where(eq(newsSources.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteNewsSource(id: string): Promise<boolean> {
+    const result = await db.delete(newsSources).where(eq(newsSources.id, id)).returning();
     return result.length > 0;
   }
 }
