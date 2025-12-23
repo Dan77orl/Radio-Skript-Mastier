@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema } from "@shared/schema";
+import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertVoiceSchema } from "@shared/schema";
 import { z } from "zod";
 import { promises as fs } from "fs";
 import path from "path";
@@ -230,8 +230,18 @@ export async function registerRoutes(
         return res.status(400).json({ error: "ElevenLabs API key not configured. Please add it in Settings." });
       }
 
-      const maleVoiceId = settings.maleVoiceId || "onwK4e9ZLuTAKqWW03F9";
-      const femaleVoiceId = settings.femaleVoiceId || "EXAVITQu4vr4xnSDxMaL";
+      const voicesList = await storage.getVoices();
+      const maleVoice = voicesList.find(v => v.gender === "male" && v.isActive);
+      const femaleVoice = voicesList.find(v => v.gender === "female" && v.isActive);
+      
+      if (!maleVoice || !femaleVoice) {
+        return res.status(400).json({ 
+          error: "Необходимо добавить активные мужской и женский голоса в разделе 'Голоса'" 
+        });
+      }
+      
+      const maleVoiceId = maleVoice.elevenLabsVoiceId;
+      const femaleVoiceId = femaleVoice.elevenLabsVoiceId;
 
       const generateVoice = async (text: string, voiceId: string): Promise<Buffer> => {
         const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
@@ -739,6 +749,106 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error generating ad:", error);
       res.status(500).json({ error: "Failed to generate ad" });
+    }
+  });
+
+  app.get("/api/voices", async (req, res) => {
+    try {
+      const voicesList = await storage.getVoices();
+      res.json(voicesList);
+    } catch (error) {
+      console.error("Error getting voices:", error);
+      res.status(500).json({ error: "Failed to get voices" });
+    }
+  });
+
+  app.post("/api/voices", async (req, res) => {
+    try {
+      const count = await storage.getVoicesCount();
+      if (count >= 4) {
+        return res.status(400).json({ error: "Maximum 4 voices allowed" });
+      }
+      const parsed = insertVoiceSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const voice = await storage.createVoice(parsed.data);
+      res.json(voice);
+    } catch (error) {
+      console.error("Error creating voice:", error);
+      res.status(500).json({ error: "Failed to create voice" });
+    }
+  });
+
+  app.patch("/api/voices/:id", async (req, res) => {
+    try {
+      const allowedFields = ["name", "gender", "isActive", "sortOrder", "description"];
+      const updates: Record<string, any> = {};
+      for (const key of allowedFields) {
+        if (key in req.body) {
+          updates[key] = req.body[key];
+        }
+      }
+      if (updates.gender && !["male", "female"].includes(updates.gender)) {
+        return res.status(400).json({ error: "Gender must be 'male' or 'female'" });
+      }
+      const updated = await storage.updateVoice(req.params.id, updates);
+      if (!updated) {
+        return res.status(404).json({ error: "Voice not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating voice:", error);
+      res.status(500).json({ error: "Failed to update voice" });
+    }
+  });
+
+  app.delete("/api/voices/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteVoice(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Voice not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting voice:", error);
+      res.status(500).json({ error: "Failed to delete voice" });
+    }
+  });
+
+  app.get("/api/elevenlabs/voices", async (req, res) => {
+    try {
+      const settings = await storage.getSettings();
+      if (!settings?.elevenLabsApiKey) {
+        return res.status(400).json({ error: "ElevenLabs API key not configured" });
+      }
+
+      const response = await fetch("https://api.elevenlabs.io/v1/voices", {
+        headers: {
+          "xi-api-key": settings.elevenLabsApiKey,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error("ElevenLabs API error:", error);
+        return res.status(response.status).json({ error: "Failed to fetch voices from ElevenLabs" });
+      }
+
+      const data = await response.json();
+      const voicesList = data.voices?.map((v: any) => ({
+        voice_id: v.voice_id,
+        name: v.name,
+        category: v.category,
+        labels: v.labels,
+        preview_url: v.preview_url,
+        description: v.description,
+      })) || [];
+
+      res.json({ voices: voicesList });
+    } catch (error) {
+      console.error("Error fetching ElevenLabs voices:", error);
+      res.status(500).json({ error: "Failed to fetch voices from ElevenLabs" });
     }
   });
 

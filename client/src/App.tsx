@@ -12,6 +12,7 @@ import Generator from "@/pages/generator";
 import Schedule from "@/pages/schedule";
 import NewsSources from "@/pages/news-sources";
 import AdsPage from "@/pages/ads";
+import VoicesPage from "@/pages/voices";
 import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/schedule" component={Schedule} />
       <Route path="/news-sources" component={NewsSources} />
       <Route path="/ads" component={AdsPage} />
+      <Route path="/voices" component={VoicesPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>

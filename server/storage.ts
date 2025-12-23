@@ -1,6 +1,6 @@
-import { users, settings, dialogs, newsSources, ads, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type Ad, type InsertAd } from "@shared/schema";
+import { users, settings, dialogs, newsSources, ads, voices, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type Ad, type InsertAd, type Voice, type InsertVoice } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, asc, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -27,6 +27,13 @@ export interface IStorage {
   createAd(ad: InsertAd): Promise<Ad>;
   updateAd(id: string, ad: Partial<InsertAd>): Promise<Ad | undefined>;
   deleteAd(id: string): Promise<boolean>;
+  
+  getVoices(): Promise<Voice[]>;
+  getVoice(id: string): Promise<Voice | undefined>;
+  createVoice(voice: InsertVoice): Promise<Voice>;
+  updateVoice(id: string, voice: Partial<InsertVoice>): Promise<Voice | undefined>;
+  deleteVoice(id: string): Promise<boolean>;
+  getVoicesCount(): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -163,6 +170,38 @@ export class DatabaseStorage implements IStorage {
   async deleteAd(id: string): Promise<boolean> {
     const result = await db.delete(ads).where(eq(ads.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getVoices(): Promise<Voice[]> {
+    return db.select().from(voices).orderBy(asc(voices.sortOrder));
+  }
+
+  async getVoice(id: string): Promise<Voice | undefined> {
+    const [voice] = await db.select().from(voices).where(eq(voices.id, id));
+    return voice || undefined;
+  }
+
+  async createVoice(insertVoice: InsertVoice): Promise<Voice> {
+    const [voice] = await db.insert(voices).values(insertVoice).returning();
+    return voice;
+  }
+
+  async updateVoice(id: string, updates: Partial<InsertVoice>): Promise<Voice | undefined> {
+    const [updated] = await db.update(voices)
+      .set(updates)
+      .where(eq(voices.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteVoice(id: string): Promise<boolean> {
+    const result = await db.delete(voices).where(eq(voices.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getVoicesCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(voices);
+    return result[0]?.count || 0;
   }
 }
 

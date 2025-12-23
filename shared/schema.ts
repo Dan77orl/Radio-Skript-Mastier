@@ -129,6 +129,26 @@ export const insertAdSchema = createInsertSchema(ads).omit({
 export type InsertAd = z.infer<typeof insertAdSchema>;
 export type Ad = typeof ads.$inferSelect;
 
+export const voices = pgTable("voices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  elevenLabsVoiceId: text("eleven_labs_voice_id").notNull(),
+  gender: text("gender").notNull().default("male"),
+  previewUrl: text("preview_url"),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertVoiceSchema = createInsertSchema(voices).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertVoice = z.infer<typeof insertVoiceSchema>;
+export type Voice = typeof voices.$inferSelect;
+
 export const topicSuggestionSchema = z.object({
   id: z.string(),
   title: z.string(),
