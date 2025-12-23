@@ -40,8 +40,11 @@ Preferred communication style: Simple, everyday language.
 3. **Dialogs** - Generated radio scripts with status tracking (pending, generating, ready, error)
 
 ### AI Integration Pattern
-- OpenAI-compatible API via Replit AI Integrations
-- Configured through environment variables `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL`
+- **Claude (Anthropic)**: Primary AI for text generation (better quality Russian texts)
+  - API key stored in database settings, entered via admin UI
+  - Uses claude-sonnet-4-20250514 model
+- **OpenAI** (via Replit AI Integrations): Fallback when Claude API key not configured
+  - Configured through environment variables `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL`
 - Includes batch processing utilities with rate limiting and retries
 - Image generation capabilities available through gpt-image-1 model
 
@@ -52,7 +55,8 @@ Preferred communication style: Simple, everyday language.
 - **Drizzle ORM**: Type-safe database operations with migration support via `drizzle-kit`
 
 ### AI Services
-- **OpenAI API** (via Replit AI Integrations): Used for dialog script generation
+- **Anthropic Claude**: Primary AI for dialog script generation (API key stored in settings)
+- **OpenAI API** (via Replit AI Integrations): Fallback for dialog script generation
 - **ElevenLabs**: Text-to-speech service for audio generation (API key stored in settings)
 
 ### Cloud Storage

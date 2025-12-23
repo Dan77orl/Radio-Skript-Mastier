@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema } from "@shared/schema";
 import { z } from "zod";
 import { promises as fs } from "fs";
@@ -11,6 +12,16 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
+
+const CLAUDE_MODEL = "claude-sonnet-4-20250514";
+
+async function getAnthropicClient(): Promise<Anthropic | null> {
+  const settings = await storage.getSettings();
+  if (!settings?.anthropicApiKey) {
+    return null;
+  }
+  return new Anthropic({ apiKey: settings.anthropicApiKey });
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -84,8 +95,35 @@ export async function registerRoutes(
 
 Реплики должны чередоваться логично, как естественный диалог.`;
 
+      const anthropic = await getAnthropicClient();
+      
+      if (anthropic) {
+        const response = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: [{ role: "user", content: prompt }],
+        });
+
+        const textContent = response.content.find(c => c.type === "text");
+        if (!textContent || textContent.type !== "text") {
+          return res.status(500).json({ error: "No response from Claude" });
+        }
+
+        const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          return res.status(500).json({ error: "Invalid response format from Claude" });
+        }
+
+        const parsed = JSON.parse(jsonMatch[0]);
+        return res.json({
+          maleText: parsed.maleText || "",
+          femaleText: parsed.femaleText || "",
+        });
+      }
+
       const response = await openai.chat.completions.create({
-        model: "gpt-5.1",
+        model: "gpt-4.1",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: prompt }
@@ -117,17 +155,31 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Prompt is required" });
       }
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-5.1",
-        messages: [
-          { 
-            role: "system", 
-            content: `Ты помогаешь улучшать промпты для генерации радио-диалогов.
+      const systemPrompt = `Ты помогаешь улучшать промпты для генерации радио-диалогов.
 Улучши данный промпт, сделав его более конкретным и детализированным.
 Добавь детали о тоне, стиле, возможных шутках или интересных фактах.
 Сохрани суть оригинального промпта.
-Верни ТОЛЬКО улучшенный промпт, без объяснений.`
-          },
+Верни ТОЛЬКО улучшенный промпт, без объяснений.`;
+
+      const anthropic = await getAnthropicClient();
+
+      if (anthropic) {
+        const response = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 512,
+          system: systemPrompt,
+          messages: [{ role: "user", content: prompt }],
+        });
+
+        const textContent = response.content.find(c => c.type === "text");
+        const improvedPrompt = textContent && textContent.type === "text" ? textContent.text : prompt;
+        return res.json({ improvedPrompt });
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4.1",
+        messages: [
+          { role: "system", content: systemPrompt },
           { role: "user", content: prompt }
         ],
         max_completion_tokens: 512,
@@ -324,12 +376,7 @@ export async function registerRoutes(
 
       const fullScript = `Мужской голос: ${maleText || ""}\n\nЖенский голос: ${femaleText || ""}`;
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-5.1",
-        messages: [
-          {
-            role: "system",
-            content: `Ты - модератор контента для радиостанции "Алания FM". 
+      const systemPrompt = `Ты - модератор контента для радиостанции "Алания FM". 
 Твоя задача - проверить радио-скрипт на соответствие следующим правилам:
 1. Нет оскорбительного или неуместного контента
 2. Нет политических или религиозных высказываний
@@ -342,20 +389,48 @@ export async function registerRoutes(
   "approved": true/false,
   "notes": "краткое описание проблем или 'Контент одобрен'",
   "suggestions": ["список предложений по улучшению, если есть"]
-}`
-          },
-          { role: "user", content: fullScript }
-        ],
-        response_format: { type: "json_object" },
-        max_completion_tokens: 512,
-      });
+}`;
 
-      const content = response.choices[0]?.message?.content;
-      if (!content) {
-        return res.status(500).json({ error: "No response from AI moderator" });
+      let result;
+      const anthropic = await getAnthropicClient();
+
+      if (anthropic) {
+        const response = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 512,
+          system: systemPrompt,
+          messages: [{ role: "user", content: fullScript }],
+        });
+
+        const textContent = response.content.find(c => c.type === "text");
+        if (!textContent || textContent.type !== "text") {
+          return res.status(500).json({ error: "No response from Claude moderator" });
+        }
+
+        const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          return res.status(500).json({ error: "Invalid response format from Claude" });
+        }
+
+        result = JSON.parse(jsonMatch[0]);
+      } else {
+        const response = await openai.chat.completions.create({
+          model: "gpt-4.1",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: fullScript }
+          ],
+          response_format: { type: "json_object" },
+          max_completion_tokens: 512,
+        });
+
+        const content = response.choices[0]?.message?.content;
+        if (!content) {
+          return res.status(500).json({ error: "No response from AI moderator" });
+        }
+
+        result = JSON.parse(content);
       }
-
-      const result = JSON.parse(content);
 
       if (dialogId) {
         await storage.updateDialog(dialogId, {

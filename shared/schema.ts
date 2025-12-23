@@ -20,10 +20,12 @@ export type User = typeof users.$inferSelect;
 export const settings = pgTable("settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   elevenLabsApiKey: text("eleven_labs_api_key"),
+  anthropicApiKey: text("anthropic_api_key"),
   yandexDiskToken: text("yandex_disk_token"),
   maleVoiceId: text("male_voice_id").default("onwK4e9ZLuTAKqWW03F9"),
   femaleVoiceId: text("female_voice_id").default("EXAVITQu4vr4xnSDxMaL"),
   dailyDialogsCount: integer("daily_dialogs_count").default(12),
+  aiProvider: text("ai_provider").default("anthropic"),
   defaultPrompt: text("default_prompt").default(`Создай короткий диалог между ведущими радио "Алания FM" (мужчина и женщина). 
 Тема: жизнь экспатов в Аланье, Турция. 
 Стиль: дружелюбный, непринужденный, с юмором.

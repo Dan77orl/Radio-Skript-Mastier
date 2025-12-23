@@ -18,6 +18,7 @@ import type { Settings } from "@shared/schema";
 
 const settingsFormSchema = z.object({
   elevenLabsApiKey: z.string().optional(),
+  anthropicApiKey: z.string().optional(),
   yandexDiskToken: z.string().optional(),
   maleVoiceId: z.string().min(1, "Укажите ID голоса"),
   femaleVoiceId: z.string().min(1, "Укажите ID голоса"),
@@ -30,6 +31,7 @@ type SettingsFormValues = z.infer<typeof settingsFormSchema>;
 export default function SettingsPage() {
   const { toast } = useToast();
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showYandexToken, setShowYandexToken] = useState(false);
 
   const { data: settings, isLoading } = useQuery<Settings>({
@@ -40,6 +42,7 @@ export default function SettingsPage() {
     resolver: zodResolver(settingsFormSchema),
     defaultValues: {
       elevenLabsApiKey: "",
+      anthropicApiKey: "",
       yandexDiskToken: "",
       maleVoiceId: "onwK4e9ZLuTAKqWW03F9",
       femaleVoiceId: "EXAVITQu4vr4xnSDxMaL",
@@ -55,6 +58,7 @@ export default function SettingsPage() {
     if (settings) {
       form.reset({
         elevenLabsApiKey: settings.elevenLabsApiKey || "",
+        anthropicApiKey: settings.anthropicApiKey || "",
         yandexDiskToken: settings.yandexDiskToken || "",
         maleVoiceId: settings.maleVoiceId || "onwK4e9ZLuTAKqWW03F9",
         femaleVoiceId: settings.femaleVoiceId || "EXAVITQu4vr4xnSDxMaL",
@@ -179,6 +183,46 @@ export default function SettingsPage() {
                       Получите ключ на{" "}
                       <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary underline">
                         elevenlabs.io
+                      </a>
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Separator />
+
+              <FormField
+                control={form.control}
+                name="anthropicApiKey"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Claude (Anthropic) API Key</FormLabel>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <div className="relative flex-1">
+                          <Input
+                            type={showAnthropicKey ? "text" : "password"}
+                            placeholder="Введите API ключ Anthropic"
+                            {...field}
+                            data-testid="input-anthropic-key"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-0 top-0"
+                            onClick={() => setShowAnthropicKey(!showAnthropicKey)}
+                          >
+                            {showAnthropicKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </FormControl>
+                    </div>
+                    <FormDescription>
+                      Claude создаёт более качественные тексты. Получите ключ на{" "}
+                      <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                        console.anthropic.com
                       </a>
                     </FormDescription>
                     <FormMessage />
