@@ -1,4 +1,4 @@
-import { users, settings, dialogs, newsSources, ads, voices, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type Ad, type InsertAd, type Voice, type InsertVoice } from "@shared/schema";
+import { users, settings, dialogs, newsSources, ads, voices, programTypes, programs, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type Ad, type InsertAd, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql } from "drizzle-orm";
 
@@ -34,6 +34,19 @@ export interface IStorage {
   updateVoice(id: string, voice: Partial<InsertVoice>): Promise<Voice | undefined>;
   deleteVoice(id: string): Promise<boolean>;
   getVoicesCount(): Promise<number>;
+  
+  getProgramTypes(): Promise<ProgramType[]>;
+  getProgramType(id: string): Promise<ProgramType | undefined>;
+  createProgramType(programType: InsertProgramType): Promise<ProgramType>;
+  updateProgramType(id: string, programType: Partial<InsertProgramType>): Promise<ProgramType | undefined>;
+  deleteProgramType(id: string): Promise<boolean>;
+  
+  getPrograms(): Promise<Program[]>;
+  getProgramsByType(typeId: string): Promise<Program[]>;
+  getProgram(id: string): Promise<Program | undefined>;
+  createProgram(program: InsertProgram): Promise<Program>;
+  updateProgram(id: string, program: Partial<InsertProgram>): Promise<Program | undefined>;
+  deleteProgram(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -202,6 +215,64 @@ export class DatabaseStorage implements IStorage {
   async getVoicesCount(): Promise<number> {
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(voices);
     return result[0]?.count || 0;
+  }
+
+  async getProgramTypes(): Promise<ProgramType[]> {
+    return db.select().from(programTypes).orderBy(asc(programTypes.sortOrder));
+  }
+
+  async getProgramType(id: string): Promise<ProgramType | undefined> {
+    const [programType] = await db.select().from(programTypes).where(eq(programTypes.id, id));
+    return programType || undefined;
+  }
+
+  async createProgramType(insertProgramType: InsertProgramType): Promise<ProgramType> {
+    const [programType] = await db.insert(programTypes).values(insertProgramType).returning();
+    return programType;
+  }
+
+  async updateProgramType(id: string, updates: Partial<InsertProgramType>): Promise<ProgramType | undefined> {
+    const [updated] = await db.update(programTypes)
+      .set(updates)
+      .where(eq(programTypes.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteProgramType(id: string): Promise<boolean> {
+    const result = await db.delete(programTypes).where(eq(programTypes.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getPrograms(): Promise<Program[]> {
+    return db.select().from(programs).orderBy(desc(programs.createdAt));
+  }
+
+  async getProgramsByType(typeId: string): Promise<Program[]> {
+    return db.select().from(programs).where(eq(programs.programTypeId, typeId)).orderBy(desc(programs.createdAt));
+  }
+
+  async getProgram(id: string): Promise<Program | undefined> {
+    const [program] = await db.select().from(programs).where(eq(programs.id, id));
+    return program || undefined;
+  }
+
+  async createProgram(insertProgram: InsertProgram): Promise<Program> {
+    const [program] = await db.insert(programs).values(insertProgram).returning();
+    return program;
+  }
+
+  async updateProgram(id: string, updates: Partial<InsertProgram>): Promise<Program | undefined> {
+    const [updated] = await db.update(programs)
+      .set(updates)
+      .where(eq(programs.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteProgram(id: string): Promise<boolean> {
+    const result = await db.delete(programs).where(eq(programs.id, id)).returning();
+    return result.length > 0;
   }
 }
 

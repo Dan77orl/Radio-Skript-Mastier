@@ -149,6 +149,54 @@ export const insertVoiceSchema = createInsertSchema(voices).omit({
 export type InsertVoice = z.infer<typeof insertVoiceSchema>;
 export type Voice = typeof voices.$inferSelect;
 
+export const programTypes = pgTable("program_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  defaultPrompt: text("default_prompt").notNull(),
+  defaultDurationSeconds: integer("default_duration_seconds").default(60),
+  icon: text("icon").default("radio"),
+  isActive: boolean("is_active").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertProgramTypeSchema = createInsertSchema(programTypes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertProgramType = z.infer<typeof insertProgramTypeSchema>;
+export type ProgramType = typeof programTypes.$inferSelect;
+
+export const programs = pgTable("programs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  programTypeId: varchar("program_type_id").notNull(),
+  title: text("title").notNull(),
+  prompt: text("prompt"),
+  scriptText: text("script_text"),
+  audioUrl: text("audio_url"),
+  duration: integer("duration"),
+  status: text("status").notNull().default("pending"),
+  scheduledDate: text("scheduled_date"),
+  slotNumber: integer("slot_number"),
+  uploadedToYandex: boolean("uploaded_to_yandex").default(false),
+  yandexPath: text("yandex_path"),
+  moderationStatus: text("moderation_status").default("pending"),
+  moderationNotes: text("moderation_notes"),
+  moderatedAt: timestamp("moderated_at"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertProgramSchema = createInsertSchema(programs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertProgram = z.infer<typeof insertProgramSchema>;
+export type Program = typeof programs.$inferSelect;
+
 export const topicSuggestionSchema = z.object({
   id: z.string(),
   title: z.string(),
