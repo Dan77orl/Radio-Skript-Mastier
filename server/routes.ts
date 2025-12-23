@@ -450,6 +450,109 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/auto-generate-day", async (req, res) => {
+    try {
+      const { date, prompt, count } = req.body;
+      
+      if (!date) {
+        return res.status(400).json({ error: "Date is required" });
+      }
+
+      const settings = await storage.getSettings();
+      const dailyCount = count || settings?.dailyDialogsCount || 12;
+      const basePrompt = prompt || settings?.defaultPrompt || "";
+
+      const systemPrompt = `Ты - сценарист для радио "Алания FM" в Аланье, Турция.
+Создай ${dailyCount} разных коротких диалогов между двумя ведущими: мужчиной и женщиной.
+Каждый диалог должен быть на русском языке, дружелюбным и естественным.
+Длительность каждого диалога при чтении - 30-50 секунд.
+Темы должны быть разнообразными: погода, местные события, советы экспатам, интересные факты о Турции, еда, культура, и т.д.
+
+ВАЖНО: Ответь в формате JSON массив:
+{
+  "dialogs": [
+    {
+      "title": "краткое название темы",
+      "maleText": "все реплики мужчины через пробел",
+      "femaleText": "все реплики женщины через пробел"
+    }
+  ]
+}
+
+Создай ровно ${dailyCount} диалогов.`;
+
+      const anthropic = await getAnthropicClient();
+      let dialogsData: { dialogs: Array<{ title: string; maleText: string; femaleText: string }> };
+
+      if (anthropic) {
+        const response = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [{ role: "user", content: basePrompt || "Создай подводки на день" }],
+        });
+
+        const textContent = response.content.find(c => c.type === "text");
+        if (!textContent || textContent.type !== "text") {
+          return res.status(500).json({ error: "No response from Claude" });
+        }
+
+        const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          return res.status(500).json({ error: "Invalid response format from Claude" });
+        }
+
+        dialogsData = JSON.parse(jsonMatch[0]);
+      } else {
+        const response = await openai.chat.completions.create({
+          model: "gpt-4.1",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: basePrompt || "Создай подводки на день" }
+          ],
+          response_format: { type: "json_object" },
+          max_completion_tokens: 4096,
+        });
+
+        const content = response.choices[0]?.message?.content;
+        if (!content) {
+          return res.status(500).json({ error: "No response from AI" });
+        }
+
+        dialogsData = JSON.parse(content);
+      }
+
+      if (!dialogsData.dialogs || !Array.isArray(dialogsData.dialogs)) {
+        return res.status(500).json({ error: "Invalid response format" });
+      }
+
+      const createdDialogs = [];
+      for (let i = 0; i < dialogsData.dialogs.length; i++) {
+        const dialog = dialogsData.dialogs[i];
+        const created = await storage.createDialog({
+          title: dialog.title || `Подводка ${i + 1}`,
+          prompt: basePrompt,
+          maleText: dialog.maleText,
+          femaleText: dialog.femaleText,
+          scriptText: `${dialog.maleText}\n\n${dialog.femaleText}`,
+          status: "pending",
+          scheduledDate: date,
+          slotNumber: i + 1,
+        });
+        createdDialogs.push(created);
+      }
+
+      res.json({ 
+        success: true, 
+        count: createdDialogs.length,
+        dialogs: createdDialogs 
+      });
+    } catch (error) {
+      console.error("Error auto-generating day:", error);
+      res.status(500).json({ error: "Failed to auto-generate dialogs" });
+    }
+  });
+
   app.post("/api/fetch-news", async (req, res) => {
     try {
       const { sourceId } = req.body;

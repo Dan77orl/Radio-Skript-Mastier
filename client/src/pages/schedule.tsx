@@ -1,10 +1,23 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight, CheckCircle, Clock, AlertCircle, Mic, PlayCircle, Calendar as CalendarIcon } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog as DialogUI,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ChevronLeft, ChevronRight, CheckCircle, Clock, AlertCircle, Mic, PlayCircle, Calendar as CalendarIcon, Sparkles, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Dialog, Settings } from "@shared/schema";
 
 function getStatusInfo(status: string) {
@@ -21,7 +34,11 @@ function getStatusInfo(status: string) {
 }
 
 export default function Schedule() {
+  const { toast } = useToast();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [autoGenPrompt, setAutoGenPrompt] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const { data: dialogs, isLoading: dialogsLoading } = useQuery<Dialog[]>({
     queryKey: ["/api/dialogs"],
@@ -32,6 +49,43 @@ export default function Schedule() {
   });
 
   const dailyCount = settings?.dailyDialogsCount || 12;
+
+  const autoGenerateMutation = useMutation({
+    mutationFn: async (data: { date: string; prompt?: string }) => {
+      const response = await apiRequest("POST", "/api/auto-generate-day", data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dialogs"] });
+      setDialogOpen(false);
+      setAutoGenPrompt("");
+      toast({
+        title: "Подводки созданы",
+        description: `Создано ${data.count} подводок на день`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось создать подводки",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAutoGenerate = (date: Date) => {
+    setSelectedDate(date);
+    setAutoGenPrompt(settings?.defaultPrompt || "");
+    setDialogOpen(true);
+  };
+
+  const submitAutoGenerate = () => {
+    if (!selectedDate) return;
+    autoGenerateMutation.mutate({
+      date: selectedDate.toISOString().split("T")[0],
+      prompt: autoGenPrompt || undefined,
+    });
+  };
 
   const getWeekDays = () => {
     const days = [];
@@ -155,6 +209,17 @@ export default function Schedule() {
                         </div>
                       )}
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={() => handleAutoGenerate(day)}
+                      disabled={autoGenerateMutation.isPending}
+                      data-testid={`button-autogen-${day.toISOString().split("T")[0]}`}
+                    >
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      Авто
+                    </Button>
                   </div>
                 );
               })}
@@ -219,6 +284,62 @@ export default function Schedule() {
           )}
         </CardContent>
       </Card>
+
+      <DialogUI open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              Авто-генерация подводок
+            </DialogTitle>
+            <DialogDescription>
+              {selectedDate && (
+                <>
+                  Создать {dailyCount} подводок на {selectedDate.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="auto-prompt">Промпт для генерации</Label>
+              <Textarea
+                id="auto-prompt"
+                placeholder="Опишите темы и стиль подводок..."
+                value={autoGenPrompt}
+                onChange={(e) => setAutoGenPrompt(e.target.value)}
+                rows={6}
+                data-testid="textarea-auto-prompt"
+              />
+              <p className="text-xs text-muted-foreground">
+                ИИ создаст разнообразные подводки на основе этого промпта
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button
+              onClick={submitAutoGenerate}
+              disabled={autoGenerateMutation.isPending}
+              data-testid="button-submit-autogen"
+            >
+              {autoGenerateMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Генерация...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Создать подводки
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </DialogUI>
     </div>
   );
 }
