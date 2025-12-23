@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema } from "@shared/schema";
+import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema } from "@shared/schema";
 import { z } from "zod";
 import { promises as fs } from "fs";
 import path from "path";
@@ -597,6 +597,148 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching news:", error);
       res.status(500).json({ error: "Failed to fetch news topics" });
+    }
+  });
+
+  app.get("/api/ads", async (req, res) => {
+    try {
+      const adsList = await storage.getAds();
+      res.json(adsList);
+    } catch (error) {
+      console.error("Error getting ads:", error);
+      res.status(500).json({ error: "Failed to get ads" });
+    }
+  });
+
+  app.post("/api/ads", async (req, res) => {
+    try {
+      const parsed = insertAdSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const ad = await storage.createAd(parsed.data);
+      res.json(ad);
+    } catch (error) {
+      console.error("Error creating ad:", error);
+      res.status(500).json({ error: "Failed to create ad" });
+    }
+  });
+
+  app.patch("/api/ads/:id", async (req, res) => {
+    try {
+      const updated = await storage.updateAd(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "Ad not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating ad:", error);
+      res.status(500).json({ error: "Failed to update ad" });
+    }
+  });
+
+  app.delete("/api/ads/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteAd(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Ad not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting ad:", error);
+      res.status(500).json({ error: "Failed to delete ad" });
+    }
+  });
+
+  app.post("/api/generate-ad", async (req, res) => {
+    try {
+      const { prompt, clientName, category } = req.body;
+      if (!prompt || prompt.length < 10) {
+        return res.status(400).json({ error: "Prompt is required and must be at least 10 characters" });
+      }
+
+      const systemPrompt = `Ты - копирайтер рекламного агентства для радио "Алания FM" в Аланье, Турция.
+Твоя задача - написать короткий рекламный ролик в формате диалога между двумя ведущими: мужчиной и женщиной.
+Реклама должна быть на русском языке, живой, запоминающейся и эффективной.
+Длительность при чтении - 20-40 секунд.
+
+ВАЖНО: Ответ должен быть в формате JSON:
+{
+  "title": "краткое название рекламы",
+  "maleText": "все реплики мужчины через пробел",
+  "femaleText": "все реплики женщины через пробел"
+}
+
+Реклама должна быть ненавязчивой, но убедительной.`;
+
+      const anthropic = await getAnthropicClient();
+      
+      if (anthropic) {
+        const response = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: [{ role: "user", content: prompt }],
+        });
+
+        const textContent = response.content.find(c => c.type === "text");
+        if (!textContent || textContent.type !== "text") {
+          return res.status(500).json({ error: "No response from Claude" });
+        }
+
+        const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          return res.status(500).json({ error: "Invalid response format from Claude" });
+        }
+
+        const parsed = JSON.parse(jsonMatch[0]);
+        
+        const ad = await storage.createAd({
+          title: parsed.title || "Реклама",
+          clientName: clientName || null,
+          prompt: prompt,
+          maleText: parsed.maleText,
+          femaleText: parsed.femaleText,
+          scriptText: `${parsed.maleText}\n\n${parsed.femaleText}`,
+          status: "pending",
+          category: category || "general",
+        });
+
+        return res.json(ad);
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4.1",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 1024,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "No response from AI" });
+      }
+
+      const parsed = JSON.parse(content);
+      
+      const ad = await storage.createAd({
+        title: parsed.title || "Реклама",
+        clientName: clientName || null,
+        prompt: prompt,
+        maleText: parsed.maleText,
+        femaleText: parsed.femaleText,
+        scriptText: `${parsed.maleText}\n\n${parsed.femaleText}`,
+        status: "pending",
+        category: category || "general",
+      });
+
+      res.json(ad);
+    } catch (error) {
+      console.error("Error generating ad:", error);
+      res.status(500).json({ error: "Failed to generate ad" });
     }
   });
 

@@ -105,6 +105,30 @@ export const insertPromptTemplateSchema = createInsertSchema(promptTemplates).om
 export type InsertPromptTemplate = z.infer<typeof insertPromptTemplateSchema>;
 export type PromptTemplate = typeof promptTemplates.$inferSelect;
 
+export const ads = pgTable("ads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  clientName: text("client_name"),
+  prompt: text("prompt").notNull(),
+  scriptText: text("script_text"),
+  maleText: text("male_text"),
+  femaleText: text("female_text"),
+  audioUrl: text("audio_url"),
+  duration: integer("duration"),
+  status: text("status").notNull().default("pending"),
+  category: text("category").default("general"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertAdSchema = createInsertSchema(ads).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAd = z.infer<typeof insertAdSchema>;
+export type Ad = typeof ads.$inferSelect;
+
 export const topicSuggestionSchema = z.object({
   id: z.string(),
   title: z.string(),

@@ -1,4 +1,4 @@
-import { users, settings, dialogs, newsSources, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource } from "@shared/schema";
+import { users, settings, dialogs, newsSources, ads, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type Ad, type InsertAd } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 
@@ -21,6 +21,12 @@ export interface IStorage {
   createNewsSource(source: InsertNewsSource): Promise<NewsSource>;
   updateNewsSource(id: string, source: Partial<InsertNewsSource>): Promise<NewsSource | undefined>;
   deleteNewsSource(id: string): Promise<boolean>;
+  
+  getAds(): Promise<Ad[]>;
+  getAd(id: string): Promise<Ad | undefined>;
+  createAd(ad: InsertAd): Promise<Ad>;
+  updateAd(id: string, ad: Partial<InsertAd>): Promise<Ad | undefined>;
+  deleteAd(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -129,6 +135,33 @@ export class DatabaseStorage implements IStorage {
 
   async deleteNewsSource(id: string): Promise<boolean> {
     const result = await db.delete(newsSources).where(eq(newsSources.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getAds(): Promise<Ad[]> {
+    return db.select().from(ads).orderBy(desc(ads.createdAt));
+  }
+
+  async getAd(id: string): Promise<Ad | undefined> {
+    const [ad] = await db.select().from(ads).where(eq(ads.id, id));
+    return ad || undefined;
+  }
+
+  async createAd(insertAd: InsertAd): Promise<Ad> {
+    const [ad] = await db.insert(ads).values(insertAd).returning();
+    return ad;
+  }
+
+  async updateAd(id: string, updates: Partial<InsertAd>): Promise<Ad | undefined> {
+    const [updated] = await db.update(ads)
+      .set(updates)
+      .where(eq(ads.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteAd(id: string): Promise<boolean> {
+    const result = await db.delete(ads).where(eq(ads.id, id)).returning();
     return result.length > 0;
   }
 }

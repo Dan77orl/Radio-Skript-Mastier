@@ -11,6 +11,7 @@ import Dashboard from "@/pages/dashboard";
 import Generator from "@/pages/generator";
 import Schedule from "@/pages/schedule";
 import NewsSources from "@/pages/news-sources";
+import AdsPage from "@/pages/ads";
 import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/generator" component={Generator} />
       <Route path="/schedule" component={Schedule} />
       <Route path="/news-sources" component={NewsSources} />
+      <Route path="/ads" component={AdsPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>
