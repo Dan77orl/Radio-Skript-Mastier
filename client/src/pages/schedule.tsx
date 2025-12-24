@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, CheckCircle, Clock, AlertCircle, Mic, PlayCircle, Calendar as CalendarIcon, Sparkles, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle, Clock, AlertCircle, Mic, PlayCircle, PauseCircle, Calendar as CalendarIcon, Sparkles, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Dialog, Settings } from "@shared/schema";
@@ -39,10 +39,39 @@ export default function Schedule() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [autoGenPrompt, setAutoGenPrompt] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [playingDialogId, setPlayingDialogId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: dialogs, isLoading: dialogsLoading } = useQuery<Dialog[]>({
     queryKey: ["/api/dialogs"],
   });
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const playAudio = (audioUrl: string, dialogId: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    if (playingDialogId === dialogId) {
+      setPlayingDialogId(null);
+      return;
+    }
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+    audio.play().catch((err) => {
+      console.error("Error playing audio:", err);
+      toast({ title: "Ошибка воспроизведения", variant: "destructive" });
+    });
+    setPlayingDialogId(dialogId);
+    audio.onended = () => setPlayingDialogId(null);
+  };
 
   const { data: settings, isLoading: settingsLoading } = useQuery<Settings>({
     queryKey: ["/api/settings"],
@@ -273,8 +302,17 @@ export default function Schedule() {
                       </p>
                     </div>
                     {slotDialog?.audioUrl && (
-                      <Button size="icon" variant="ghost">
-                        <PlayCircle className="h-4 w-4" />
+                      <Button 
+                        size="icon" 
+                        variant="ghost"
+                        onClick={() => playAudio(slotDialog.audioUrl!, slotDialog.id)}
+                        data-testid={`button-play-dialog-${slotDialog.id}`}
+                      >
+                        {playingDialogId === slotDialog.id ? (
+                          <PauseCircle className="h-4 w-4" />
+                        ) : (
+                          <PlayCircle className="h-4 w-4" />
+                        )}
                       </Button>
                     )}
                   </div>

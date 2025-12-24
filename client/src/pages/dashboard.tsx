@@ -1,10 +1,11 @@
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
-import { Mic, Calendar, CheckCircle, Clock, AlertCircle, Plus, PlayCircle } from "lucide-react";
+import { Mic, Calendar, CheckCircle, Clock, AlertCircle, Plus, PlayCircle, PauseCircle } from "lucide-react";
 import type { Dialog, Settings } from "@shared/schema";
 
 function StatCard({ 
@@ -52,6 +53,9 @@ function getStatusBadge(status: string) {
 }
 
 export default function Dashboard() {
+  const [playingDialogId, setPlayingDialogId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   const { data: dialogs, isLoading: dialogsLoading } = useQuery<Dialog[]>({
     queryKey: ["/api/dialogs"],
   });
@@ -59,6 +63,30 @@ export default function Dashboard() {
   const { data: settings, isLoading: settingsLoading } = useQuery<Settings>({
     queryKey: ["/api/settings"],
   });
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const playAudio = (audioUrl: string, dialogId: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    if (playingDialogId === dialogId) {
+      setPlayingDialogId(null);
+      return;
+    }
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+    audio.play().catch((err) => console.error("Error playing audio:", err));
+    setPlayingDialogId(dialogId);
+    audio.onended = () => setPlayingDialogId(null);
+  };
 
   const today = new Date().toISOString().split("T")[0];
   const todayDialogs = dialogs?.filter(d => d.scheduledDate === today) || [];
@@ -150,8 +178,17 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 shrink-0">
                       {getStatusBadge(dialog.status)}
                       {dialog.audioUrl && (
-                        <Button size="icon" variant="ghost" data-testid={`button-play-${dialog.id}`}>
-                          <PlayCircle className="h-4 w-4" />
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          data-testid={`button-play-${dialog.id}`}
+                          onClick={() => playAudio(dialog.audioUrl!, dialog.id)}
+                        >
+                          {playingDialogId === dialog.id ? (
+                            <PauseCircle className="h-4 w-4" />
+                          ) : (
+                            <PlayCircle className="h-4 w-4" />
+                          )}
                         </Button>
                       )}
                     </div>
@@ -163,7 +200,7 @@ export default function Dashboard() {
                 <Mic className="h-12 w-12 text-muted-foreground/50 mb-4" />
                 <p className="text-muted-foreground">Пока нет подводок</p>
                 <Link href="/generator">
-                  <Button variant="link" className="mt-2">Создать первую</Button>
+                  <Button variant="ghost" className="mt-2">Создать первую</Button>
                 </Link>
               </div>
             )}
