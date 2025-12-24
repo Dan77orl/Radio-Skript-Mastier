@@ -101,7 +101,9 @@ export default function Dashboard() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Панель управления</h1>
-          <p className="text-muted-foreground">Генератор подводок для радио Alanya FM</p>
+          <p className="text-muted-foreground">
+            Генератор подводок для радио {settings?.stationName || "Радио"}
+          </p>
         </div>
         <Link href="/generator">
           <Button data-testid="button-new-dialog">
