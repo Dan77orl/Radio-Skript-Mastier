@@ -211,8 +211,11 @@ export default function VoicesPage() {
   };
 
   const getProgramTypeNames = (ids: string[] | null | undefined): string[] => {
-    if (!ids || !programTypes) return [];
-    return ids.map(id => programTypes.find(pt => pt.id === id)?.name).filter(Boolean) as string[];
+    if (!ids) return [];
+    return ids.map(id => {
+      if (id === "dialogs") return "Подводки / Диалоги";
+      return programTypes?.find(pt => pt.id === id)?.name;
+    }).filter(Boolean) as string[];
   };
 
   const voicesCount = voices?.length || 0;
@@ -270,33 +273,45 @@ export default function VoicesPage() {
                   </div>
                 </div>
 
-                {programTypes && programTypes.length > 0 && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Назначить на передачи</label>
-                    <div className="grid gap-2 max-h-[150px] overflow-y-auto border rounded-lg p-3">
-                      {programTypes.map((pt) => (
-                        <div 
-                          key={pt.id} 
-                          className="flex items-center gap-2 cursor-pointer"
-                          onClick={() => toggleProgramType(pt.id)}
-                        >
-                          <Checkbox 
-                            checked={selectedProgramTypes.includes(pt.id)} 
-                            onCheckedChange={() => toggleProgramType(pt.id)}
-                            data-testid={`checkbox-program-${pt.id}`}
-                          />
-                          <div className="flex items-center gap-2">
-                            <Mic className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">{pt.name}</span>
-                          </div>
-                        </div>
-                      ))}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Назначить на передачи</label>
+                  <div className="grid gap-2 max-h-[150px] overflow-y-auto border rounded-lg p-3">
+                    <div 
+                      className="flex items-center gap-2 cursor-pointer"
+                      onClick={() => toggleProgramType("dialogs")}
+                    >
+                      <Checkbox 
+                        checked={selectedProgramTypes.includes("dialogs")} 
+                        onCheckedChange={() => toggleProgramType("dialogs")}
+                        data-testid="checkbox-program-dialogs"
+                      />
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">Подводки / Диалоги</span>
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Выберите передачи, которые будет вести эта персона
-                    </p>
+                    {programTypes?.map((pt) => (
+                      <div 
+                        key={pt.id} 
+                        className="flex items-center gap-2 cursor-pointer"
+                        onClick={() => toggleProgramType(pt.id)}
+                      >
+                        <Checkbox 
+                          checked={selectedProgramTypes.includes(pt.id)} 
+                          onCheckedChange={() => toggleProgramType(pt.id)}
+                          data-testid={`checkbox-program-${pt.id}`}
+                        />
+                        <div className="flex items-center gap-2">
+                          <Mic className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{pt.name}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                )}
+                  <p className="text-xs text-muted-foreground">
+                    Выберите передачи, которые будет вести эта персона
+                  </p>
+                </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Голос ElevenLabs</label>
@@ -536,36 +551,42 @@ export default function VoicesPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {programTypes && programTypes.length > 0 ? (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Назначить на передачи</label>
-                <div className="grid gap-2 max-h-[250px] overflow-y-auto border rounded-lg p-3">
-                  {programTypes.map((pt) => (
-                    <div 
-                      key={pt.id} 
-                      className="flex items-center gap-2 cursor-pointer hover-elevate p-2 rounded-md"
-                      onClick={() => toggleProgramType(pt.id)}
-                    >
-                      <Checkbox 
-                        checked={selectedProgramTypes.includes(pt.id)} 
-                        onCheckedChange={() => toggleProgramType(pt.id)}
-                        data-testid={`edit-checkbox-program-${pt.id}`}
-                      />
-                      <div className="flex items-center gap-2">
-                        <Mic className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{pt.name}</span>
-                      </div>
-                    </div>
-                  ))}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Назначить на передачи</label>
+              <div className="grid gap-2 max-h-[250px] overflow-y-auto border rounded-lg p-3">
+                <div 
+                  className="flex items-center gap-2 cursor-pointer hover-elevate p-2 rounded-md"
+                  onClick={() => toggleProgramType("dialogs")}
+                >
+                  <Checkbox 
+                    checked={selectedProgramTypes.includes("dialogs")} 
+                    onCheckedChange={() => toggleProgramType("dialogs")}
+                    data-testid="edit-checkbox-program-dialogs"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">Подводки / Диалоги</span>
+                  </div>
                 </div>
+                {programTypes?.map((pt) => (
+                  <div 
+                    key={pt.id} 
+                    className="flex items-center gap-2 cursor-pointer hover-elevate p-2 rounded-md"
+                    onClick={() => toggleProgramType(pt.id)}
+                  >
+                    <Checkbox 
+                      checked={selectedProgramTypes.includes(pt.id)} 
+                      onCheckedChange={() => toggleProgramType(pt.id)}
+                      data-testid={`edit-checkbox-program-${pt.id}`}
+                    />
+                    <div className="flex items-center gap-2">
+                      <Mic className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">{pt.name}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Mic className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>Нет доступных передач</p>
-                <p className="text-xs mt-2">Создайте типы программ в разделе "Передачи"</p>
-              </div>
-            )}
+            </div>
           </div>
 
           <DialogFooter>
