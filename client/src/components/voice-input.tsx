@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Loader2 } from "lucide-react";
+import { Mic, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
@@ -18,7 +19,11 @@ declare global {
 export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProps) {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
-  const [recognition, setRecognition] = useState<any>(null);
+  const recognitionRef = useRef<any>(null);
+  const onTranscriptRef = useRef(onTranscript);
+  const { toast } = useToast();
+
+  onTranscriptRef.current = onTranscript;
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -31,33 +36,71 @@ export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProp
 
       recognitionInstance.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
-        onTranscript(transcript);
+        onTranscriptRef.current(transcript);
         setIsListening(false);
+        toast({
+          title: "Голосовой ввод",
+          description: `Распознано: "${transcript}"`,
+        });
       };
 
-      recognitionInstance.onerror = () => {
+      recognitionInstance.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
         setIsListening(false);
+        if (event.error === "not-allowed") {
+          toast({
+            title: "Ошибка микрофона",
+            description: "Разрешите доступ к микрофону в браузере",
+            variant: "destructive",
+          });
+        } else if (event.error === "no-speech") {
+          toast({
+            title: "Голос не распознан",
+            description: "Попробуйте говорить громче",
+            variant: "destructive",
+          });
+        }
       };
 
       recognitionInstance.onend = () => {
         setIsListening(false);
       };
 
-      setRecognition(recognitionInstance);
+      recognitionRef.current = recognitionInstance;
     }
-  }, [onTranscript]);
+  }, [toast]);
 
   const toggleListening = useCallback(() => {
-    if (!recognition) return;
+    if (!recognitionRef.current) {
+      toast({
+        title: "Не поддерживается",
+        description: "Голосовой ввод не поддерживается в этом браузере",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (isListening) {
-      recognition.stop();
+      recognitionRef.current.stop();
       setIsListening(false);
     } else {
-      recognition.start();
-      setIsListening(true);
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+        toast({
+          title: "Слушаю...",
+          description: "Говорите в микрофон",
+        });
+      } catch (error) {
+        console.error("Failed to start recognition:", error);
+        toast({
+          title: "Ошибка",
+          description: "Не удалось запустить запись",
+          variant: "destructive",
+        });
+      }
     }
-  }, [recognition, isListening]);
+  }, [isListening, toast]);
 
   if (!isSupported) {
     return null;
@@ -66,7 +109,7 @@ export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProp
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant={isListening ? "destructive" : "ghost"}
       size="icon"
       onClick={toggleListening}
       disabled={disabled}
@@ -74,7 +117,7 @@ export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProp
       data-testid="button-voice-input"
     >
       {isListening ? (
-        <Loader2 className="h-4 w-4 animate-spin text-red-500" />
+        <Loader2 className="h-4 w-4 animate-spin" />
       ) : (
         <Mic className="h-4 w-4" />
       )}
