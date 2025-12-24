@@ -436,6 +436,56 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
     }
   });
 
+  app.post("/api/test-anthropic", async (req, res) => {
+    try {
+      const { apiKey } = req.body;
+      if (!apiKey) {
+        return res.status(400).json({ error: "API key is required" });
+      }
+
+      const Anthropic = (await import("@anthropic-ai/sdk")).default;
+      const anthropic = new Anthropic({ apiKey });
+      
+      await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 10,
+        messages: [{ role: "user", content: "Hi" }],
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error testing Anthropic:", error);
+      if (error?.status === 401 || error?.message?.includes("authentication")) {
+        return res.status(401).json({ error: "Неверный API ключ" });
+      }
+      res.status(500).json({ error: error?.message || "Ошибка подключения" });
+    }
+  });
+
+  app.post("/api/test-yandex", async (req, res) => {
+    try {
+      const { token } = req.body;
+      if (!token) {
+        return res.status(400).json({ error: "Token is required" });
+      }
+
+      const response = await fetch("https://cloud-api.yandex.net/v1/disk/", {
+        headers: {
+          Authorization: `OAuth ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        return res.status(401).json({ error: "Неверный OAuth токен" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error testing Yandex Disk:", error);
+      res.status(500).json({ error: "Ошибка подключения" });
+    }
+  });
+
   app.post("/api/generate-audio", async (req, res) => {
     try {
       const { maleText, femaleText, title, scheduledDate, slotNumber } = req.body;

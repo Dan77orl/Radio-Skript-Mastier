@@ -182,6 +182,68 @@ export default function SettingsPage() {
     },
   });
 
+  const testAnthropicMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/test-anthropic", {
+        apiKey: form.getValues("anthropicApiKey"),
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Успешно",
+        description: "Подключение к Claude (Anthropic) работает",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка подключения",
+        description: error.message || "Не удалось подключиться к Anthropic",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const testYandexMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/test-yandex", {
+        token: form.getValues("yandexDiskToken"),
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Успешно",
+        description: "Подключение к Яндекс.Диску работает",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка подключения",
+        description: error.message || "Не удалось подключиться к Яндекс.Диску",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveFieldMutation = useMutation({
+    mutationFn: async (fieldData: Partial<SettingsFormValues>) => {
+      return apiRequest("POST", "/api/settings", { ...form.getValues(), ...fieldData });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      toast({
+        title: "Сохранено",
+        description: "API ключ сохранён",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось сохранить",
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: SettingsFormValues) => {
     saveMutation.mutate(data);
   };
@@ -291,6 +353,32 @@ export default function SettingsPage() {
                           </Button>
                         </div>
                       </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => saveFieldMutation.mutate({ anthropicApiKey: field.value })}
+                        disabled={saveFieldMutation.isPending || !field.value}
+                        data-testid="button-save-anthropic"
+                      >
+                        {saveFieldMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => testAnthropicMutation.mutate()}
+                        disabled={testAnthropicMutation.isPending || !field.value}
+                        data-testid="button-test-anthropic"
+                      >
+                        {testAnthropicMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Проверить"
+                        )}
+                      </Button>
                     </div>
                     <FormDescription>
                       Claude создаёт более качественные тексты. Получите ключ на{" "}
@@ -334,9 +422,35 @@ export default function SettingsPage() {
                           </Button>
                         </div>
                       </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => saveFieldMutation.mutate({ yandexDiskToken: field.value })}
+                        disabled={saveFieldMutation.isPending || !field.value}
+                        data-testid="button-save-yandex"
+                      >
+                        {saveFieldMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => testYandexMutation.mutate()}
+                        disabled={testYandexMutation.isPending || !field.value}
+                        data-testid="button-test-yandex"
+                      >
+                        {testYandexMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Проверить"
+                        )}
+                      </Button>
                     </div>
                     <FormDescription>
-                      Токен для загрузки файлов на Яндекс.Диск (настроим позже)
+                      Токен для загрузки файлов на Яндекс.Диск
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
