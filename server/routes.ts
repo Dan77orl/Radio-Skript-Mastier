@@ -883,14 +883,92 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         d.scheduledDate === date && 
         d.maleText && 
         d.femaleText && 
-        d.status === "pending"
+        (d.status === "pending" || d.status === "generating")
       );
+
+      if (dialogsForDate.length === 0) {
+        return res.json({ queued: 0, message: "No dialogs to generate" });
+      }
+
+      const settings = await storage.getSettings();
+      if (!settings?.elevenLabsApiKey) {
+        return res.status(400).json({ error: "ElevenLabs API key not configured" });
+      }
+
+      const voicesList = await storage.getVoices();
+      const maleVoice = voicesList.find(v => v.gender === "male" && v.isActive);
+      const femaleVoice = voicesList.find(v => v.gender === "female" && v.isActive);
+      
+      if (!maleVoice || !femaleVoice) {
+        return res.status(400).json({ 
+          error: "Необходимо добавить активные мужской и женский голоса в разделе 'Голоса'" 
+        });
+      }
 
       for (const dialog of dialogsForDate) {
         await storage.updateDialog(dialog.id, { status: "generating" });
       }
 
       res.json({ queued: dialogsForDate.length });
+
+      const generateVoiceAudio = async (text: string, voiceId: string): Promise<Buffer> => {
+        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+          method: "POST",
+          headers: {
+            "xi-api-key": settings.elevenLabsApiKey!,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            text,
+            model_id: "eleven_v3",
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75,
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        return Buffer.from(arrayBuffer);
+      };
+
+      (async () => {
+        for (const dialog of dialogsForDate) {
+          try {
+            console.log(`Generating audio for dialog ${dialog.id}...`);
+            
+            const [maleAudio, femaleAudio] = await Promise.all([
+              generateVoiceAudio(dialog.maleText!, maleVoice.elevenLabsVoiceId),
+              generateVoiceAudio(dialog.femaleText!, femaleVoice.elevenLabsVoiceId),
+            ]);
+
+            const audioDir = path.join(process.cwd(), "public", "audio");
+            await fs.mkdir(audioDir, { recursive: true });
+
+            const timestamp = Date.now();
+            const combinedFile = path.join(audioDir, `dialog_${dialog.id}_${timestamp}.mp3`);
+
+            const combined = Buffer.concat([maleAudio, femaleAudio]);
+            await fs.writeFile(combinedFile, combined);
+
+            await storage.updateDialog(dialog.id, {
+              audioUrl: `/audio/dialog_${dialog.id}_${timestamp}.mp3`,
+              duration: Math.round((combined.length / 1024) * 0.5),
+              status: "ready",
+            });
+
+            console.log(`Audio generated for dialog ${dialog.id}`);
+          } catch (error) {
+            console.error(`Error generating audio for dialog ${dialog.id}:`, error);
+            await storage.updateDialog(dialog.id, { status: "error" });
+          }
+        }
+      })();
     } catch (error) {
       console.error("Error sending to automation:", error);
       res.status(500).json({ error: "Failed to send to automation" });
