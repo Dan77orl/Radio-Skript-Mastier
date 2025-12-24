@@ -44,15 +44,15 @@ import {
   Volume2,
   Edit
 } from "lucide-react";
-import type { ProgramType, Program } from "@shared/schema";
+import type { ProgramType, Program, Settings } from "@shared/schema";
 
-const defaultProgramTypes = [
+const getDefaultProgramTypes = (stationName: string) => [
   {
     name: "Прогноз погоды",
     slug: "weather",
     description: "Прогноз погоды для Аланьи",
     icon: "cloud-sun",
-    defaultPrompt: `Создай краткий прогноз погоды для радио "Алания FM".
+    defaultPrompt: `Создай краткий прогноз погоды для радио "${stationName}".
 Город: Аланья, Турция
 Стиль: дружелюбный, неформальный
 Длительность: 20-30 секунд при чтении
@@ -63,7 +63,7 @@ const defaultProgramTypes = [
     slug: "news",
     description: "Новостной выпуск",
     icon: "newspaper",
-    defaultPrompt: `Создай краткий новостной выпуск для радио "Алания FM".
+    defaultPrompt: `Создай краткий новостной выпуск для радио "${stationName}".
 Тематика: местные новости Аланьи и Турции, интересные мировые события
 Стиль: информативный, но не сухой
 Длительность: 40-60 секунд при чтении
@@ -74,7 +74,7 @@ const defaultProgramTypes = [
     slug: "celebrity",
     description: "Новости шоу-бизнеса",
     icon: "sparkles",
-    defaultPrompt: `Создай выпуск светских новостей для радио "Алания FM".
+    defaultPrompt: `Создай выпуск светских новостей для радио "${stationName}".
 Тематика: интересные события из мира звезд, забавные факты
 Стиль: легкий, с юмором
 Длительность: 30-40 секунд при чтении`,
@@ -84,7 +84,7 @@ const defaultProgramTypes = [
     slug: "digest",
     description: "Обзор интересных событий",
     icon: "file-text",
-    defaultPrompt: `Создай дайджест интересных событий для радио "Алания FM".
+    defaultPrompt: `Создай дайджест интересных событий для радио "${stationName}".
 Тематика: события в Аланье, полезные советы для экспатов
 Стиль: информативный и дружелюбный
 Длительность: 40-50 секунд при чтении`,
@@ -114,6 +114,13 @@ export default function ShowsPage() {
   const [newProgramPrompt, setNewProgramPrompt] = useState("");
   const [playingProgramId, setPlayingProgramId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const { data: settings } = useQuery<Settings>({
+    queryKey: ["/api/settings"],
+  });
+
+  const stationName = settings?.stationName || "Радио";
+  const defaultProgramTypes = getDefaultProgramTypes(stationName);
 
   const { data: programTypes, isLoading: isLoadingTypes } = useQuery<ProgramType[]>({
     queryKey: ["/api/program-types"],
