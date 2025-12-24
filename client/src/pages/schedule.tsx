@@ -15,7 +15,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, CheckCircle, Clock, AlertCircle, Mic, PlayCircle, PauseCircle, Calendar as CalendarIcon, Sparkles, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle, Clock, AlertCircle, Mic, PlayCircle, PauseCircle, Calendar as CalendarIcon, Sparkles, Loader2, FileText, User, X } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { VoiceInput } from "@/components/voice-input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -41,6 +42,7 @@ export default function Schedule() {
   const [autoGenPrompt, setAutoGenPrompt] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [playingDialogId, setPlayingDialogId] = useState<string | null>(null);
+  const [viewingDate, setViewingDate] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: dialogs, isLoading: dialogsLoading } = useQuery<Dialog[]>({
@@ -239,17 +241,27 @@ export default function Schedule() {
                         </div>
                       )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full mt-2"
-                      onClick={() => handleAutoGenerate(day)}
-                      disabled={autoGenerateMutation.isPending}
-                      data-testid={`button-autogen-${day.toISOString().split("T")[0]}`}
-                    >
-                      <Sparkles className="h-3 w-3 mr-1" />
-                      Авто
-                    </Button>
+                    <div className="flex gap-1 mt-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setViewingDate(day.toISOString().split("T")[0])}
+                        data-testid={`button-view-${day.toISOString().split("T")[0]}`}
+                      >
+                        <FileText className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleAutoGenerate(day)}
+                        disabled={autoGenerateMutation.isPending}
+                        data-testid={`button-autogen-${day.toISOString().split("T")[0]}`}
+                      >
+                        <Sparkles className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                 );
               })}
@@ -319,6 +331,125 @@ export default function Schedule() {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Тексты диалогов
+            </CardTitle>
+            <CardDescription>
+              {viewingDate 
+                ? new Date(viewingDate).toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })
+                : "Выберите день для просмотра текстов"
+              }
+            </CardDescription>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant={viewingDate === new Date().toISOString().split("T")[0] ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewingDate(new Date().toISOString().split("T")[0])}
+              data-testid="button-view-today"
+            >
+              Сегодня
+            </Button>
+            {viewingDate && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setViewingDate(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {viewingDate ? (
+            <ScrollArea className="h-[500px]">
+              {(() => {
+                const dayDialogs = dialogs?.filter(d => d.scheduledDate === viewingDate) || [];
+                const sortedDialogs = [...dayDialogs].sort((a, b) => (a.slotNumber || 0) - (b.slotNumber || 0));
+                
+                if (sortedDialogs.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                      <p className="text-muted-foreground">Нет диалогов на этот день</p>
+                      <Button
+                        variant="outline"
+                        className="mt-4"
+                        onClick={() => {
+                          setSelectedDate(new Date(viewingDate));
+                          setDialogOpen(true);
+                        }}
+                      >
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Сгенерировать
+                      </Button>
+                    </div>
+                  );
+                }
+                
+                return (
+                  <div className="space-y-6">
+                    {sortedDialogs.map((dialog, index) => (
+                      <div key={dialog.id} className="space-y-3 pb-6 border-b last:border-b-0">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">#{dialog.slotNumber || index + 1}</Badge>
+                            <span className="font-medium">{dialog.title}</span>
+                          </div>
+                          {dialog.audioUrl && (
+                            <Button 
+                              size="icon" 
+                              variant="ghost"
+                              onClick={() => playAudio(dialog.audioUrl!, dialog.id)}
+                            >
+                              {playingDialogId === dialog.id ? (
+                                <PauseCircle className="h-4 w-4" />
+                              ) : (
+                                <PlayCircle className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                        
+                        {dialog.maleText && (
+                          <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                              <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Мужской голос</span>
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap">{dialog.maleText}</p>
+                          </div>
+                        )}
+                        
+                        {dialog.femaleText && (
+                          <div className="rounded-lg bg-pink-50 dark:bg-pink-950/30 p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <User className="h-4 w-4 text-pink-600 dark:text-pink-400" />
+                              <span className="text-sm font-medium text-pink-600 dark:text-pink-400">Женский голос</span>
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap">{dialog.femaleText}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </ScrollArea>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <CalendarIcon className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">Нажмите "Сегодня" или выберите день в календаре выше</p>
             </div>
           )}
         </CardContent>
