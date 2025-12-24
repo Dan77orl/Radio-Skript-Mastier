@@ -94,6 +94,39 @@ async function getAnthropicClient(): Promise<Anthropic | null> {
   return new Anthropic({ apiKey: settings.anthropicApiKey });
 }
 
+interface StationContext {
+  stationName: string;
+  stationDescription: string;
+  malePersona: string;
+  femalePersona: string;
+  personaList: string;
+}
+
+async function buildStationContext(): Promise<StationContext> {
+  const settings = await storage.getSettings();
+  const voices = await storage.getVoices();
+  
+  const stationName = settings?.stationName || "Alanya FM";
+  const stationDescription = settings?.stationDescription || "русскоязычная радиостанция для экспатов в Аланье, Турция";
+  
+  const activeVoices = voices.filter(v => v.isActive);
+  const maleVoices = activeVoices.filter(v => v.gender === "male");
+  const femaleVoices = activeVoices.filter(v => v.gender === "female");
+  
+  const malePersona = maleVoices.length > 0 
+    ? maleVoices.map(v => v.personaName || v.name).join(", ")
+    : "ведущий";
+  const femalePersona = femaleVoices.length > 0 
+    ? femaleVoices.map(v => v.personaName || v.name).join(", ")
+    : "ведущая";
+  
+  const personaList = activeVoices.length > 0 
+    ? activeVoices.map(v => `${v.personaName || v.name} (${v.gender === "male" ? "мужчина" : "женщина"})`).join(", ")
+    : "ведущий (мужчина), ведущая (женщина)";
+  
+  return { stationName, stationDescription, malePersona, femalePersona, personaList };
+}
+
 interface WeatherData {
   temperature: number;
   windspeed: number;
@@ -266,15 +299,17 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Prompt is required and must be at least 10 characters" });
       }
 
-      const systemPrompt = `Ты - сценарист для радио "Алания FM" в Аланье, Турция. 
-Твоя задача - написать короткий диалог между двумя ведущими: мужчиной и женщиной.
+      const ctx = await buildStationContext();
+      const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}". 
+${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
+Твоя задача - написать короткий диалог между ведущими: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
 Диалог должен быть на русском языке, дружелюбным и естественным.
 Длительность при чтении - 30-50 секунд.
 
 ВАЖНО: Ответ должен быть в формате JSON:
 {
-  "maleText": "текст для мужчины (все его реплики через пробел)",
-  "femaleText": "текст для женщины (все её реплики через пробел)"
+  "maleText": "текст для ${ctx.malePersona} (все его реплики через пробел)",
+  "femaleText": "текст для ${ctx.femalePersona} (все её реплики через пробел)"
 }
 
 Реплики должны чередоваться логично, как естественный диалог.`;
@@ -616,7 +651,8 @@ export async function registerRoutes(
 
       const fullScript = `Мужской голос: ${maleText || ""}\n\nЖенский голос: ${femaleText || ""}`;
 
-      const systemPrompt = `Ты - модератор контента для радиостанции "Алания FM". 
+      const ctx = await buildStationContext();
+      const systemPrompt = `Ты - модератор контента для радиостанции "${ctx.stationName}". 
 Твоя задача - проверить радио-скрипт на соответствие следующим правилам:
 1. Нет оскорбительного или неуместного контента
 2. Нет политических или религиозных высказываний
@@ -702,8 +738,10 @@ export async function registerRoutes(
       const dailyCount = count || settings?.dailyDialogsCount || 12;
       const basePrompt = prompt || settings?.defaultPrompt || "";
 
-      const systemPrompt = `Ты - сценарист для радио "Алания FM" в Аланье, Турция.
-Создай ${dailyCount} разных коротких диалогов между двумя ведущими: мужчиной и женщиной.
+      const ctx = await buildStationContext();
+      const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}".
+${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
+Создай ${dailyCount} разных коротких диалогов между ведущими: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
 Каждый диалог должен быть на русском языке, дружелюбным и естественным.
 Длительность каждого диалога при чтении - 30-50 секунд.
 Темы должны быть разнообразными: погода, местные события, советы экспатам, интересные факты о Турции, еда, культура, и т.д.
@@ -713,8 +751,8 @@ export async function registerRoutes(
   "dialogs": [
     {
       "title": "краткое название темы",
-      "maleText": "все реплики мужчины через пробел",
-      "femaleText": "все реплики женщины через пробел"
+      "maleText": "все реплики ${ctx.malePersona} через пробел",
+      "femaleText": "все реплики ${ctx.femalePersona} через пробел"
     }
   ]
 }
@@ -897,16 +935,18 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Prompt is required and must be at least 10 characters" });
       }
 
-      const systemPrompt = `Ты - копирайтер рекламного агентства для радио "Алания FM" в Аланье, Турция.
-Твоя задача - написать короткий рекламный ролик в формате диалога между двумя ведущими: мужчиной и женщиной.
+      const ctx = await buildStationContext();
+      const systemPrompt = `Ты - копирайтер рекламного агентства для радио "${ctx.stationName}".
+${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
+Твоя задача - написать короткий рекламный ролик в формате диалога между ведущими: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
 Реклама должна быть на русском языке, живой, запоминающейся и эффективной.
 Длительность при чтении - 20-40 секунд.
 
 ВАЖНО: Ответ должен быть в формате JSON:
 {
   "title": "краткое название рекламы",
-  "maleText": "все реплики мужчины через пробел",
-  "femaleText": "все реплики женщины через пробел"
+  "maleText": "все реплики ${ctx.malePersona} через пробел",
+  "femaleText": "все реплики ${ctx.femalePersona} через пробел"
 }
 
 Реклама должна быть ненавязчивой, но убедительной.`;
@@ -1207,12 +1247,19 @@ export async function registerRoutes(
       const prompt = program.prompt || programType.defaultPrompt;
       let scriptText: string;
 
+      const ctx = await buildStationContext();
+      const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
+${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
+Активные ведущие: ${ctx.personaList}.
+Создавай контент на русском языке в стиле радиостанции.`;
+
       const anthropic = await getAnthropicClient();
       
       if (anthropic) {
         const message = await anthropic.messages.create({
           model: CLAUDE_MODEL,
           max_tokens: 1024,
+          system: systemPrompt,
           messages: [{ role: "user", content: prompt }],
         });
         
@@ -1221,7 +1268,10 @@ export async function registerRoutes(
       } else {
         const response = await openai.chat.completions.create({
           model: "gpt-4o",
-          messages: [{ role: "user", content: prompt }],
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: prompt }
+          ],
         });
         
         scriptText = response.choices[0]?.message?.content || "";
@@ -1463,11 +1513,13 @@ export async function registerRoutes(
               return;
             }
 
-            const personaContext = `\nВЕДУЩИЕ: ${maleVoice.name} (мужчина) и ${femaleVoice.name} (женщина). Используй их имена в диалоге естественно.\n`;
+            const ctx = await buildStationContext();
+            const personaContext = `\nВЕДУЩИЕ: ${maleVoice.personaName || maleVoice.name} (мужчина) и ${femaleVoice.personaName || femaleVoice.name} (женщина). Используй их имена в диалоге естественно.\n`;
+            const stationContext = `Радиостанция: ${ctx.stationName}. ${ctx.stationDescription ? ctx.stationDescription : ""}\n`;
 
             for (let i = 0; i < itemsCount; i++) {
-              const basePrompt = automation.prompt || "Создай короткий диалог для радио Алания FM";
-              const enhancedPrompt = basePrompt + contextInfo + personaContext;
+              const basePrompt = automation.prompt || `Создай короткий диалог для радио ${ctx.stationName}`;
+              const enhancedPrompt = stationContext + basePrompt + contextInfo + personaContext;
               
               const dialog = await storage.createDialog({
                 title: `Подводка ${tomorrowStr} #${i + 1}`,
@@ -1492,9 +1544,12 @@ export async function registerRoutes(
               return;
             }
 
+            const ctx = await buildStationContext();
+            const stationContext = `Радиостанция: ${ctx.stationName}. ${ctx.stationDescription ? ctx.stationDescription : ""}\n`;
+            
             for (let i = 0; i < itemsCount; i++) {
               const basePrompt = automation.prompt || programType.defaultPrompt;
-              const enhancedPrompt = basePrompt + contextInfo;
+              const enhancedPrompt = stationContext + basePrompt + contextInfo;
               
               await storage.createProgram({
                 programTypeId: programType.id,
