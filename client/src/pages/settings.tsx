@@ -284,7 +284,7 @@ export default function SettingsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>ElevenLabs API Key</FormLabel>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
                       <FormControl>
                         <div className="relative flex-1">
                           <Input
@@ -307,6 +307,7 @@ export default function SettingsPage() {
                       <Button
                         type="button"
                         variant="outline"
+                        size="icon"
                         onClick={() => saveFieldMutation.mutate({ elevenLabsApiKey: field.value })}
                         disabled={saveFieldMutation.isPending || !field.value}
                         data-testid="button-save-elevenlabs"
@@ -350,7 +351,7 @@ export default function SettingsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Claude (Anthropic) API Key</FormLabel>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
                       <FormControl>
                         <div className="relative flex-1">
                           <Input
@@ -373,6 +374,7 @@ export default function SettingsPage() {
                       <Button
                         type="button"
                         variant="outline"
+                        size="icon"
                         onClick={() => saveFieldMutation.mutate({ anthropicApiKey: field.value })}
                         disabled={saveFieldMutation.isPending || !field.value}
                         data-testid="button-save-anthropic"
@@ -419,7 +421,7 @@ export default function SettingsPage() {
                       <HardDrive className="h-4 w-4" />
                       Яндекс.Диск OAuth Token
                     </FormLabel>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
                       <FormControl>
                         <div className="relative flex-1">
                           <Input
@@ -442,6 +444,7 @@ export default function SettingsPage() {
                       <Button
                         type="button"
                         variant="outline"
+                        size="icon"
                         onClick={() => saveFieldMutation.mutate({ yandexDiskToken: field.value })}
                         disabled={saveFieldMutation.isPending || !field.value}
                         data-testid="button-save-yandex"
