@@ -205,17 +205,20 @@ export default function Schedule() {
                 return (
                   <div
                     key={day.toISOString()}
-                    className={`rounded-lg border p-3 ${isCurrentDay ? "border-primary bg-primary/5" : ""}`}
+                    className={`rounded-lg border p-3 cursor-pointer transition-colors hover-elevate ${
+                      isCurrentDay ? "border-primary bg-primary/5" : ""
+                    } ${viewingDate === day.toISOString().split("T")[0] ? "ring-2 ring-primary" : ""}`}
                     data-testid={`day-${day.toISOString().split("T")[0]}`}
+                    onClick={() => setViewingDate(day.toISOString().split("T")[0])}
                   >
                     <div className="mb-3 text-center">
                       <div className="text-xs font-medium text-muted-foreground">{dayNames[dayIndex]}</div>
                       <div className={`text-lg font-bold ${isCurrentDay ? "text-primary" : ""}`}>
                         {day.getDate()}
                       </div>
-                      {readyCount > 0 && (
-                        <Badge variant="secondary" className="mt-1">
-                          {readyCount}/{dailyCount}
+                      {dayDialogs.length > 0 && (
+                        <Badge variant={readyCount === dailyCount ? "default" : "secondary"} className="mt-1">
+                          {dayDialogs.length}/{dailyCount}
                         </Badge>
                       )}
                     </div>
@@ -246,7 +249,10 @@ export default function Schedule() {
                         variant="ghost"
                         size="sm"
                         className="flex-1"
-                        onClick={() => setViewingDate(day.toISOString().split("T")[0])}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setViewingDate(day.toISOString().split("T")[0]);
+                        }}
                         data-testid={`button-view-${day.toISOString().split("T")[0]}`}
                       >
                         <FileText className="h-3 w-3" />
@@ -255,7 +261,10 @@ export default function Schedule() {
                         variant="ghost"
                         size="sm"
                         className="flex-1"
-                        onClick={() => handleAutoGenerate(day)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAutoGenerate(day);
+                        }}
                         disabled={autoGenerateMutation.isPending}
                         data-testid={`button-autogen-${day.toISOString().split("T")[0]}`}
                       >
