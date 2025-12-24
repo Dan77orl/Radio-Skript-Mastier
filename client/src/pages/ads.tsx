@@ -196,7 +196,7 @@ export default function AdsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Описание рекламы</FormLabel>
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 items-start">
                         <FormControl>
                           <Textarea
                             placeholder="Опишите что нужно рекламировать: продукт, услугу, акцию, контактные данные и т.д."

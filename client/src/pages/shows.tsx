@@ -351,7 +351,7 @@ export default function ShowsPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Промпт по умолчанию</label>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 items-start">
                       <Textarea
                         placeholder="Промпт для генерации..."
                         value={newTypePrompt}
@@ -459,7 +459,7 @@ export default function ShowsPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Промпт по умолчанию</label>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 items-start">
                       <Textarea
                         placeholder="Промпт для генерации..."
                         value={newTypePrompt}
@@ -542,7 +542,7 @@ export default function ShowsPage() {
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Промпт (опционально)</label>
-                          <div className="flex gap-1">
+                          <div className="flex gap-1 items-start">
                             <Textarea
                               placeholder={`Оставьте пустым для использования промпта по умолчанию`}
                               value={newProgramPrompt}
@@ -699,7 +699,7 @@ export default function ShowsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <div className="flex gap-1">
+            <div className="flex gap-1 items-start">
               <Textarea
                 value={editingType?.defaultPrompt || ""}
                 onChange={(e) => setEditingType(prev => prev ? { ...prev, defaultPrompt: e.target.value } : null)}

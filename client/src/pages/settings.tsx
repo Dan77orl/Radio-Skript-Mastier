@@ -557,7 +557,7 @@ export default function SettingsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Промпт по умолчанию</FormLabel>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 items-start">
                       <FormControl>
                         <Textarea
                           placeholder="Базовый промпт для генерации диалогов..."
@@ -704,7 +704,7 @@ export default function SettingsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Описание / Промпт о станции</FormLabel>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 items-start">
                       <FormControl>
                         <Textarea
                           placeholder="Опишите вашу радиостанцию: формат, аудиторию, стиль вещания. Эта информация будет использоваться в генерации контента."
