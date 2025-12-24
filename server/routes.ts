@@ -1095,7 +1095,16 @@ export async function registerRoutes(
 
   app.post("/api/automations", async (req, res) => {
     try {
-      const automation = await storage.createAutomation(req.body);
+      const data = {
+        name: req.body.name,
+        automationType: req.body.automationType || "dialog",
+        programTypeId: req.body.programTypeId || null,
+        voiceIds: Array.isArray(req.body.voiceIds) ? req.body.voiceIds : [],
+        prompt: req.body.prompt || null,
+        itemsCount: typeof req.body.itemsCount === "number" ? req.body.itemsCount : 1,
+        isActive: req.body.isActive !== false,
+      };
+      const automation = await storage.createAutomation(data);
       res.json(automation);
     } catch (error) {
       console.error("Error creating automation:", error);
@@ -1105,7 +1114,16 @@ export async function registerRoutes(
 
   app.patch("/api/automations/:id", async (req, res) => {
     try {
-      const updated = await storage.updateAutomation(req.params.id, req.body);
+      const updates: Record<string, unknown> = {};
+      if (req.body.name !== undefined) updates.name = req.body.name;
+      if (req.body.automationType !== undefined) updates.automationType = req.body.automationType;
+      if (req.body.programTypeId !== undefined) updates.programTypeId = req.body.programTypeId || null;
+      if (req.body.voiceIds !== undefined) updates.voiceIds = Array.isArray(req.body.voiceIds) ? req.body.voiceIds : [];
+      if (req.body.prompt !== undefined) updates.prompt = req.body.prompt || null;
+      if (req.body.itemsCount !== undefined) updates.itemsCount = typeof req.body.itemsCount === "number" ? req.body.itemsCount : 1;
+      if (req.body.isActive !== undefined) updates.isActive = req.body.isActive;
+      
+      const updated = await storage.updateAutomation(req.params.id, updates as any);
       if (!updated) {
         return res.status(404).json({ error: "Automation not found" });
       }

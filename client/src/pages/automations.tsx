@@ -471,10 +471,7 @@ export default function AutomationsPage() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => {
-                      setSelectedAutomation(automation);
-                      setIsCreateOpen(true);
-                    }}
+                    onClick={() => setSelectedAutomation(automation)}
                     data-testid={`button-edit-${automation.id}`}
                   >
                     <Settings2 className="h-4 w-4" />
