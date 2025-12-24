@@ -68,14 +68,11 @@ export default function Generator() {
     let basePrompt = `Создай короткий диалог между ведущими радио "${stationName}" (мужчина и женщина). 
 Тема: жизнь в ${location}. 
 Стиль: дружелюбный, непринужденный, с юмором.
-Длительность: 30-50 секунд при чтении.`;
+Длительность: 30-50 секунд при чтении.
+Обязательно включи: приветствие слушателей, интересный факт или совет про жизнь в ${location}.`;
 
     if (description) {
       basePrompt += `\nО станции: ${description}`;
-    }
-
-    if (s?.defaultPrompt) {
-      basePrompt += `\n\nДополнительные инструкции:\n${s.defaultPrompt}`;
     }
 
     return basePrompt;
