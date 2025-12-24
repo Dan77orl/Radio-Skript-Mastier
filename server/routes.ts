@@ -1361,6 +1361,46 @@ export async function registerRoutes(
           let itemsCreated = 0;
           const itemsCount = automation.itemsCount || 1;
 
+          const weather = await fetchAlanayWeather();
+          const newsItems = await storage.getNewsItems();
+          const unusedNews = newsItems.filter(n => !n.isUsed).slice(0, 10);
+
+          const tomorrowDate = new Date();
+          tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+          const tomorrowStr = tomorrowDate.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
+
+          let contextInfo = `\n\nКОНТЕКСТ ДЛЯ ПОДВОДКИ (на завтра - ${tomorrowStr}):\n`;
+          
+          if (weather) {
+            const hasTomorrowData = weather.daily && 
+              weather.daily.temperature_max.length > 1 && 
+              weather.daily.temperature_min.length > 1 &&
+              typeof weather.daily.temperature_max[1] === 'number' &&
+              typeof weather.daily.temperature_min[1] === 'number';
+            
+            if (hasTomorrowData) {
+              const maxTemp = Math.round(weather.daily!.temperature_max[1]);
+              const minTemp = Math.round(weather.daily!.temperature_min[1]);
+              const precipitation = weather.daily!.precipitation_sum[1] || 0;
+              
+              contextInfo += `\nПОГОДА В АЛАНЬЕ ЗАВТРА: ${maxTemp}°C днём, ${minTemp}°C ночью`;
+              if (precipitation > 0) {
+                contextInfo += `, ожидается осадки (${precipitation} мм)`;
+              }
+              contextInfo += `.\n`;
+            } else if (typeof weather.temperature === 'number') {
+              contextInfo += `\nПОГОДА СЕЙЧАС: ${Math.round(weather.temperature)}°C, ${getWeatherDescription(weather.weathercode)}.\n`;
+            }
+          }
+
+          const newsToUse = unusedNews.slice(0, 5);
+          if (newsToUse.length > 0) {
+            contextInfo += `\nАКТУАЛЬНЫЕ НОВОСТИ:\n`;
+            newsToUse.forEach((news, i) => {
+              contextInfo += `${i + 1}. ${news.title}${news.summary ? ` - ${news.summary.substring(0, 100)}...` : ""}\n`;
+            });
+          }
+
           if (automation.automationType === "dialog") {
             const voicesList = await storage.getVoices();
             const selectedVoices = automation.voiceIds?.length 
@@ -1379,14 +1419,23 @@ export async function registerRoutes(
               return;
             }
 
+            const personaContext = `\nВЕДУЩИЕ: ${maleVoice.name} (мужчина) и ${femaleVoice.name} (женщина). Используй их имена в диалоге естественно.\n`;
+
             for (let i = 0; i < itemsCount; i++) {
-              const prompt = automation.prompt || "Создай короткий диалог для радио Алания FM";
+              const basePrompt = automation.prompt || "Создай короткий диалог для радио Алания FM";
+              const enhancedPrompt = basePrompt + contextInfo + personaContext;
+              
               const dialog = await storage.createDialog({
-                title: `Подводка ${new Date().toLocaleDateString("ru-RU")} #${i + 1}`,
-                prompt,
+                title: `Подводка ${tomorrowStr} #${i + 1}`,
+                prompt: enhancedPrompt,
                 status: "pending",
               });
+              
               itemsCreated++;
+            }
+            
+            for (const newsItem of newsToUse) {
+              await storage.markNewsItemUsed(newsItem.id);
             }
           } else if (automation.automationType === "program" && automation.programTypeId) {
             const programType = await storage.getProgramType(automation.programTypeId);
@@ -1400,14 +1449,20 @@ export async function registerRoutes(
             }
 
             for (let i = 0; i < itemsCount; i++) {
-              const prompt = automation.prompt || programType.defaultPrompt;
+              const basePrompt = automation.prompt || programType.defaultPrompt;
+              const enhancedPrompt = basePrompt + contextInfo;
+              
               await storage.createProgram({
                 programTypeId: programType.id,
-                title: `${programType.name} ${new Date().toLocaleDateString("ru-RU")} #${i + 1}`,
-                prompt,
+                title: `${programType.name} ${tomorrowStr} #${i + 1}`,
+                prompt: enhancedPrompt,
                 status: "pending",
               });
               itemsCreated++;
+            }
+            
+            for (const newsItem of newsToUse) {
+              await storage.markNewsItemUsed(newsItem.id);
             }
           }
 
