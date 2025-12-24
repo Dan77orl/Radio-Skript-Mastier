@@ -218,6 +218,21 @@ export default function ShowsPage() {
     },
   });
 
+  useEffect(() => {
+    if (!activeTab && programTypes && programTypes.length > 0) {
+      setActiveTab(programTypes[0].id);
+    }
+  }, [activeTab, programTypes]);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
   const seedDefaultTypes = async () => {
     for (const type of defaultProgramTypes) {
       await createTypeMutation.mutateAsync(type);
@@ -358,21 +373,6 @@ export default function ShowsPage() {
       </div>
     );
   }
-
-  useEffect(() => {
-    if (!activeTab && programTypes && programTypes.length > 0) {
-      setActiveTab(programTypes[0].id);
-    }
-  }, [activeTab, programTypes]);
-
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
 
   const currentType = programTypes?.find(t => t.id === activeTab);
   const IconComponent = currentType?.icon ? iconMap[currentType.icon] || Radio : Radio;
