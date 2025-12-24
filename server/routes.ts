@@ -76,6 +76,76 @@ async function getAnthropicClient(): Promise<Anthropic | null> {
   return new Anthropic({ apiKey: settings.anthropicApiKey });
 }
 
+interface WeatherData {
+  temperature: number;
+  windspeed: number;
+  winddirection: number;
+  weathercode: number;
+  time: string;
+  daily?: {
+    temperature_max: number[];
+    temperature_min: number[];
+    precipitation_sum: number[];
+    sunrise: string[];
+    sunset: string[];
+  };
+}
+
+const ALANYA_COORDS = { lat: 36.5444, lon: 31.9997 };
+
+async function fetchAlanayWeather(): Promise<WeatherData | null> {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${ALANYA_COORDS.lat}&longitude=${ALANYA_COORDS.lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,sunrise,sunset&timezone=Europe/Istanbul`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return {
+      temperature: data.current_weather?.temperature,
+      windspeed: data.current_weather?.windspeed,
+      winddirection: data.current_weather?.winddirection,
+      weathercode: data.current_weather?.weathercode,
+      time: data.current_weather?.time,
+      daily: data.daily ? {
+        temperature_max: data.daily.temperature_2m_max,
+        temperature_min: data.daily.temperature_2m_min,
+        precipitation_sum: data.daily.precipitation_sum,
+        sunrise: data.daily.sunrise,
+        sunset: data.daily.sunset,
+      } : undefined,
+    };
+  } catch (error) {
+    console.error("Error fetching weather:", error);
+    return null;
+  }
+}
+
+function getWeatherDescription(code: number): string {
+  const descriptions: Record<number, string> = {
+    0: "ясно",
+    1: "преимущественно ясно",
+    2: "переменная облачность",
+    3: "пасмурно",
+    45: "туман",
+    48: "изморозь",
+    51: "легкая морось",
+    53: "морось",
+    55: "сильная морось",
+    61: "небольшой дождь",
+    63: "дождь",
+    65: "сильный дождь",
+    71: "небольшой снег",
+    73: "снег",
+    75: "сильный снег",
+    80: "ливень",
+    81: "умеренный ливень",
+    82: "сильный ливень",
+    95: "гроза",
+    96: "гроза с градом",
+    99: "сильная гроза с градом",
+  };
+  return descriptions[code] || "неизвестно";
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -102,6 +172,23 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error saving settings:", error);
       res.status(500).json({ error: "Failed to save settings" });
+    }
+  });
+
+  app.get("/api/weather", async (req, res) => {
+    try {
+      const weather = await fetchAlanayWeather();
+      if (!weather) {
+        return res.status(503).json({ error: "Weather service unavailable" });
+      }
+      res.json({
+        ...weather,
+        description: getWeatherDescription(weather.weathercode),
+        location: "Alanya, Turkey",
+      });
+    } catch (error) {
+      console.error("Error fetching weather:", error);
+      res.status(500).json({ error: "Failed to fetch weather" });
     }
   });
 
