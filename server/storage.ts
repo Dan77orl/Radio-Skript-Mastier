@@ -1,4 +1,4 @@
-import { users, settings, dialogs, newsSources, ads, voices, programTypes, programs, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type Ad, type InsertAd, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram } from "@shared/schema";
+import { users, settings, dialogs, newsSources, ads, voices, programTypes, programs, automations, automationRuns, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type Ad, type InsertAd, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql } from "drizzle-orm";
 
@@ -47,6 +47,16 @@ export interface IStorage {
   createProgram(program: InsertProgram): Promise<Program>;
   updateProgram(id: string, program: Partial<InsertProgram>): Promise<Program | undefined>;
   deleteProgram(id: string): Promise<boolean>;
+  
+  getAutomations(): Promise<Automation[]>;
+  getAutomation(id: string): Promise<Automation | undefined>;
+  createAutomation(automation: InsertAutomation): Promise<Automation>;
+  updateAutomation(id: string, automation: Partial<InsertAutomation>): Promise<Automation | undefined>;
+  deleteAutomation(id: string): Promise<boolean>;
+  
+  getAutomationRuns(automationId: string): Promise<AutomationRun[]>;
+  createAutomationRun(run: InsertAutomationRun): Promise<AutomationRun>;
+  updateAutomationRun(id: string, run: Partial<InsertAutomationRun>): Promise<AutomationRun | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -273,6 +283,53 @@ export class DatabaseStorage implements IStorage {
   async deleteProgram(id: string): Promise<boolean> {
     const result = await db.delete(programs).where(eq(programs.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getAutomations(): Promise<Automation[]> {
+    return db.select().from(automations).orderBy(desc(automations.createdAt));
+  }
+
+  async getAutomation(id: string): Promise<Automation | undefined> {
+    const [automation] = await db.select().from(automations).where(eq(automations.id, id));
+    return automation || undefined;
+  }
+
+  async createAutomation(insertAutomation: InsertAutomation): Promise<Automation> {
+    const [automation] = await db.insert(automations).values(insertAutomation).returning();
+    return automation;
+  }
+
+  async updateAutomation(id: string, updates: Partial<InsertAutomation>): Promise<Automation | undefined> {
+    const [updated] = await db.update(automations)
+      .set(updates)
+      .where(eq(automations.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteAutomation(id: string): Promise<boolean> {
+    await db.delete(automationRuns).where(eq(automationRuns.automationId, id));
+    const result = await db.delete(automations).where(eq(automations.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getAutomationRuns(automationId: string): Promise<AutomationRun[]> {
+    return db.select().from(automationRuns)
+      .where(eq(automationRuns.automationId, automationId))
+      .orderBy(desc(automationRuns.startedAt));
+  }
+
+  async createAutomationRun(insertRun: InsertAutomationRun): Promise<AutomationRun> {
+    const [run] = await db.insert(automationRuns).values(insertRun).returning();
+    return run;
+  }
+
+  async updateAutomationRun(id: string, updates: Partial<InsertAutomationRun>): Promise<AutomationRun | undefined> {
+    const [updated] = await db.update(automationRuns)
+      .set(updates)
+      .where(eq(automationRuns.id, id))
+      .returning();
+    return updated || undefined;
   }
 }
 

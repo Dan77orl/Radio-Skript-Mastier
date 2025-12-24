@@ -214,3 +214,45 @@ export const dialogGenerationRequestSchema = z.object({
 });
 
 export type DialogGenerationRequest = z.infer<typeof dialogGenerationRequestSchema>;
+
+export const automations = pgTable("automations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  automationType: text("automation_type").notNull().default("dialog"),
+  programTypeId: varchar("program_type_id"),
+  voiceIds: text("voice_ids").array(),
+  prompt: text("prompt"),
+  itemsCount: integer("items_count").default(1),
+  scheduleType: text("schedule_type").default("manual"),
+  scheduleCron: text("schedule_cron"),
+  isActive: boolean("is_active").default(true),
+  lastRunAt: timestamp("last_run_at"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertAutomationSchema = createInsertSchema(automations).omit({
+  id: true,
+  createdAt: true,
+  lastRunAt: true,
+});
+
+export type InsertAutomation = z.infer<typeof insertAutomationSchema>;
+export type Automation = typeof automations.$inferSelect;
+
+export const automationRuns = pgTable("automation_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  automationId: varchar("automation_id").notNull(),
+  status: text("status").notNull().default("running"),
+  itemsCreated: integer("items_created").default(0),
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertAutomationRunSchema = createInsertSchema(automationRuns).omit({
+  id: true,
+  startedAt: true,
+});
+
+export type InsertAutomationRun = z.infer<typeof insertAutomationRunSchema>;
+export type AutomationRun = typeof automationRuns.$inferSelect;
