@@ -60,15 +60,31 @@ export default function Generator() {
 
   const [expandedDialogId, setExpandedDialogId] = useState<string | null>(null);
 
-  const defaultPrompt = `Создай короткий диалог между ведущими радио "Алания FM" (мужчина и женщина). 
-Тема: жизнь экспатов в Аланье, Турция. 
+  const buildDynamicPrompt = (s: Settings | undefined) => {
+    const stationName = s?.stationName || "Радио";
+    const location = s?.stationLocation || "Турция";
+    const description = s?.stationDescription || "";
+    
+    let basePrompt = `Создай короткий диалог между ведущими радио "${stationName}" (мужчина и женщина). 
+Тема: жизнь в ${location}. 
 Стиль: дружелюбный, непринужденный, с юмором.
 Длительность: 30-50 секунд при чтении.`;
+
+    if (description) {
+      basePrompt += `\nО станции: ${description}`;
+    }
+
+    if (s?.defaultPrompt) {
+      basePrompt += `\n\nДополнительные инструкции:\n${s.defaultPrompt}`;
+    }
+
+    return basePrompt;
+  };
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      prompt: defaultPrompt,
+      prompt: "",
       title: "",
       scheduledDate: new Date().toISOString().split("T")[0],
       slotNumber: "1",
@@ -76,10 +92,11 @@ export default function Generator() {
   });
 
   useEffect(() => {
-    if (settingsLoaded && settings?.defaultPrompt) {
-      form.setValue("prompt", settings.defaultPrompt);
+    if (settingsLoaded) {
+      const dynamicPrompt = buildDynamicPrompt(settings);
+      form.setValue("prompt", dynamicPrompt);
     }
-  }, [settingsLoaded, settings?.defaultPrompt, form]);
+  }, [settingsLoaded, settings, form]);
 
   const generateScriptMutation = useMutation({
     mutationFn: async (data: { prompt: string }) => {
