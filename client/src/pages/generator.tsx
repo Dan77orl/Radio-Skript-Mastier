@@ -262,53 +262,6 @@ export default function Generator() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Промпт дня
-                  </label>
-                  {isDailyPromptDirty && (
-                    <Button
-                      size="sm"
-                      onClick={() => saveDailyPromptMutation.mutate(dailyPromptValue)}
-                      disabled={saveDailyPromptMutation.isPending}
-                      data-testid="button-save-daily-prompt"
-                    >
-                      {saveDailyPromptMutation.isPending ? (
-                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                      ) : (
-                        <Save className="mr-2 h-3 w-3" />
-                      )}
-                      Сохранить
-                    </Button>
-                  )}
-                </div>
-                <div className="relative">
-                  <Textarea
-                    value={dailyPromptValue}
-                    onChange={(e) => {
-                      setDailyPromptValue(e.target.value);
-                      setIsDailyPromptDirty(true);
-                    }}
-                    placeholder="Инструкции для генерации диалогов на весь день..."
-                    className="min-h-[100px] text-sm pr-12"
-                    data-testid="textarea-daily-prompt"
-                  />
-                  <div className="absolute right-2 top-2">
-                    <VoiceInput 
-                      onTranscript={(text) => {
-                        setDailyPromptValue(prev => prev + " " + text);
-                        setIsDailyPromptDirty(true);
-                      }} 
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Этот промпт применяется ко всем слотам дня. Включает контекст станции и персон автоматически.
-                </p>
-              </div>
-
               <div className="flex flex-wrap gap-3">
                 <Button
                   onClick={onGenerateAllSlots}
@@ -349,6 +302,57 @@ export default function Generator() {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Общий промпт для диалогов
+                </CardTitle>
+                {isDailyPromptDirty && (
+                  <Button
+                    size="sm"
+                    onClick={() => saveDailyPromptMutation.mutate(dailyPromptValue)}
+                    disabled={saveDailyPromptMutation.isPending}
+                    data-testid="button-save-daily-prompt"
+                  >
+                    {saveDailyPromptMutation.isPending ? (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-3 w-3" />
+                    )}
+                    Сохранить
+                  </Button>
+                )}
+              </div>
+              <CardDescription>
+                Этот промпт применяется ко всем слотам. Контекст станции и персон добавляется автоматически.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="relative">
+                <Textarea
+                  value={dailyPromptValue}
+                  onChange={(e) => {
+                    setDailyPromptValue(e.target.value);
+                    setIsDailyPromptDirty(true);
+                  }}
+                  placeholder="Инструкции для генерации диалогов на весь день..."
+                  className="min-h-[120px] text-sm pr-12"
+                  data-testid="textarea-daily-prompt"
+                />
+                <div className="absolute right-2 top-2">
+                  <VoiceInput 
+                    onTranscript={(text) => {
+                      setDailyPromptValue(prev => prev + " " + text);
+                      setIsDailyPromptDirty(true);
+                    }} 
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
