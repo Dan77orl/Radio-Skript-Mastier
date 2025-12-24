@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Wand2, Loader2, Calendar, Clock, User, CheckCircle, Edit3, Send, RefreshCw, ChevronDown, ChevronUp, Play } from "lucide-react";
+import { Wand2, Loader2, Calendar, Clock, User, CheckCircle, Edit3, Send, RefreshCw, ChevronDown, ChevronUp, Play, FileText, Save } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Settings, Dialog, NewsItem } from "@shared/schema";
@@ -67,10 +67,18 @@ export default function Generator() {
   const [expandedSlots, setExpandedSlots] = useState<Set<number>>(new Set());
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
   const [editPrompt, setEditPrompt] = useState<string>("");
+  const [dailyPromptValue, setDailyPromptValue] = useState<string>("");
+  const [isDailyPromptDirty, setIsDailyPromptDirty] = useState(false);
 
   const { data: settings } = useQuery<Settings>({
     queryKey: ["/api/settings"],
   });
+
+  useEffect(() => {
+    if (settings?.dailyPrompt && !isDailyPromptDirty) {
+      setDailyPromptValue(settings.dailyPrompt);
+    }
+  }, [settings?.dailyPrompt, isDailyPromptDirty]);
 
   const { data: dialogs, isLoading: dialogsLoading } = useQuery<Dialog[]>({
     queryKey: ["/api/dialogs"],
@@ -158,6 +166,27 @@ export default function Generator() {
     },
   });
 
+  const saveDailyPromptMutation = useMutation({
+    mutationFn: async (dailyPrompt: string) => {
+      const response = await apiRequest("PATCH", "/api/settings", { dailyPrompt });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      setIsDailyPromptDirty(false);
+      toast({
+        title: "Промпт дня сохранён",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось сохранить промпт",
+        variant: "destructive",
+      });
+    },
+  });
+
   const toggleSlot = (slotNumber: number) => {
     const newExpanded = new Set(expandedSlots);
     if (newExpanded.has(slotNumber)) {
@@ -232,6 +261,43 @@ export default function Generator() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Промпт дня
+                  </label>
+                  {isDailyPromptDirty && (
+                    <Button
+                      size="sm"
+                      onClick={() => saveDailyPromptMutation.mutate(dailyPromptValue)}
+                      disabled={saveDailyPromptMutation.isPending}
+                      data-testid="button-save-daily-prompt"
+                    >
+                      {saveDailyPromptMutation.isPending ? (
+                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                      ) : (
+                        <Save className="mr-2 h-3 w-3" />
+                      )}
+                      Сохранить
+                    </Button>
+                  )}
+                </div>
+                <Textarea
+                  value={dailyPromptValue}
+                  onChange={(e) => {
+                    setDailyPromptValue(e.target.value);
+                    setIsDailyPromptDirty(true);
+                  }}
+                  placeholder="Инструкции для генерации диалогов на весь день..."
+                  className="min-h-[100px] text-sm"
+                  data-testid="textarea-daily-prompt"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Этот промпт применяется ко всем слотам дня. Включает контекст станции и персон автоматически.
+                </p>
+              </div>
+
               <div className="flex flex-wrap gap-3">
                 <Button
                   onClick={onGenerateAllSlots}
