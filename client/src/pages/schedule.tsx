@@ -16,6 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, CheckCircle, Clock, AlertCircle, Mic, PlayCircle, PauseCircle, Calendar as CalendarIcon, Sparkles, Loader2 } from "lucide-react";
+import { VoiceInput } from "@/components/voice-input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Dialog, Settings } from "@shared/schema";
@@ -341,14 +342,18 @@ export default function Schedule() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="auto-prompt">Промпт для генерации</Label>
-              <Textarea
-                id="auto-prompt"
-                placeholder="Опишите темы и стиль подводок..."
-                value={autoGenPrompt}
-                onChange={(e) => setAutoGenPrompt(e.target.value)}
-                rows={6}
-                data-testid="textarea-auto-prompt"
-              />
+              <div className="flex gap-1 items-start">
+                <Textarea
+                  id="auto-prompt"
+                  placeholder="Опишите темы и стиль подводок..."
+                  value={autoGenPrompt}
+                  onChange={(e) => setAutoGenPrompt(e.target.value)}
+                  rows={6}
+                  data-testid="textarea-auto-prompt"
+                  className="flex-1"
+                />
+                <VoiceInput onTranscript={(text) => setAutoGenPrompt(prev => prev + " " + text)} />
+              </div>
               <p className="text-xs text-muted-foreground">
                 ИИ создаст разнообразные подводки на основе этого промпта
               </p>

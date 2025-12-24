@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Newspaper, Plus, Trash2, Edit2, Globe, Loader2, RefreshCw, Download } from "lucide-react";
+import { VoiceInput } from "@/components/voice-input";
 import type { NewsSource, NewsItem } from "@shared/schema";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -191,9 +192,12 @@ export default function NewsSources() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Название</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Alanya News" {...field} data-testid="input-source-name" />
-                        </FormControl>
+                        <div className="flex gap-1 items-center">
+                          <FormControl>
+                            <Input placeholder="Alanya News" {...field} data-testid="input-source-name" className="flex-1" />
+                          </FormControl>
+                          <VoiceInput onTranscript={(text) => field.onChange(field.value + text)} />
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -261,9 +265,12 @@ export default function NewsSources() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Описание</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Краткое описание источника" {...field} data-testid="input-source-description" />
-                        </FormControl>
+                        <div className="flex gap-1 items-center">
+                          <FormControl>
+                            <Input placeholder="Краткое описание источника" {...field} data-testid="input-source-description" className="flex-1" />
+                          </FormControl>
+                          <VoiceInput onTranscript={(text) => field.onChange((field.value || "") + text)} />
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}

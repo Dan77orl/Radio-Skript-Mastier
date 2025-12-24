@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Play, Pause, Plus, Trash2, Volume2, User, Users, Mic, Edit2 } from "lucide-react";
+import { VoiceInput } from "@/components/voice-input";
 import type { Voice, ProgramType } from "@shared/schema";
 
 interface ElevenLabsVoice {
@@ -252,12 +253,16 @@ export default function VoicesPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Имя персоны</label>
-                    <Input
-                      placeholder="Например: Алексей"
-                      value={personaName}
-                      onChange={(e) => setPersonaName(e.target.value)}
-                      data-testid="input-persona-name"
-                    />
+                    <div className="flex gap-1 items-center">
+                      <Input
+                        placeholder="Например: Алексей"
+                        value={personaName}
+                        onChange={(e) => setPersonaName(e.target.value)}
+                        data-testid="input-persona-name"
+                        className="flex-1"
+                      />
+                      <VoiceInput onTranscript={(text) => setPersonaName(prev => prev + text)} />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Пол</label>
