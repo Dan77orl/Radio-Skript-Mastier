@@ -392,7 +392,7 @@ export async function registerRoutes(
           },
           body: JSON.stringify({
             text,
-            model_id: "eleven_multilingual_v2",
+            model_id: "eleven_v3",
             voice_settings: {
               stability: 0.5,
               similarity_boost: 0.75,
