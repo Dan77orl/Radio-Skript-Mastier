@@ -34,8 +34,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Play, Pause, Plus, Trash2, Volume2, User, Users } from "lucide-react";
-import type { Voice } from "@shared/schema";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Play, Pause, Plus, Trash2, Volume2, User, Users, Mic, Edit2 } from "lucide-react";
+import type { Voice, ProgramType } from "@shared/schema";
 
 interface ElevenLabsVoice {
   voice_id: string;
@@ -49,14 +50,21 @@ interface ElevenLabsVoice {
 export default function VoicesPage() {
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingVoice, setEditingVoice] = useState<Voice | null>(null);
   const [selectedElevenLabsVoice, setSelectedElevenLabsVoice] = useState<ElevenLabsVoice | null>(null);
   const [personaName, setPersonaName] = useState("");
   const [personaGender, setPersonaGender] = useState("male");
+  const [selectedProgramTypes, setSelectedProgramTypes] = useState<string[]>([]);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: voices, isLoading } = useQuery<Voice[]>({
     queryKey: ["/api/voices"],
+  });
+
+  const { data: programTypes } = useQuery<ProgramType[]>({
+    queryKey: ["/api/program-types"],
   });
 
   const { data: elevenLabsData, isLoading: isLoadingElevenLabs, isError: isElevenLabsError, error: elevenLabsError } = useQuery<{ voices: ElevenLabsVoice[] }>({
@@ -65,7 +73,7 @@ export default function VoicesPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; elevenLabsVoiceId: string; gender: string; previewUrl: string; description: string }) => {
+    mutationFn: async (data: { name: string; elevenLabsVoiceId: string; gender: string; previewUrl: string; description: string; assignedProgramTypeIds?: string[] }) => {
       const response = await apiRequest("POST", "/api/voices", data);
       return response.json();
     },
@@ -75,6 +83,7 @@ export default function VoicesPage() {
       setSelectedElevenLabsVoice(null);
       setPersonaName("");
       setPersonaGender("male");
+      setSelectedProgramTypes([]);
       toast({
         title: "Голос добавлен",
         description: "Персона успешно создана",
@@ -84,6 +93,30 @@ export default function VoicesPage() {
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось добавить голос",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { assignedProgramTypeIds?: string[] } }) => {
+      const response = await apiRequest("PATCH", `/api/voices/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/voices"] });
+      setIsEditDialogOpen(false);
+      setEditingVoice(null);
+      setSelectedProgramTypes([]);
+      toast({
+        title: "Сохранено",
+        description: "Назначения персоны обновлены",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось обновить персону",
         variant: "destructive",
       });
     },
@@ -151,7 +184,35 @@ export default function VoicesPage() {
       gender: personaGender,
       previewUrl: selectedElevenLabsVoice.preview_url,
       description: selectedElevenLabsVoice.name,
+      assignedProgramTypeIds: selectedProgramTypes.length > 0 ? selectedProgramTypes : undefined,
     });
+  };
+
+  const handleEditVoice = (voice: Voice) => {
+    setEditingVoice(voice);
+    setSelectedProgramTypes(voice.assignedProgramTypeIds || []);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingVoice) return;
+    updateMutation.mutate({
+      id: editingVoice.id,
+      data: { assignedProgramTypeIds: selectedProgramTypes },
+    });
+  };
+
+  const toggleProgramType = (programTypeId: string) => {
+    setSelectedProgramTypes(prev => 
+      prev.includes(programTypeId) 
+        ? prev.filter(id => id !== programTypeId)
+        : [...prev, programTypeId]
+    );
+  };
+
+  const getProgramTypeNames = (ids: string[] | null | undefined): string[] => {
+    if (!ids || !programTypes) return [];
+    return ids.map(id => programTypes.find(pt => pt.id === id)?.name).filter(Boolean) as string[];
   };
 
   const voicesCount = voices?.length || 0;
@@ -208,6 +269,34 @@ export default function VoicesPage() {
                     </Select>
                   </div>
                 </div>
+
+                {programTypes && programTypes.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Назначить на передачи</label>
+                    <div className="grid gap-2 max-h-[150px] overflow-y-auto border rounded-lg p-3">
+                      {programTypes.map((pt) => (
+                        <div 
+                          key={pt.id} 
+                          className="flex items-center gap-2 cursor-pointer"
+                          onClick={() => toggleProgramType(pt.id)}
+                        >
+                          <Checkbox 
+                            checked={selectedProgramTypes.includes(pt.id)} 
+                            onCheckedChange={() => toggleProgramType(pt.id)}
+                            data-testid={`checkbox-program-${pt.id}`}
+                          />
+                          <div className="flex items-center gap-2">
+                            <Mic className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">{pt.name}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Выберите передачи, которые будет вести эта персона
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Голос ElevenLabs</label>
@@ -345,7 +434,17 @@ export default function VoicesPage() {
                       ElevenLabs: {voice.description}
                     </p>
                   )}
-                  <div className="flex items-center gap-2">
+                  {voice.assignedProgramTypeIds && voice.assignedProgramTypeIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {getProgramTypeNames(voice.assignedProgramTypeIds).map((name, i) => (
+                        <Badge key={i} variant="secondary" className="text-xs">
+                          <Mic className="mr-1 h-3 w-3" />
+                          {name}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
                     {voice.previewUrl && (
                       <Button
                         variant="outline"
@@ -366,6 +465,14 @@ export default function VoicesPage() {
                         )}
                       </Button>
                     )}
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleEditVoice(voice)}
+                      data-testid={`button-edit-${voice.id}`}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="outline" size="icon">
@@ -418,6 +525,63 @@ export default function VoicesPage() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Редактировать персону</DialogTitle>
+            <DialogDescription>
+              Назначьте передачи для {editingVoice?.name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {programTypes && programTypes.length > 0 ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Назначить на передачи</label>
+                <div className="grid gap-2 max-h-[250px] overflow-y-auto border rounded-lg p-3">
+                  {programTypes.map((pt) => (
+                    <div 
+                      key={pt.id} 
+                      className="flex items-center gap-2 cursor-pointer hover-elevate p-2 rounded-md"
+                      onClick={() => toggleProgramType(pt.id)}
+                    >
+                      <Checkbox 
+                        checked={selectedProgramTypes.includes(pt.id)} 
+                        onCheckedChange={() => toggleProgramType(pt.id)}
+                        data-testid={`edit-checkbox-program-${pt.id}`}
+                      />
+                      <div className="flex items-center gap-2">
+                        <Mic className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">{pt.name}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Mic className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>Нет доступных передач</p>
+                <p className="text-xs mt-2">Создайте типы программ в разделе "Передачи"</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={updateMutation.isPending}
+              data-testid="button-save-edit"
+            >
+              {updateMutation.isPending ? "Сохранение..." : "Сохранить"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

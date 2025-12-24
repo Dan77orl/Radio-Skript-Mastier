@@ -144,6 +144,7 @@ export const voices = pgTable("voices", {
   description: text("description"),
   isActive: boolean("is_active").default(true),
   sortOrder: integer("sort_order").default(0),
+  assignedProgramTypeIds: text("assigned_program_type_ids").array(),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
