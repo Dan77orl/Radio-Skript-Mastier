@@ -286,24 +286,22 @@ export default function SettingsPage() {
                     <FormLabel>ElevenLabs API Key</FormLabel>
                     <div className="flex gap-2 items-center">
                       <FormControl>
-                        <div className="relative flex-1">
-                          <Input
-                            type={showApiKey ? "text" : "password"}
-                            placeholder="Введите API ключ ElevenLabs"
-                            {...field}
-                            data-testid="input-elevenlabs-key"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-0 top-0"
-                            onClick={() => setShowApiKey(!showApiKey)}
-                          >
-                            {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                        </div>
+                        <Input
+                          type={showApiKey ? "text" : "password"}
+                          placeholder="Введите API ключ ElevenLabs"
+                          {...field}
+                          data-testid="input-elevenlabs-key"
+                          className="flex-1"
+                        />
                       </FormControl>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                      >
+                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
@@ -353,24 +351,22 @@ export default function SettingsPage() {
                     <FormLabel>Claude (Anthropic) API Key</FormLabel>
                     <div className="flex gap-2 items-center">
                       <FormControl>
-                        <div className="relative flex-1">
-                          <Input
-                            type={showAnthropicKey ? "text" : "password"}
-                            placeholder="Введите API ключ Anthropic"
-                            {...field}
-                            data-testid="input-anthropic-key"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-0 top-0"
-                            onClick={() => setShowAnthropicKey(!showAnthropicKey)}
-                          >
-                            {showAnthropicKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                        </div>
+                        <Input
+                          type={showAnthropicKey ? "text" : "password"}
+                          placeholder="Введите API ключ Anthropic"
+                          {...field}
+                          data-testid="input-anthropic-key"
+                          className="flex-1"
+                        />
                       </FormControl>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowAnthropicKey(!showAnthropicKey)}
+                      >
+                        {showAnthropicKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
@@ -423,24 +419,22 @@ export default function SettingsPage() {
                     </FormLabel>
                     <div className="flex gap-2 items-center">
                       <FormControl>
-                        <div className="relative flex-1">
-                          <Input
-                            type={showYandexToken ? "text" : "password"}
-                            placeholder="Введите OAuth токен Яндекс.Диска"
-                            {...field}
-                            data-testid="input-yandex-token"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-0 top-0"
-                            onClick={() => setShowYandexToken(!showYandexToken)}
-                          >
-                            {showYandexToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                        </div>
+                        <Input
+                          type={showYandexToken ? "text" : "password"}
+                          placeholder="Введите OAuth токен Яндекс.Диска"
+                          {...field}
+                          data-testid="input-yandex-token"
+                          className="flex-1"
+                        />
                       </FormControl>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowYandexToken(!showYandexToken)}
+                      >
+                        {showYandexToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
