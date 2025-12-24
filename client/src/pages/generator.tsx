@@ -12,7 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Wand2, Mic, MicOff, User, Loader2, Sparkles, Sun, Palmtree, Coffee, MapPin, Utensils, Lightbulb, PlayCircle, Download, Shield, CheckCircle, AlertTriangle } from "lucide-react";
+import { Wand2, Mic, MicOff, User, Loader2, Sparkles, Sun, Palmtree, Coffee, MapPin, Utensils, Lightbulb, PlayCircle, Download, Shield, CheckCircle, AlertTriangle, FileText, Calendar, ChevronDown, ChevronUp } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Settings, Dialog } from "@shared/schema";
 
 declare global {
@@ -51,6 +53,12 @@ export default function Generator() {
   const { data: settings, isSuccess: settingsLoaded } = useQuery<Settings>({
     queryKey: ["/api/settings"],
   });
+
+  const { data: dialogs, isLoading: dialogsLoading } = useQuery<Dialog[]>({
+    queryKey: ["/api/dialogs"],
+  });
+
+  const [expandedDialogId, setExpandedDialogId] = useState<string | null>(null);
 
   const defaultPrompt = `Создай короткий диалог между ведущими радио "Алания FM" (мужчина и женщина). 
 Тема: жизнь экспатов в Аланье, Турция. 
@@ -628,6 +636,98 @@ export default function Generator() {
               </CardContent>
             </Card>
           )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                История диалогов
+              </CardTitle>
+              <CardDescription>Все сгенерированные тексты</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {dialogsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : dialogs && dialogs.length > 0 ? (
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-3 pr-4">
+                    {dialogs
+                      .filter(d => d.maleText || d.femaleText)
+                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                      .map((dialog) => (
+                        <Collapsible
+                          key={dialog.id}
+                          open={expandedDialogId === dialog.id}
+                          onOpenChange={(open) => setExpandedDialogId(open ? dialog.id : null)}
+                        >
+                          <div className="rounded-lg border p-3">
+                            <CollapsibleTrigger className="w-full">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  <Badge variant="outline" className="shrink-0">
+                                    {dialog.status === "ready" ? "Готово" : dialog.status === "generating" ? "Генерация..." : "Ожидание"}
+                                  </Badge>
+                                  <span className="font-medium truncate">{dialog.title}</span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    {new Date(dialog.createdAt).toLocaleDateString("ru-RU")}
+                                  </span>
+                                  {expandedDialogId === dialog.id ? (
+                                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                  ) : (
+                                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                  )}
+                                </div>
+                              </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <div className="mt-3 space-y-3">
+                                {dialog.maleText && (
+                                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                      <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Мужской голос</span>
+                                    </div>
+                                    <p className="text-sm whitespace-pre-wrap">{dialog.maleText}</p>
+                                  </div>
+                                )}
+                                {dialog.femaleText && (
+                                  <div className="rounded-lg bg-pink-50 dark:bg-pink-950/30 p-3">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <User className="h-4 w-4 text-pink-600 dark:text-pink-400" />
+                                      <span className="text-sm font-medium text-pink-600 dark:text-pink-400">Женский голос</span>
+                                    </div>
+                                    <p className="text-sm whitespace-pre-wrap">{dialog.femaleText}</p>
+                                  </div>
+                                )}
+                                {dialog.audioUrl && (
+                                  <div className="rounded-lg bg-muted p-3">
+                                    <audio controls className="w-full" src={dialog.audioUrl}>
+                                      Ваш браузер не поддерживает аудио
+                                    </audio>
+                                  </div>
+                                )}
+                              </div>
+                            </CollapsibleContent>
+                          </div>
+                        </Collapsible>
+                      ))}
+                  </div>
+                </ScrollArea>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <FileText className="h-10 w-10 text-muted-foreground/50 mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    Нет сгенерированных диалогов
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
