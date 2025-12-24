@@ -306,6 +306,19 @@ export default function SettingsPage() {
                       <Button
                         type="button"
                         variant="outline"
+                        onClick={() => saveFieldMutation.mutate({ elevenLabsApiKey: field.value })}
+                        disabled={saveFieldMutation.isPending || !field.value}
+                        data-testid="button-save-elevenlabs"
+                      >
+                        {saveFieldMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
                         onClick={() => testElevenLabsMutation.mutate()}
                         disabled={testElevenLabsMutation.isPending || !field.value}
                         data-testid="button-test-elevenlabs"
