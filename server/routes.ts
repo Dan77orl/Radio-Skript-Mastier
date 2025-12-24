@@ -1070,5 +1070,171 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/automations", async (req, res) => {
+    try {
+      const automationsList = await storage.getAutomations();
+      res.json(automationsList);
+    } catch (error) {
+      console.error("Error getting automations:", error);
+      res.status(500).json({ error: "Failed to get automations" });
+    }
+  });
+
+  app.get("/api/automations/:id", async (req, res) => {
+    try {
+      const automation = await storage.getAutomation(req.params.id);
+      if (!automation) {
+        return res.status(404).json({ error: "Automation not found" });
+      }
+      res.json(automation);
+    } catch (error) {
+      console.error("Error getting automation:", error);
+      res.status(500).json({ error: "Failed to get automation" });
+    }
+  });
+
+  app.post("/api/automations", async (req, res) => {
+    try {
+      const automation = await storage.createAutomation(req.body);
+      res.json(automation);
+    } catch (error) {
+      console.error("Error creating automation:", error);
+      res.status(500).json({ error: "Failed to create automation" });
+    }
+  });
+
+  app.patch("/api/automations/:id", async (req, res) => {
+    try {
+      const updated = await storage.updateAutomation(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "Automation not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating automation:", error);
+      res.status(500).json({ error: "Failed to update automation" });
+    }
+  });
+
+  app.delete("/api/automations/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteAutomation(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Automation not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting automation:", error);
+      res.status(500).json({ error: "Failed to delete automation" });
+    }
+  });
+
+  app.get("/api/automations/:id/runs", async (req, res) => {
+    try {
+      const runs = await storage.getAutomationRuns(req.params.id);
+      res.json(runs);
+    } catch (error) {
+      console.error("Error getting automation runs:", error);
+      res.status(500).json({ error: "Failed to get automation runs" });
+    }
+  });
+
+  app.post("/api/automations/:id/run", async (req, res) => {
+    try {
+      const automation = await storage.getAutomation(req.params.id);
+      if (!automation) {
+        return res.status(404).json({ error: "Automation not found" });
+      }
+
+      const run = await storage.createAutomationRun({
+        automationId: automation.id,
+        status: "running",
+        itemsCreated: 0,
+      });
+
+      const executeAutomation = async () => {
+        try {
+          let itemsCreated = 0;
+          const itemsCount = automation.itemsCount || 1;
+
+          if (automation.automationType === "dialog") {
+            const voicesList = await storage.getVoices();
+            const selectedVoices = automation.voiceIds?.length 
+              ? voicesList.filter(v => automation.voiceIds?.includes(v.id))
+              : voicesList.filter(v => v.isActive);
+            
+            const maleVoice = selectedVoices.find(v => v.gender === "male");
+            const femaleVoice = selectedVoices.find(v => v.gender === "female");
+
+            if (!maleVoice || !femaleVoice) {
+              await storage.updateAutomationRun(run.id, {
+                status: "error",
+                errorMessage: "Требуются активные голоса для мужчины и женщины",
+                completedAt: new Date(),
+              });
+              return;
+            }
+
+            for (let i = 0; i < itemsCount; i++) {
+              const prompt = automation.prompt || "Создай короткий диалог для радио Алания FM";
+              const dialog = await storage.createDialog({
+                title: `Подводка ${new Date().toLocaleDateString("ru-RU")} #${i + 1}`,
+                prompt,
+                status: "pending",
+              });
+              itemsCreated++;
+            }
+          } else if (automation.automationType === "program" && automation.programTypeId) {
+            const programType = await storage.getProgramType(automation.programTypeId);
+            if (!programType) {
+              await storage.updateAutomationRun(run.id, {
+                status: "error",
+                errorMessage: "Тип программы не найден",
+                completedAt: new Date(),
+              });
+              return;
+            }
+
+            for (let i = 0; i < itemsCount; i++) {
+              const prompt = automation.prompt || programType.defaultPrompt;
+              await storage.createProgram({
+                programTypeId: programType.id,
+                title: `${programType.name} ${new Date().toLocaleDateString("ru-RU")} #${i + 1}`,
+                prompt,
+                status: "pending",
+              });
+              itemsCreated++;
+            }
+          }
+
+          await storage.updateAutomationRun(run.id, {
+            status: "completed",
+            itemsCreated,
+            completedAt: new Date(),
+          });
+
+          await storage.updateAutomation(automation.id, {
+            lastRunAt: new Date(),
+          } as any);
+
+        } catch (error) {
+          console.error("Automation execution error:", error);
+          await storage.updateAutomationRun(run.id, {
+            status: "error",
+            errorMessage: error instanceof Error ? error.message : "Unknown error",
+            completedAt: new Date(),
+          });
+        }
+      };
+
+      executeAutomation();
+
+      res.json({ run, message: "Automation started" });
+    } catch (error) {
+      console.error("Error running automation:", error);
+      res.status(500).json({ error: "Failed to run automation" });
+    }
+  });
+
   return httpServer;
 }
