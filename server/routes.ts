@@ -7,6 +7,24 @@ import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, inser
 import { z } from "zod";
 import { promises as fs } from "fs";
 import path from "path";
+import multer from "multer";
+
+const uploadDir = path.join(process.cwd(), "public", "uploads");
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: async (_req, _file, cb) => {
+      await fs.mkdir(uploadDir, { recursive: true });
+      cb(null, uploadDir);
+    },
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      const name = `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
+      cb(null, name);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -172,6 +190,32 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error saving settings:", error);
       res.status(500).json({ error: "Failed to save settings" });
+    }
+  });
+
+  app.post("/api/upload/logo", upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      const url = `/uploads/${req.file.filename}`;
+      res.json({ url });
+    } catch (error) {
+      console.error("Error uploading logo:", error);
+      res.status(500).json({ error: "Failed to upload logo" });
+    }
+  });
+
+  app.post("/api/upload/attachment", upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      const url = `/uploads/${req.file.filename}`;
+      res.json({ url });
+    } catch (error) {
+      console.error("Error uploading attachment:", error);
+      res.status(500).json({ error: "Failed to upload attachment" });
     }
   });
 

@@ -111,6 +111,12 @@ export class DatabaseStorage implements IStorage {
           femaleVoiceId: newSettings.femaleVoiceId ?? existing.femaleVoiceId,
           dailyDialogsCount: newSettings.dailyDialogsCount ?? existing.dailyDialogsCount,
           defaultPrompt: newSettings.defaultPrompt ?? existing.defaultPrompt,
+          anthropicApiKey: newSettings.anthropicApiKey ?? existing.anthropicApiKey,
+          stationName: newSettings.stationName ?? existing.stationName,
+          stationLogo: newSettings.stationLogo ?? existing.stationLogo,
+          stationDescription: newSettings.stationDescription ?? existing.stationDescription,
+          stationWebsite: newSettings.stationWebsite ?? existing.stationWebsite,
+          stationAttachments: newSettings.stationAttachments ?? existing.stationAttachments,
         })
         .where(eq(settings.id, existing.id))
         .returning();

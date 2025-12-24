@@ -31,6 +31,11 @@ export const settings = pgTable("settings", {
 Стиль: дружелюбный, непринужденный, с юмором.
 Длительность: 30-50 секунд при чтении.
 Обязательно включи: приветствие слушателей, интересный факт или совет про жизнь в Турции.`),
+  stationName: text("station_name").default("Alanya FM"),
+  stationLogo: text("station_logo"),
+  stationDescription: text("station_description"),
+  stationWebsite: text("station_website"),
+  stationAttachments: text("station_attachments").array(),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).omit({

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Save, Key, Mic, Settings2, Eye, EyeOff, Loader2, CheckCircle, AlertCircle, HardDrive } from "lucide-react";
+import { Save, Key, Mic, Settings2, Eye, EyeOff, Loader2, CheckCircle, AlertCircle, HardDrive, Radio, Upload, Globe, X, FileText } from "lucide-react";
 import type { Settings } from "@shared/schema";
 
 const settingsFormSchema = z.object({
@@ -24,6 +24,11 @@ const settingsFormSchema = z.object({
   femaleVoiceId: z.string().min(1, "Укажите ID голоса"),
   dailyDialogsCount: z.coerce.number().min(1).max(50),
   defaultPrompt: z.string().min(10, "Промпт должен быть не менее 10 символов"),
+  stationName: z.string().optional(),
+  stationLogo: z.string().optional(),
+  stationDescription: z.string().optional(),
+  stationWebsite: z.string().optional(),
+  stationAttachments: z.array(z.string()).optional(),
 });
 
 type SettingsFormValues = z.infer<typeof settingsFormSchema>;
@@ -33,6 +38,9 @@ export default function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showYandexToken, setShowYandexToken] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   const { data: settings, isLoading } = useQuery<Settings>({
     queryKey: ["/api/settings"],
@@ -51,6 +59,11 @@ export default function SettingsPage() {
 Тема: жизнь экспатов в Аланье, Турция. 
 Стиль: дружелюбный, непринужденный, с юмором.
 Длительность: 30-50 секунд при чтении.`,
+      stationName: "Alanya FM",
+      stationLogo: "",
+      stationDescription: "",
+      stationWebsite: "",
+      stationAttachments: [],
     },
   });
 
@@ -64,9 +77,69 @@ export default function SettingsPage() {
         femaleVoiceId: settings.femaleVoiceId || "EXAVITQu4vr4xnSDxMaL",
         dailyDialogsCount: settings.dailyDialogsCount || 12,
         defaultPrompt: settings.defaultPrompt || "",
+        stationName: settings.stationName || "Alanya FM",
+        stationLogo: settings.stationLogo || "",
+        stationDescription: settings.stationDescription || "",
+        stationWebsite: settings.stationWebsite || "",
+        stationAttachments: settings.stationAttachments || [],
       });
     }
   }, [settings, form]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploadingLogo(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    try {
+      const response = await fetch("/api/upload/logo", {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) throw new Error("Ошибка загрузки");
+      
+      const data = await response.json();
+      form.setValue("stationLogo", data.url);
+      toast({ title: "Логотип загружен" });
+    } catch (error) {
+      toast({ title: "Ошибка загрузки логотипа", variant: "destructive" });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    try {
+      const response = await fetch("/api/upload/attachment", {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) throw new Error("Ошибка загрузки");
+      
+      const data = await response.json();
+      const currentAttachments = form.getValues("stationAttachments") || [];
+      form.setValue("stationAttachments", [...currentAttachments, data.url]);
+      toast({ title: "Файл добавлен" });
+    } catch (error) {
+      toast({ title: "Ошибка загрузки файла", variant: "destructive" });
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    const currentAttachments = form.getValues("stationAttachments") || [];
+    form.setValue("stationAttachments", currentAttachments.filter((_, i) => i !== index));
+  };
 
   const saveMutation = useMutation({
     mutationFn: async (data: SettingsFormValues) => {
@@ -363,6 +436,187 @@ export default function SettingsPage() {
                     </FormControl>
                     <FormDescription>
                       Этот промпт будет использоваться по умолчанию при создании новых подводок
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Radio className="h-5 w-5" />
+                О радиостанции
+              </CardTitle>
+              <CardDescription>Информация о вашей радиостанции</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="stationName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Название станции</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Alanya FM" {...field} data-testid="input-station-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="stationWebsite"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Globe className="h-4 w-4" />
+                        Сайт станции
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://alanyafm.com" {...field} data-testid="input-station-website" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="stationLogo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Логотип</FormLabel>
+                    <div className="flex items-center gap-4">
+                      {field.value ? (
+                        <div className="relative">
+                          <img 
+                            src={field.value} 
+                            alt="Логотип" 
+                            className="h-16 w-16 rounded-md object-cover border"
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="destructive"
+                            className="absolute -top-2 -right-2 h-6 w-6"
+                            onClick={() => form.setValue("stationLogo", "")}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="h-16 w-16 rounded-md border-2 border-dashed flex items-center justify-center text-muted-foreground">
+                          <Radio className="h-6 w-6" />
+                        </div>
+                      )}
+                      <div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          ref={logoInputRef}
+                          onChange={handleLogoUpload}
+                          className="hidden"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => logoInputRef.current?.click()}
+                          disabled={uploadingLogo}
+                          data-testid="button-upload-logo"
+                        >
+                          {uploadingLogo ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Upload className="mr-2 h-4 w-4" />
+                          )}
+                          Загрузить логотип
+                        </Button>
+                      </div>
+                    </div>
+                    <FormDescription>
+                      Рекомендуемый размер: 200x200 px
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Separator />
+
+              <FormField
+                control={form.control}
+                name="stationDescription"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Описание / Промпт о станции</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Опишите вашу радиостанцию: формат, аудиторию, стиль вещания. Эта информация будет использоваться в генерации контента."
+                        className="min-h-[120px]"
+                        {...field}
+                        data-testid="textarea-station-description"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Используется как контекст при генерации диалогов и передач
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Separator />
+
+              <FormField
+                control={form.control}
+                name="stationAttachments"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Прикреплённые файлы
+                    </FormLabel>
+                    <div className="space-y-2">
+                      {(field.value || []).map((url, index) => (
+                        <div key={index} className="flex items-center gap-2 p-2 rounded-md bg-muted">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="flex-1 text-sm truncate">{url.split("/").pop()}</span>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeAttachment(index)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <div>
+                        <input
+                          type="file"
+                          ref={attachmentInputRef}
+                          onChange={handleAttachmentUpload}
+                          className="hidden"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => attachmentInputRef.current?.click()}
+                          data-testid="button-add-attachment"
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          Добавить файл
+                        </Button>
+                      </div>
+                    </div>
+                    <FormDescription>
+                      Дополнительные материалы о станции (PDF, документы)
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
