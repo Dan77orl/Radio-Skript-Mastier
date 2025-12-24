@@ -14,6 +14,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Save, Key, Mic, Settings2, Eye, EyeOff, Loader2, CheckCircle, AlertCircle, HardDrive, Radio, Upload, Globe, X, FileText } from "lucide-react";
+import { VoiceInput } from "@/components/voice-input";
 import type { Settings } from "@shared/schema";
 
 const settingsFormSchema = z.object({
@@ -556,14 +557,17 @@ export default function SettingsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Промпт по умолчанию</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Базовый промпт для генерации диалогов..."
-                        className="min-h-[150px]"
-                        {...field}
-                        data-testid="textarea-default-prompt"
-                      />
-                    </FormControl>
+                    <div className="flex gap-1">
+                      <FormControl>
+                        <Textarea
+                          placeholder="Базовый промпт для генерации диалогов..."
+                          className="min-h-[150px] flex-1"
+                          {...field}
+                          data-testid="textarea-default-prompt"
+                        />
+                      </FormControl>
+                      <VoiceInput onTranscript={(text) => field.onChange(field.value + " " + text)} />
+                    </div>
                     <FormDescription>
                       Этот промпт будет использоваться по умолчанию при создании новых подводок
                     </FormDescription>
@@ -700,14 +704,17 @@ export default function SettingsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Описание / Промпт о станции</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Опишите вашу радиостанцию: формат, аудиторию, стиль вещания. Эта информация будет использоваться в генерации контента."
-                        className="min-h-[120px]"
-                        {...field}
-                        data-testid="textarea-station-description"
-                      />
-                    </FormControl>
+                    <div className="flex gap-1">
+                      <FormControl>
+                        <Textarea
+                          placeholder="Опишите вашу радиостанцию: формат, аудиторию, стиль вещания. Эта информация будет использоваться в генерации контента."
+                          className="min-h-[120px] flex-1"
+                          {...field}
+                          data-testid="textarea-station-description"
+                        />
+                      </FormControl>
+                      <VoiceInput onTranscript={(text) => field.onChange(field.value + " " + text)} />
+                    </div>
                     <FormDescription>
                       Используется как контекст при генерации диалогов и передач
                     </FormDescription>

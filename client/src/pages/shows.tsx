@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { VoiceInput } from "@/components/voice-input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -318,11 +319,15 @@ export default function ShowsPage() {
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Название</label>
-                    <Input
-                      placeholder="Например: Прогноз погоды"
-                      value={newTypeName}
-                      onChange={(e) => setNewTypeName(e.target.value)}
-                    />
+                    <div className="flex gap-1">
+                      <Input
+                        placeholder="Например: Прогноз погоды"
+                        value={newTypeName}
+                        onChange={(e) => setNewTypeName(e.target.value)}
+                        className="flex-1"
+                      />
+                      <VoiceInput onTranscript={(text) => setNewTypeName(prev => prev + text)} />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Slug (для URL)</label>
@@ -334,20 +339,28 @@ export default function ShowsPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Описание</label>
-                    <Input
-                      placeholder="Краткое описание"
-                      value={newTypeDescription}
-                      onChange={(e) => setNewTypeDescription(e.target.value)}
-                    />
+                    <div className="flex gap-1">
+                      <Input
+                        placeholder="Краткое описание"
+                        value={newTypeDescription}
+                        onChange={(e) => setNewTypeDescription(e.target.value)}
+                        className="flex-1"
+                      />
+                      <VoiceInput onTranscript={(text) => setNewTypeDescription(prev => prev + text)} />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Промпт по умолчанию</label>
-                    <Textarea
-                      placeholder="Промпт для генерации..."
-                      value={newTypePrompt}
-                      onChange={(e) => setNewTypePrompt(e.target.value)}
-                      rows={5}
-                    />
+                    <div className="flex gap-1">
+                      <Textarea
+                        placeholder="Промпт для генерации..."
+                        value={newTypePrompt}
+                        onChange={(e) => setNewTypePrompt(e.target.value)}
+                        rows={5}
+                        className="flex-1"
+                      />
+                      <VoiceInput onTranscript={(text) => setNewTypePrompt(prev => prev + " " + text)} />
+                    </div>
                   </div>
                 </div>
                 <DialogFooter>
@@ -414,11 +427,15 @@ export default function ShowsPage() {
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Название</label>
-                    <Input
-                      placeholder="Например: Прогноз погоды"
-                      value={newTypeName}
-                      onChange={(e) => setNewTypeName(e.target.value)}
-                    />
+                    <div className="flex gap-1">
+                      <Input
+                        placeholder="Например: Прогноз погоды"
+                        value={newTypeName}
+                        onChange={(e) => setNewTypeName(e.target.value)}
+                        className="flex-1"
+                      />
+                      <VoiceInput onTranscript={(text) => setNewTypeName(prev => prev + text)} />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Slug</label>
@@ -430,20 +447,28 @@ export default function ShowsPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Описание</label>
-                    <Input
-                      placeholder="Краткое описание"
-                      value={newTypeDescription}
-                      onChange={(e) => setNewTypeDescription(e.target.value)}
-                    />
+                    <div className="flex gap-1">
+                      <Input
+                        placeholder="Краткое описание"
+                        value={newTypeDescription}
+                        onChange={(e) => setNewTypeDescription(e.target.value)}
+                        className="flex-1"
+                      />
+                      <VoiceInput onTranscript={(text) => setNewTypeDescription(prev => prev + text)} />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Промпт по умолчанию</label>
-                    <Textarea
-                      placeholder="Промпт для генерации..."
-                      value={newTypePrompt}
-                      onChange={(e) => setNewTypePrompt(e.target.value)}
-                      rows={5}
-                    />
+                    <div className="flex gap-1">
+                      <Textarea
+                        placeholder="Промпт для генерации..."
+                        value={newTypePrompt}
+                        onChange={(e) => setNewTypePrompt(e.target.value)}
+                        rows={5}
+                        className="flex-1"
+                      />
+                      <VoiceInput onTranscript={(text) => setNewTypePrompt(prev => prev + " " + text)} />
+                    </div>
                   </div>
                 </div>
                 <DialogFooter>
@@ -504,22 +529,30 @@ export default function ShowsPage() {
                       <div className="space-y-4 py-4">
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Название</label>
-                          <Input
-                            placeholder="Название передачи"
-                            value={newProgramTitle}
-                            onChange={(e) => setNewProgramTitle(e.target.value)}
-                            data-testid="input-program-title"
-                          />
+                          <div className="flex gap-1">
+                            <Input
+                              placeholder="Название передачи"
+                              value={newProgramTitle}
+                              onChange={(e) => setNewProgramTitle(e.target.value)}
+                              data-testid="input-program-title"
+                              className="flex-1"
+                            />
+                            <VoiceInput onTranscript={(text) => setNewProgramTitle(prev => prev + text)} />
+                          </div>
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Промпт (опционально)</label>
-                          <Textarea
-                            placeholder={`Оставьте пустым для использования промпта по умолчанию`}
-                            value={newProgramPrompt}
-                            onChange={(e) => setNewProgramPrompt(e.target.value)}
-                            rows={4}
-                            data-testid="textarea-program-prompt"
-                          />
+                          <div className="flex gap-1">
+                            <Textarea
+                              placeholder={`Оставьте пустым для использования промпта по умолчанию`}
+                              value={newProgramPrompt}
+                              onChange={(e) => setNewProgramPrompt(e.target.value)}
+                              rows={4}
+                              data-testid="textarea-program-prompt"
+                              className="flex-1"
+                            />
+                            <VoiceInput onTranscript={(text) => setNewProgramPrompt(prev => prev + " " + text)} />
+                          </div>
                           <p className="text-xs text-muted-foreground">
                             Промпт по умолчанию: {type.defaultPrompt.substring(0, 100)}...
                           </p>
@@ -666,12 +699,15 @@ export default function ShowsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Textarea
-              value={editingType?.defaultPrompt || ""}
-              onChange={(e) => setEditingType(prev => prev ? { ...prev, defaultPrompt: e.target.value } : null)}
-              rows={10}
-              className="font-mono text-sm"
-            />
+            <div className="flex gap-1">
+              <Textarea
+                value={editingType?.defaultPrompt || ""}
+                onChange={(e) => setEditingType(prev => prev ? { ...prev, defaultPrompt: e.target.value } : null)}
+                rows={10}
+                className="font-mono text-sm flex-1"
+              />
+              <VoiceInput onTranscript={(text) => setEditingType(prev => prev ? { ...prev, defaultPrompt: prev.defaultPrompt + " " + text } : null)} />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditPromptDialogOpen(false)}>

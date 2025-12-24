@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { VoiceInput } from "@/components/voice-input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -195,14 +196,18 @@ export default function AdsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Описание рекламы</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Опишите что нужно рекламировать: продукт, услугу, акцию, контактные данные и т.д."
-                          rows={5}
-                          {...field}
-                          data-testid="textarea-ad-prompt"
-                        />
-                      </FormControl>
+                      <div className="flex gap-1">
+                        <FormControl>
+                          <Textarea
+                            placeholder="Опишите что нужно рекламировать: продукт, услугу, акцию, контактные данные и т.д."
+                            rows={5}
+                            {...field}
+                            data-testid="textarea-ad-prompt"
+                            className="flex-1"
+                          />
+                        </FormControl>
+                        <VoiceInput onTranscript={(text) => field.onChange(field.value + " " + text)} />
+                      </div>
                       <FormDescription>
                         ИИ создаст диалог между ведущими на основе вашего описания
                       </FormDescription>
