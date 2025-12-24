@@ -1102,7 +1102,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
   app.patch("/api/voices/:id", async (req, res) => {
     try {
-      const allowedFields = ["name", "gender", "isActive", "sortOrder", "description"];
+      const allowedFields = ["name", "gender", "isActive", "sortOrder", "description", "personaName", "assignedProgramTypeIds"];
       const updates: Record<string, any> = {};
       for (const key of allowedFields) {
         if (key in req.body) {
