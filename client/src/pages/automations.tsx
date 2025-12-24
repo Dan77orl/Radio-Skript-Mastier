@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -17,10 +17,17 @@ import { Separator } from "@/components/ui/separator";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Play, Trash2, Clock, CheckCircle, XCircle, Loader2, Zap, Settings2 } from "lucide-react";
+import { Plus, Play, Trash2, Clock, CheckCircle, XCircle, Loader2, Zap, Settings2, Mic, MicOff } from "lucide-react";
 import type { Automation, AutomationRun, Voice, ProgramType } from "@shared/schema";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
+
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
 
 const automationFormSchema = z.object({
   name: z.string().min(1, "Название обязательно"),
@@ -39,6 +46,8 @@ export default function AutomationsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedAutomation, setSelectedAutomation] = useState<Automation | null>(null);
   const [showRuns, setShowRuns] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const { data: automations = [], isLoading: automationsLoading } = useQuery<Automation[]>({
     queryKey: ["/api/automations"],
@@ -177,6 +186,71 @@ export default function AutomationsPage() {
         return "Программы";
       default:
         return type;
+    }
+  };
+
+  const startVoiceInput = () => {
+    const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionClass) {
+      toast({
+        title: "Не поддерживается",
+        description: "Голосовой ввод не поддерживается вашим браузером",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const recognition = new SpeechRecognitionClass();
+    recognition.lang = "ru-RU";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      const currentPrompt = form.getValues("prompt") || "";
+      if (event.results[event.results.length - 1].isFinal) {
+        form.setValue("prompt", currentPrompt + " " + transcript);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+      toast({
+        title: "Ошибка записи",
+        description: "Не удалось распознать речь",
+        variant: "destructive",
+      });
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const stopVoiceInput = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+  };
+
+  const toggleVoiceInput = () => {
+    if (isListening) {
+      stopVoiceInput();
+    } else {
+      startVoiceInput();
     }
   };
 
@@ -332,6 +406,26 @@ export default function AutomationsPage() {
                           data-testid="input-automation-prompt"
                         />
                       </FormControl>
+                      <Button
+                        type="button"
+                        variant={isListening ? "destructive" : "outline"}
+                        size="sm"
+                        onClick={toggleVoiceInput}
+                        className="mt-2"
+                        data-testid="button-voice-input-create"
+                      >
+                        {isListening ? (
+                          <>
+                            <MicOff className="mr-2 h-4 w-4" />
+                            Остановить
+                          </>
+                        ) : (
+                          <>
+                            <Mic className="mr-2 h-4 w-4" />
+                            Голосовой ввод
+                          </>
+                        )}
+                      </Button>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -650,6 +744,26 @@ export default function AutomationsPage() {
                         data-testid="input-edit-prompt"
                       />
                     </FormControl>
+                    <Button
+                      type="button"
+                      variant={isListening ? "destructive" : "outline"}
+                      size="sm"
+                      onClick={toggleVoiceInput}
+                      className="mt-2"
+                      data-testid="button-voice-input-edit"
+                    >
+                      {isListening ? (
+                        <>
+                          <MicOff className="mr-2 h-4 w-4" />
+                          Остановить
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="mr-2 h-4 w-4" />
+                          Голосовой ввод
+                        </>
+                      )}
+                    </Button>
                     <FormMessage />
                   </FormItem>
                 )}
