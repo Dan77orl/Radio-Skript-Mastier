@@ -11,10 +11,13 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Newspaper, Plus, Trash2, Edit2, Globe, Loader2, RefreshCw } from "lucide-react";
-import type { NewsSource } from "@shared/schema";
+import { Newspaper, Plus, Trash2, Edit2, Globe, Loader2, RefreshCw, Download } from "lucide-react";
+import type { NewsSource, NewsItem } from "@shared/schema";
+import { format } from "date-fns";
+import { ru } from "date-fns/locale";
 
 const sourceFormSchema = z.object({
   name: z.string().min(1, "Введите название"),
@@ -35,6 +38,12 @@ export default function NewsSources() {
   const { data: sources = [], isLoading } = useQuery<NewsSource[]>({
     queryKey: ["/api/news-sources"],
   });
+
+  const { data: newsItems = [] } = useQuery<NewsItem[]>({
+    queryKey: ["/api/news-items"],
+  });
+
+  const [fetchingSourceId, setFetchingSourceId] = useState<string | null>(null);
 
   const form = useForm<SourceFormValues>({
     resolver: zodResolver(sourceFormSchema),
@@ -94,19 +103,23 @@ export default function NewsSources() {
     },
   });
 
-  const fetchNewsMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/fetch-news", {});
-      return response.json() as Promise<{ topics: Array<{ title: string; description: string; category: string }> }>;
+  const fetchSourceMutation = useMutation({
+    mutationFn: async (sourceId: string) => {
+      setFetchingSourceId(sourceId);
+      const response = await apiRequest("POST", `/api/news-sources/${sourceId}/fetch`, {});
+      return response.json() as Promise<{ fetched: number; saved: number }>;
     },
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/news-items"] });
       toast({
-        title: "Темы получены",
-        description: `Найдено ${data.topics?.length || 0} тем для подводок`,
+        title: "Новости получены",
+        description: `Загружено ${data.fetched} новостей, сохранено ${data.saved}`,
       });
+      setFetchingSourceId(null);
     },
     onError: (error: Error) => {
       toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      setFetchingSourceId(null);
     },
   });
 
@@ -156,19 +169,6 @@ export default function NewsSources() {
           <p className="text-muted-foreground">Управление RSS и новостными источниками</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={() => fetchNewsMutation.mutate()}
-            disabled={fetchNewsMutation.isPending || sources.length === 0}
-            data-testid="button-fetch-news"
-          >
-            {fetchNewsMutation.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Получить темы
-          </Button>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={openCreateDialog} data-testid="button-add-source">
@@ -347,6 +347,19 @@ export default function NewsSources() {
                     <Button
                       size="icon"
                       variant="ghost"
+                      onClick={() => fetchSourceMutation.mutate(source.id)}
+                      disabled={fetchingSourceId === source.id}
+                      data-testid={`button-fetch-${source.id}`}
+                    >
+                      {fetchingSourceId === source.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
                       onClick={() => openEditDialog(source)}
                       data-testid={`button-edit-${source.id}`}
                     >
@@ -369,24 +382,42 @@ export default function NewsSources() {
         </div>
       )}
 
-      {fetchNewsMutation.data?.topics && fetchNewsMutation.data.topics.length > 0 && (
+      {newsItems.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Рекомендуемые темы</CardTitle>
-            <CardDescription>Темы на основе источников новостей</CardDescription>
+            <CardTitle>Загруженные новости</CardTitle>
+            <CardDescription>
+              {newsItems.length} новостей из источников
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {fetchNewsMutation.data.topics.map((topic, idx) => (
-                <div key={idx} className="p-3 rounded-lg border space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{topic.title}</span>
-                    <Badge variant="secondary" className="text-xs">{topic.category}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{topic.description}</p>
-                </div>
-              ))}
-            </div>
+            <ScrollArea className="h-[400px]">
+              <div className="space-y-3">
+                {newsItems.map((item) => {
+                  const source = sources.find(s => s.id === item.sourceId);
+                  return (
+                    <div key={item.id} className="p-3 rounded-lg border space-y-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-medium text-sm">{item.title}</span>
+                        {item.isUsed && (
+                          <Badge variant="secondary" className="text-xs shrink-0">Использовано</Badge>
+                        )}
+                      </div>
+                      {item.summary && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">{item.summary}</p>
+                      )}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {source && <span>{source.name}</span>}
+                        {item.publishedAt && (
+                          <span>{format(new Date(item.publishedAt), "d MMM, HH:mm", { locale: ru })}</span>
+                        )}
+                        {item.category && <Badge variant="outline" className="text-xs">{item.category}</Badge>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
           </CardContent>
         </Card>
       )}

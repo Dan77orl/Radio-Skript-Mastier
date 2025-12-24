@@ -132,6 +132,7 @@ export type Ad = typeof ads.$inferSelect;
 export const voices = pgTable("voices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  personaName: text("persona_name"),
   elevenLabsVoiceId: text("eleven_labs_voice_id").notNull(),
   gender: text("gender").notNull().default("male"),
   previewUrl: text("preview_url"),
@@ -256,3 +257,24 @@ export const insertAutomationRunSchema = createInsertSchema(automationRuns).omit
 
 export type InsertAutomationRun = z.infer<typeof insertAutomationRunSchema>;
 export type AutomationRun = typeof automationRuns.$inferSelect;
+
+export const newsItems = pgTable("news_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sourceId: varchar("source_id").notNull(),
+  title: text("title").notNull(),
+  summary: text("summary"),
+  content: text("content"),
+  url: text("url"),
+  publishedAt: timestamp("published_at"),
+  category: text("category"),
+  isUsed: boolean("is_used").default(false),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertNewsItemSchema = createInsertSchema(newsItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNewsItem = z.infer<typeof insertNewsItemSchema>;
+export type NewsItem = typeof newsItems.$inferSelect;

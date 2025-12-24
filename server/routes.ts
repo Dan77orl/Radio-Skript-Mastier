@@ -15,6 +15,59 @@ const openai = new OpenAI({
 
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
+interface ParsedNewsItem {
+  title: string;
+  summary?: string;
+  content?: string;
+  url?: string;
+  publishedAt?: string;
+  category?: string;
+}
+
+async function fetchNewsFromSource(source: { url: string; type: string }): Promise<ParsedNewsItem[]> {
+  try {
+    const response = await fetch(source.url);
+    const text = await response.text();
+    
+    if (source.type === "rss") {
+      const items: ParsedNewsItem[] = [];
+      const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
+      let match;
+      
+      while ((match = itemRegex.exec(text)) !== null) {
+        const itemContent = match[1];
+        const getTag = (tag: string) => {
+          const tagMatch = itemContent.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>|<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
+          return tagMatch ? (tagMatch[1] || tagMatch[2] || "").trim() : "";
+        };
+        
+        const title = getTag("title");
+        const description = getTag("description");
+        const link = getTag("link");
+        const pubDate = getTag("pubDate");
+        const category = getTag("category");
+        
+        if (title) {
+          items.push({
+            title,
+            summary: description.substring(0, 500),
+            url: link,
+            publishedAt: pubDate ? new Date(pubDate).toISOString() : undefined,
+            category: category || undefined,
+          });
+        }
+      }
+      
+      return items.slice(0, 20);
+    }
+    
+    return [];
+  } catch (error) {
+    console.error("Error fetching news from source:", error);
+    return [];
+  }
+}
+
 async function getAnthropicClient(): Promise<Anthropic | null> {
   const settings = await storage.getSettings();
   if (!settings?.anthropicApiKey) {
@@ -373,6 +426,52 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting news source:", error);
       res.status(500).json({ error: "Failed to delete news source" });
+    }
+  });
+
+  app.get("/api/news-items", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const items = await storage.getNewsItems(limit);
+      res.json(items);
+    } catch (error) {
+      console.error("Error getting news items:", error);
+      res.status(500).json({ error: "Failed to get news items" });
+    }
+  });
+
+  app.post("/api/news-sources/:id/fetch", async (req, res) => {
+    try {
+      const source = await storage.getNewsSource(req.params.id);
+      if (!source) {
+        return res.status(404).json({ error: "News source not found" });
+      }
+      
+      const fetchedItems = await fetchNewsFromSource(source);
+      const savedItems = [];
+      
+      for (const item of fetchedItems) {
+        try {
+          const saved = await storage.createNewsItem({
+            sourceId: source.id,
+            title: item.title,
+            summary: item.summary || null,
+            content: item.content || null,
+            url: item.url || null,
+            publishedAt: item.publishedAt ? new Date(item.publishedAt) : null,
+            category: item.category || null,
+            isUsed: false,
+          });
+          savedItems.push(saved);
+        } catch (e) {
+          console.error("Error saving news item:", e);
+        }
+      }
+      
+      res.json({ fetched: fetchedItems.length, saved: savedItems.length });
+    } catch (error) {
+      console.error("Error fetching news:", error);
+      res.status(500).json({ error: "Failed to fetch news" });
     }
   });
 

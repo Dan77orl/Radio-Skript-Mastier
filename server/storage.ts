@@ -1,4 +1,4 @@
-import { users, settings, dialogs, newsSources, ads, voices, programTypes, programs, automations, automationRuns, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type Ad, type InsertAd, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun } from "@shared/schema";
+import { users, settings, dialogs, newsSources, newsItems, ads, voices, programTypes, programs, automations, automationRuns, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql } from "drizzle-orm";
 
@@ -57,6 +57,12 @@ export interface IStorage {
   getAutomationRuns(automationId: string): Promise<AutomationRun[]>;
   createAutomationRun(run: InsertAutomationRun): Promise<AutomationRun>;
   updateAutomationRun(id: string, run: Partial<InsertAutomationRun>): Promise<AutomationRun | undefined>;
+  
+  getNewsItems(limit?: number): Promise<NewsItem[]>;
+  getUnusedNewsItems(limit?: number): Promise<NewsItem[]>;
+  createNewsItem(item: InsertNewsItem): Promise<NewsItem>;
+  markNewsItemUsed(id: string): Promise<void>;
+  clearOldNewsItems(daysOld: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -330,6 +336,37 @@ export class DatabaseStorage implements IStorage {
       .where(eq(automationRuns.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  async getNewsItems(limit: number = 50): Promise<NewsItem[]> {
+    return db.select().from(newsItems)
+      .orderBy(desc(newsItems.publishedAt))
+      .limit(limit);
+  }
+
+  async getUnusedNewsItems(limit: number = 10): Promise<NewsItem[]> {
+    return db.select().from(newsItems)
+      .where(eq(newsItems.isUsed, false))
+      .orderBy(desc(newsItems.publishedAt))
+      .limit(limit);
+  }
+
+  async createNewsItem(insertItem: InsertNewsItem): Promise<NewsItem> {
+    const [item] = await db.insert(newsItems).values(insertItem).returning();
+    return item;
+  }
+
+  async markNewsItemUsed(id: string): Promise<void> {
+    await db.update(newsItems)
+      .set({ isUsed: true })
+      .where(eq(newsItems.id, id));
+  }
+
+  async clearOldNewsItems(daysOld: number): Promise<void> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+    await db.delete(newsItems)
+      .where(sql`${newsItems.createdAt} < ${cutoffDate}`);
   }
 }
 
