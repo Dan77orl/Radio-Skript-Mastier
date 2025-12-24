@@ -28,6 +28,7 @@ const settingsFormSchema = z.object({
   stationLogo: z.string().optional(),
   stationDescription: z.string().optional(),
   stationWebsite: z.string().optional(),
+  stationLocation: z.string().optional(),
   stationAttachments: z.array(z.string()).optional(),
 });
 
@@ -63,6 +64,7 @@ export default function SettingsPage() {
       stationLogo: "",
       stationDescription: "",
       stationWebsite: "",
+      stationLocation: "Аланья, Турция",
       stationAttachments: [],
     },
   });
@@ -81,6 +83,7 @@ export default function SettingsPage() {
         stationLogo: settings.stationLogo || "",
         stationDescription: settings.stationDescription || "",
         stationWebsite: settings.stationWebsite || "",
+        stationLocation: settings.stationLocation || "Аланья, Турция",
         stationAttachments: settings.stationAttachments || [],
       });
     }
@@ -593,6 +596,22 @@ export default function SettingsPage() {
                       <FormControl>
                         <Input placeholder="https://alanyafm.com" {...field} data-testid="input-station-website" />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="stationLocation"
+                  render={({ field }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>Местоположение</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Аланья, Турция" {...field} data-testid="input-station-location" />
+                      </FormControl>
+                      <FormDescription>
+                        Отображается внизу боковой панели
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

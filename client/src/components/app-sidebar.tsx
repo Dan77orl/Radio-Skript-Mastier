@@ -72,6 +72,7 @@ export function AppSidebar() {
 
   const stationName = settings?.stationName || "Alanya FM";
   const stationLogo = settings?.stationLogo;
+  const stationLocation = settings?.stationLocation || "Аланья, Турция";
 
   return (
     <Sidebar>
@@ -119,7 +120,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-4">
         <div className="text-xs text-muted-foreground text-center">
-          Аланья, Турция
+          {stationLocation}
         </div>
       </SidebarFooter>
     </Sidebar>

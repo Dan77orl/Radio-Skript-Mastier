@@ -35,6 +35,7 @@ export const settings = pgTable("settings", {
   stationLogo: text("station_logo"),
   stationDescription: text("station_description"),
   stationWebsite: text("station_website"),
+  stationLocation: text("station_location").default("Аланья, Турция"),
   stationAttachments: text("station_attachments").array(),
 });
 
