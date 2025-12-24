@@ -31,6 +31,16 @@ export const settings = pgTable("settings", {
 Стиль: дружелюбный, непринужденный, с юмором.
 Длительность: 30-50 секунд при чтении.
 Обязательно включи: приветствие слушателей, интересный факт или совет про жизнь в Турции.`),
+  dailyPrompt: text("daily_prompt").default(`Сегодня создаём диалоги для радио. Учитывай:
+- День недели и время суток для каждого слота
+- Актуальные события и праздники
+- Местные новости и погоду
+- Стиль: дружелюбный, с юмором
+- Для утренних слотов: бодрящие темы, приветствие дня
+- Для дневных слотов: полезные советы, интересные факты
+- Для вечерних слотов: расслабляющие темы, итоги дня`),
+  slotPrompts: text("slot_prompts").array(),
+  accumulatedLearnings: text("accumulated_learnings"),
   stationName: text("station_name").default("Alanya FM"),
   stationLogo: text("station_logo"),
   stationDescription: text("station_description"),

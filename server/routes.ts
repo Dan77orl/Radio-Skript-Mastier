@@ -595,6 +595,308 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
     }
   });
 
+  app.post("/api/generate-day-dialogs", async (req, res) => {
+    try {
+      const { date, totalSlots } = req.body;
+      
+      if (!date || !totalSlots) {
+        return res.status(400).json({ error: "Date and totalSlots are required" });
+      }
+
+      const existingDialogs = await storage.getDialogs();
+      const existingForDate = existingDialogs.filter(d => d.scheduledDate === date);
+      const existingBySlot = new Map<number, string>();
+      existingForDate.forEach(d => {
+        if (d.slotNumber) {
+          existingBySlot.set(d.slotNumber, d.id);
+        }
+      });
+
+      const settings = await storage.getSettings();
+      const ctx = await buildStationContext();
+      const newsItems = await storage.getNewsItems(10);
+      const unusedNews = newsItems.filter(n => !n.isUsed).slice(0, 5);
+      
+      const dateObj = new Date(date);
+      const weekdays = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
+      const weekday = weekdays[dateObj.getDay()];
+      const dateFormatted = dateObj.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+      
+      const holidays: Record<string, string> = {
+        "12-25": "Рождество (европейское)",
+        "12-31": "Канун Нового года",
+        "01-01": "Новый год",
+        "01-07": "Рождество (православное)",
+        "02-14": "День святого Валентина",
+        "03-08": "Международный женский день",
+      };
+      const monthDay = `${String(dateObj.getMonth() + 1).padStart(2, "0")}-${String(dateObj.getDate()).padStart(2, "0")}`;
+      const holiday = holidays[monthDay] || null;
+      
+      const newsContext = unusedNews.length > 0 
+        ? `\n\nАктуальные новости для использования:\n${unusedNews.map((n, i) => `${i + 1}. ${n.title}${n.summary ? `: ${n.summary}` : ""}`).join("\n")}`
+        : "";
+
+      const dailyPrompt = settings?.dailyPrompt || "";
+      const slotPrompts = settings?.slotPrompts || [];
+      const learnings = settings?.accumulatedLearnings || "";
+
+      const generatedDialogs = [];
+
+      for (let slotNumber = 1; slotNumber <= totalSlots; slotNumber++) {
+        const startHour = 7;
+        const endHour = 22;
+        const hoursRange = endHour - startHour;
+        const slotDuration = hoursRange / totalSlots;
+        const slotHour = startHour + (slotNumber - 1) * slotDuration;
+        const hour = Math.floor(slotHour);
+        const timeLabel = `${hour.toString().padStart(2, "0")}:00`;
+        
+        let timeOfDay = "день";
+        if (hour < 10) timeOfDay = "утро";
+        else if (hour < 14) timeOfDay = "день";
+        else if (hour < 18) timeOfDay = "вечер";
+        else timeOfDay = "поздний вечер";
+
+        const slotPrompt = slotPrompts[slotNumber - 1] || "";
+        
+        const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}". 
+${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
+Ведущие: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
+
+КОНТЕКСТ ДНЯ:
+- Дата: ${dateFormatted}, ${weekday}
+${holiday ? `- Праздник: ${holiday}` : ""}
+- Время слота: ${timeLabel} (${timeOfDay})
+- Слот номер: ${slotNumber} из ${totalSlots}
+${newsContext}
+
+${dailyPrompt ? `ОБЩИЕ ИНСТРУКЦИИ НА ДЕНЬ:\n${dailyPrompt}\n` : ""}
+${slotPrompt ? `ИНСТРУКЦИИ ДЛЯ ЭТОГО СЛОТА:\n${slotPrompt}\n` : ""}
+${learnings ? `НАКОПЛЕННЫЙ ОПЫТ:\n${learnings}\n` : ""}
+
+Создай короткий диалог (30-50 секунд при чтении).
+Учитывай время суток и день недели.
+${hour < 10 ? "Утренний слот: бодрое приветствие, энергичный тон." : ""}
+${hour >= 18 ? "Вечерний слот: расслабленный тон, итоги дня." : ""}
+
+ВАЖНО: Ответ в формате JSON:
+{
+  "title": "краткое название темы диалога",
+  "maleText": "текст для ${ctx.malePersona}",
+  "femaleText": "текст для ${ctx.femalePersona}"
+}`;
+
+        const userPrompt = `Создай диалог для слота #${slotNumber} (${timeLabel}, ${timeOfDay}).`;
+
+        try {
+          const anthropic = await getAnthropicClient();
+          let maleText = "";
+          let femaleText = "";
+          let title = `Слот #${slotNumber}`;
+
+          if (anthropic) {
+            const response = await anthropic.messages.create({
+              model: CLAUDE_MODEL,
+              max_tokens: 1024,
+              system: systemPrompt,
+              messages: [{ role: "user", content: userPrompt }],
+            });
+
+            const textContent = response.content.find(c => c.type === "text");
+            if (textContent && textContent.type === "text") {
+              const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                maleText = parsed.maleText || "";
+                femaleText = parsed.femaleText || "";
+                title = parsed.title || title;
+              }
+            }
+          } else {
+            const response = await openai.chat.completions.create({
+              model: "gpt-4.1",
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt }
+              ],
+              response_format: { type: "json_object" },
+              max_completion_tokens: 1024,
+            });
+
+            const content = response.choices[0]?.message?.content;
+            if (content) {
+              const parsed = JSON.parse(content);
+              maleText = parsed.maleText || "";
+              femaleText = parsed.femaleText || "";
+              title = parsed.title || title;
+            }
+          }
+
+          const existingDialogId = existingBySlot.get(slotNumber);
+          let dialog;
+          
+          if (existingDialogId) {
+            dialog = await storage.updateDialog(existingDialogId, {
+              title,
+              prompt: userPrompt,
+              scriptText: `${maleText}\n\n${femaleText}`,
+              maleText,
+              femaleText,
+              status: "pending",
+              moderationStatus: "pending",
+              moderationNotes: null,
+              moderatedAt: null,
+              newsSourceIds: unusedNews.length > 0 ? unusedNews.map(n => n.id) : null,
+            });
+          } else {
+            dialog = await storage.createDialog({
+              title,
+              prompt: userPrompt,
+              scriptText: `${maleText}\n\n${femaleText}`,
+              maleText,
+              femaleText,
+              audioUrl: null,
+              duration: null,
+              status: "pending",
+              scheduledDate: date,
+              slotNumber,
+              uploadedToYandex: false,
+              yandexPath: null,
+              moderationStatus: "pending",
+              moderationNotes: null,
+              moderatedAt: null,
+              newsSourceIds: unusedNews.length > 0 ? unusedNews.map(n => n.id) : null,
+            });
+          }
+
+          if (dialog) generatedDialogs.push(dialog);
+        } catch (slotError) {
+          console.error(`Error generating slot ${slotNumber}:`, slotError);
+        }
+      }
+
+      for (const news of unusedNews) {
+        await storage.markNewsItemUsed(news.id);
+      }
+
+      res.json({ dialogs: generatedDialogs, generatedCount: generatedDialogs.length });
+    } catch (error) {
+      console.error("Error generating day dialogs:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate dialogs" });
+    }
+  });
+
+  app.post("/api/dialogs/:id/regenerate", async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      const dialogId = req.params.id;
+      
+      const dialog = await storage.getDialog(dialogId);
+      if (!dialog) {
+        return res.status(404).json({ error: "Dialog not found" });
+      }
+
+      const ctx = await buildStationContext();
+      
+      const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}". 
+${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
+Ведущие: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
+
+Текущий диалог:
+Мужской текст: ${dialog.maleText || ""}
+Женский текст: ${dialog.femaleText || ""}
+
+Перегенерируй диалог с учётом новых инструкций.
+Создай короткий диалог (30-50 секунд при чтении).
+
+ВАЖНО: Ответ в формате JSON:
+{
+  "maleText": "новый текст для ${ctx.malePersona}",
+  "femaleText": "новый текст для ${ctx.femalePersona}"
+}`;
+
+      const anthropic = await getAnthropicClient();
+      let maleText = dialog.maleText || "";
+      let femaleText = dialog.femaleText || "";
+
+      if (anthropic) {
+        const response = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: [{ role: "user", content: prompt }],
+        });
+
+        const textContent = response.content.find(c => c.type === "text");
+        if (textContent && textContent.type === "text") {
+          const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            maleText = parsed.maleText || maleText;
+            femaleText = parsed.femaleText || femaleText;
+          }
+        }
+      } else {
+        const response = await openai.chat.completions.create({
+          model: "gpt-4.1",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: prompt }
+          ],
+          response_format: { type: "json_object" },
+          max_completion_tokens: 1024,
+        });
+
+        const content = response.choices[0]?.message?.content;
+        if (content) {
+          const parsed = JSON.parse(content);
+          maleText = parsed.maleText || maleText;
+          femaleText = parsed.femaleText || femaleText;
+        }
+      }
+
+      const updatedDialog = await storage.updateDialog(dialogId, {
+        maleText,
+        femaleText,
+        scriptText: `${maleText}\n\n${femaleText}`,
+        prompt: `${dialog.prompt || ""}\n\nОбновление: ${prompt}`,
+      });
+
+      res.json(updatedDialog);
+    } catch (error) {
+      console.error("Error regenerating dialog:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to regenerate dialog" });
+    }
+  });
+
+  app.post("/api/send-to-automation", async (req, res) => {
+    try {
+      const { date } = req.body;
+      
+      if (!date) {
+        return res.status(400).json({ error: "Date is required" });
+      }
+
+      const dialogs = await storage.getDialogs();
+      const dialogsForDate = dialogs.filter(d => 
+        d.scheduledDate === date && 
+        d.maleText && 
+        d.femaleText && 
+        d.status === "pending"
+      );
+
+      for (const dialog of dialogsForDate) {
+        await storage.updateDialog(dialog.id, { status: "generating" });
+      }
+
+      res.json({ queued: dialogsForDate.length });
+    } catch (error) {
+      console.error("Error sending to automation:", error);
+      res.status(500).json({ error: "Failed to send to automation" });
+    }
+  });
+
   app.get("/api/news-sources", async (req, res) => {
     try {
       const sources = await storage.getNewsSources();
