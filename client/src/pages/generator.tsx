@@ -10,6 +10,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Wand2, Loader2, Calendar, Clock, User, CheckCircle, Edit3, Send, RefreshCw, ChevronDown, ChevronUp, Play, FileText, Save } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { VoiceInput } from "@/components/voice-input";
 import type { Settings, Dialog, NewsItem } from "@shared/schema";
 
 function getSlotTimeLabel(slotNumber: number, totalSlots: number): string {
@@ -283,16 +284,26 @@ export default function Generator() {
                     </Button>
                   )}
                 </div>
-                <Textarea
-                  value={dailyPromptValue}
-                  onChange={(e) => {
-                    setDailyPromptValue(e.target.value);
-                    setIsDailyPromptDirty(true);
-                  }}
-                  placeholder="Инструкции для генерации диалогов на весь день..."
-                  className="min-h-[100px] text-sm"
-                  data-testid="textarea-daily-prompt"
-                />
+                <div className="relative">
+                  <Textarea
+                    value={dailyPromptValue}
+                    onChange={(e) => {
+                      setDailyPromptValue(e.target.value);
+                      setIsDailyPromptDirty(true);
+                    }}
+                    placeholder="Инструкции для генерации диалогов на весь день..."
+                    className="min-h-[100px] text-sm pr-12"
+                    data-testid="textarea-daily-prompt"
+                  />
+                  <div className="absolute right-2 top-2">
+                    <VoiceInput 
+                      onTranscript={(text) => {
+                        setDailyPromptValue(prev => prev + " " + text);
+                        setIsDailyPromptDirty(true);
+                      }} 
+                    />
+                  </div>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   Этот промпт применяется ко всем слотам дня. Включает контекст станции и персон автоматически.
                 </p>
