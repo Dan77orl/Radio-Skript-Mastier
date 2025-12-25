@@ -280,14 +280,40 @@ export default function Schedule() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Детали сегодняшнего дня</CardTitle>
-          <CardDescription>
-            {new Date().toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })}
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>
+              {viewingDate 
+                ? `Детали ${new Date(viewingDate).toLocaleDateString("ru-RU", { weekday: "long" })}`
+                : "Детали дня"
+              }
+            </CardTitle>
+            <CardDescription>
+              {viewingDate 
+                ? new Date(viewingDate).toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })
+                : "Выберите день в календаре выше"
+              }
+            </CardDescription>
+          </div>
+          {!viewingDate && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setViewingDate(new Date().toISOString().split("T")[0])}
+              data-testid="button-select-today"
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              Сегодня
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
-          {dialogsLoading ? (
+          {!viewingDate ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <CalendarIcon className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">Нажмите на день в календаре для просмотра слотов</p>
+            </div>
+          ) : dialogsLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 4 }, (_, i) => (
                 <Skeleton key={i} className="h-16 w-full" />
@@ -296,9 +322,8 @@ export default function Schedule() {
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: dailyCount }, (_, i) => {
-                const today = new Date().toISOString().split("T")[0];
-                const todayDialogs = dialogs?.filter(d => d.scheduledDate === today) || [];
-                const slotDialog = todayDialogs.find(d => d.slotNumber === i + 1);
+                const selectedDialogs = dialogs?.filter(d => d.scheduledDate === viewingDate) || [];
+                const slotDialog = selectedDialogs.find(d => d.slotNumber === i + 1);
                 const statusInfo = slotDialog ? getStatusInfo(slotDialog.status) : getStatusInfo("pending");
                 const StatusIcon = statusInfo.icon;
 
@@ -306,7 +331,7 @@ export default function Schedule() {
                   <div
                     key={i}
                     className={`flex items-center gap-3 rounded-lg border-2 p-3 ${statusInfo.bg}`}
-                    data-testid={`today-slot-${i + 1}`}
+                    data-testid={`slot-${i + 1}`}
                   >
                     <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${slotDialog?.status === "ready" ? "bg-green-500" : "bg-muted"}`}>
                       {slotDialog?.status === "ready" ? (
