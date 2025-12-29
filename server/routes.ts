@@ -1740,9 +1740,8 @@ ${instructions || "Создай альтернативный вариант с �
 
       if (mimeType === "application/pdf" || ext === ".pdf") {
         const pdfBuffer = await fs.readFile(filePath);
-        const pdfParseModule = await import("pdf-parse");
-        const pdfParse = pdfParseModule.default || pdfParseModule;
-        const pdfData = await pdfParse(pdfBuffer);
+        const pdfParseLib = require("pdf-parse");
+        const pdfData = await pdfParseLib(pdfBuffer);
         extractedText = pdfData.text;
       } else if (
         mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
