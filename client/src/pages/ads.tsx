@@ -1187,13 +1187,22 @@ export default function AdsPage() {
                             <Badge variant="secondary" className="text-xs">
                               {getCategoryLabel(ad.category || "general")}
                             </Badge>
+                            {ad.duration && (
+                              <Badge variant="outline" className="text-xs">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {ad.duration} сек
+                              </Badge>
+                            )}
                           </div>
                           {ad.clientName && (
                             <p className="text-sm text-muted-foreground truncate">{ad.clientName}</p>
                           )}
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Этап: {stages.find(s => s.key === ad.stage)?.label || ad.stage}
-                          </p>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                            <span>Этап: {stages.find(s => s.key === ad.stage)?.label || ad.stage}</span>
+                            {ad.createdAt && (
+                              <span>{new Date(ad.createdAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           {ad.status === "ready" ? (
