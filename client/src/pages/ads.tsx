@@ -117,6 +117,8 @@ export default function AdsPage() {
   const [selectedMusicTrack, setSelectedMusicTrack] = useState<string | null>(null);
   const [playingMusicTrackId, setPlayingMusicTrackId] = useState<string | null>(null);
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isAutoSelectingMusic, setIsAutoSelectingMusic] = useState(false);
+  const [autoSelectReasoning, setAutoSelectReasoning] = useState<string | null>(null);
 
   const { data: ads, isLoading } = useQuery<Ad[]>({
     queryKey: ["/api/ads"],
@@ -363,6 +365,45 @@ export default function AdsPage() {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const autoSelectMusic = async () => {
+    if (!currentAd?.selectedVariantText) return;
+    setIsAutoSelectingMusic(true);
+    setAutoSelectReasoning(null);
+    try {
+      const response = await fetch("/api/epidemic/auto-select", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adText: currentAd.selectedVariantText,
+          category: currentAd.category,
+          title: currentAd.title,
+        }),
+      });
+      if (!response.ok) throw new Error("Auto-select failed");
+      const data = await response.json();
+      setMusicSearchResults(data.tracks || []);
+      if (data.recommendedTrack) {
+        setSelectedMusicTrack(data.recommendedTrack.id);
+      }
+      if (data.analysis?.reasoning) {
+        setAutoSelectReasoning(data.analysis.reasoning);
+      }
+      toast({
+        title: "Музыка подобрана",
+        description: data.analysis?.reasoning || "Рекомендуемый трек выбран",
+      });
+    } catch (error) {
+      console.error("Auto-select error:", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось подобрать музыку автоматически",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAutoSelectingMusic(false);
+    }
   };
 
   const getCategoryLabel = (value: string) => {
@@ -779,14 +820,37 @@ export default function AdsPage() {
               </div>
 
               <div className="space-y-4 border-t pt-4">
-                <div className="flex items-center gap-2">
-                  <Music className="h-4 w-4" />
-                  <span className="font-medium">Добавить фоновую музыку</span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Music className="h-4 w-4" />
+                    <span className="font-medium">Добавить фоновую музыку</span>
+                  </div>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={autoSelectMusic}
+                    disabled={isAutoSelectingMusic}
+                    data-testid="button-auto-select-music"
+                  >
+                    {isAutoSelectingMusic ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-2 h-4 w-4" />
+                    )}
+                    Подобрать автоматически
+                  </Button>
                 </div>
+
+                {autoSelectReasoning && (
+                  <div className="rounded-lg bg-primary/10 p-3 text-sm">
+                    <Sparkles className="inline h-4 w-4 mr-1" />
+                    {autoSelectReasoning}
+                  </div>
+                )}
                 
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Поиск музыки (happy, chill, upbeat...)"
+                    placeholder="Или поиск вручную (happy, chill, upbeat...)"
                     value={musicSearchQuery}
                     onChange={(e) => setMusicSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && searchMusic()}

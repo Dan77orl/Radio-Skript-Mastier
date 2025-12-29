@@ -2649,5 +2649,137 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
     }
   });
 
+  app.post("/api/epidemic/auto-select", async (req, res) => {
+    try {
+      const token = process.env.EPIDEMIC_SOUND_TOKEN;
+      if (!token) {
+        return res.status(400).json({ error: "Epidemic Sound token not configured" });
+      }
+
+      const { adText, category, title } = req.body;
+      if (!adText) {
+        return res.status(400).json({ error: "Ad text is required" });
+      }
+
+      const anthropic = await getAnthropicClient();
+      if (!anthropic) {
+        return res.status(400).json({ error: "Claude API key not configured" });
+      }
+
+      const categoryLabels: Record<string, string> = {
+        general: "общая реклама",
+        restaurant: "ресторан/кафе",
+        real_estate: "недвижимость",
+        services: "услуги",
+        shop: "магазин/товары",
+        events: "мероприятия/события",
+      };
+
+      const analysisPrompt = `Проанализируй рекламный текст и подбери подходящую фоновую музыку.
+
+РЕКЛАМНЫЙ ТЕКСТ:
+${adText}
+
+КАТЕГОРИЯ: ${categoryLabels[category] || category}
+${title ? `НАЗВАНИЕ: ${title}` : ""}
+
+Твоя задача - определить подходящие поисковые запросы для поиска фоновой музыки на Epidemic Sound.
+
+Учитывай:
+- Настроение текста (радостное, спокойное, энергичное, элегантное)
+- Целевую аудиторию
+- Категорию бизнеса
+- Темп подачи информации
+
+Ответь ТОЛЬКО в формате JSON:
+{
+  "primaryQuery": "основной поисковый запрос на английском (1-3 слова, mood/genre)",
+  "secondaryQuery": "дополнительный запрос на английском (1-2 слова)",
+  "suggestedBpm": "slow/medium/fast",
+  "reasoning": "краткое объяснение выбора на русском (1 предложение)"
+}
+
+Примеры хороших запросов: "upbeat corporate", "chill acoustic", "happy pop", "elegant piano", "energetic electronic", "warm jazz"`;
+
+      const claudeResponse = await anthropic.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: 500,
+        messages: [{ role: "user", content: analysisPrompt }],
+      });
+
+      const responseText = claudeResponse.content[0].type === "text" 
+        ? claudeResponse.content[0].text 
+        : "";
+      
+      let analysis;
+      try {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          analysis = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error("No JSON found");
+        }
+      } catch {
+        analysis = {
+          primaryQuery: "upbeat corporate",
+          secondaryQuery: "positive",
+          suggestedBpm: "medium",
+          reasoning: "Стандартный выбор для рекламы",
+        };
+      }
+
+      const searchResults: any[] = [];
+      
+      const primaryUrl = `${EPIDEMIC_API_BASE}/tracks/search?query=${encodeURIComponent(analysis.primaryQuery)}&limit=5`;
+      const primaryResponse = await fetch(primaryUrl, {
+        headers: {
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+      
+      if (primaryResponse.ok) {
+        const primaryData = await primaryResponse.json();
+        if (primaryData.tracks) {
+          searchResults.push(...primaryData.tracks);
+        }
+      }
+
+      if (analysis.secondaryQuery && searchResults.length < 5) {
+        const secondaryUrl = `${EPIDEMIC_API_BASE}/tracks/search?query=${encodeURIComponent(analysis.secondaryQuery)}&limit=3`;
+        const secondaryResponse = await fetch(secondaryUrl, {
+          headers: {
+            "Accept": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+        
+        if (secondaryResponse.ok) {
+          const secondaryData = await secondaryResponse.json();
+          if (secondaryData.tracks) {
+            const existingIds = new Set(searchResults.map(t => t.id));
+            const newTracks = secondaryData.tracks.filter((t: any) => !existingIds.has(t.id));
+            searchResults.push(...newTracks);
+          }
+        }
+      }
+
+      const uniqueTracks = searchResults.slice(0, 8);
+
+      res.json({
+        tracks: uniqueTracks,
+        analysis: {
+          primaryQuery: analysis.primaryQuery,
+          secondaryQuery: analysis.secondaryQuery,
+          reasoning: analysis.reasoning,
+        },
+        recommendedTrack: uniqueTracks[0] || null,
+      });
+    } catch (error) {
+      console.error("Error auto-selecting music:", error);
+      res.status(500).json({ error: "Failed to auto-select music" });
+    }
+  });
+
   return httpServer;
 }
