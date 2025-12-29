@@ -1,4 +1,4 @@
-import { users, settings, dialogs, newsSources, newsItems, ads, voices, programTypes, programs, automations, automationRuns, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun } from "@shared/schema";
+import { users, settings, dialogs, newsSources, newsItems, ads, adPresets, voices, programTypes, programs, automations, automationRuns, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdPreset, type InsertAdPreset, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql } from "drizzle-orm";
 
@@ -27,6 +27,12 @@ export interface IStorage {
   createAd(ad: InsertAd): Promise<Ad>;
   updateAd(id: string, ad: Partial<InsertAd>): Promise<Ad | undefined>;
   deleteAd(id: string): Promise<boolean>;
+  
+  getAdPresets(): Promise<AdPreset[]>;
+  getAdPreset(id: string): Promise<AdPreset | undefined>;
+  createAdPreset(preset: InsertAdPreset): Promise<AdPreset>;
+  updateAdPreset(id: string, preset: Partial<InsertAdPreset>): Promise<AdPreset | undefined>;
+  deleteAdPreset(id: string): Promise<boolean>;
   
   getVoices(): Promise<Voice[]>;
   getVoice(id: string): Promise<Voice | undefined>;
@@ -204,6 +210,33 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAd(id: string): Promise<boolean> {
     const result = await db.delete(ads).where(eq(ads.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getAdPresets(): Promise<AdPreset[]> {
+    return db.select().from(adPresets).orderBy(asc(adPresets.sortOrder));
+  }
+
+  async getAdPreset(id: string): Promise<AdPreset | undefined> {
+    const [preset] = await db.select().from(adPresets).where(eq(adPresets.id, id));
+    return preset || undefined;
+  }
+
+  async createAdPreset(insertPreset: InsertAdPreset): Promise<AdPreset> {
+    const [preset] = await db.insert(adPresets).values(insertPreset).returning();
+    return preset;
+  }
+
+  async updateAdPreset(id: string, updates: Partial<InsertAdPreset>): Promise<AdPreset | undefined> {
+    const [updated] = await db.update(adPresets)
+      .set(updates)
+      .where(eq(adPresets.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteAdPreset(id: string): Promise<boolean> {
+    const result = await db.delete(adPresets).where(eq(adPresets.id, id)).returning();
     return result.length > 0;
   }
 

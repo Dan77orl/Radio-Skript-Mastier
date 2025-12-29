@@ -1323,6 +1323,78 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
     }
   });
 
+  app.get("/api/ad-presets", async (req, res) => {
+    try {
+      const presets = await storage.getAdPresets();
+      res.json(presets);
+    } catch (error) {
+      console.error("Error getting ad presets:", error);
+      res.status(500).json({ error: "Failed to get ad presets" });
+    }
+  });
+
+  app.get("/api/ad-presets/:id", async (req, res) => {
+    try {
+      const preset = await storage.getAdPreset(req.params.id);
+      if (!preset) {
+        return res.status(404).json({ error: "Preset not found" });
+      }
+      res.json(preset);
+    } catch (error) {
+      console.error("Error getting ad preset:", error);
+      res.status(500).json({ error: "Failed to get ad preset" });
+    }
+  });
+
+  app.post("/api/ad-presets", async (req, res) => {
+    try {
+      const { name, description, miniPrompt, defaultVoiceId, defaultTargetDurationSeconds, defaultCategory } = req.body;
+      if (!name || !miniPrompt) {
+        return res.status(400).json({ error: "Name and miniPrompt are required" });
+      }
+      const preset = await storage.createAdPreset({
+        name,
+        description,
+        miniPrompt,
+        defaultVoiceId,
+        defaultTargetDurationSeconds: defaultTargetDurationSeconds || 30,
+        defaultCategory: defaultCategory || "general",
+        isActive: true,
+        sortOrder: 0,
+      });
+      res.json(preset);
+    } catch (error) {
+      console.error("Error creating ad preset:", error);
+      res.status(500).json({ error: "Failed to create ad preset" });
+    }
+  });
+
+  app.patch("/api/ad-presets/:id", async (req, res) => {
+    try {
+      const updated = await storage.updateAdPreset(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "Preset not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating ad preset:", error);
+      res.status(500).json({ error: "Failed to update ad preset" });
+    }
+  });
+
+  app.delete("/api/ad-presets/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteAdPreset(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Preset not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting ad preset:", error);
+      res.status(500).json({ error: "Failed to delete ad preset" });
+    }
+  });
+
   app.get("/api/ads", async (req, res) => {
     try {
       const adsList = await storage.getAds();

@@ -144,6 +144,7 @@ export const ads = pgTable("ads", {
   status: text("status").notNull().default("draft"),
   stage: text("stage").default("prompt"),
   category: text("category").default("general"),
+  presetId: text("preset_id"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
@@ -155,6 +156,27 @@ export const insertAdSchema = createInsertSchema(ads).omit({
 
 export type InsertAd = z.infer<typeof insertAdSchema>;
 export type Ad = typeof ads.$inferSelect;
+
+export const adPresets = pgTable("ad_presets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  miniPrompt: text("mini_prompt").notNull(),
+  defaultVoiceId: text("default_voice_id"),
+  defaultTargetDurationSeconds: integer("default_target_duration_seconds").default(30),
+  defaultCategory: text("default_category").default("general"),
+  isActive: boolean("is_active").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertAdPresetSchema = createInsertSchema(adPresets).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAdPreset = z.infer<typeof insertAdPresetSchema>;
+export type AdPreset = typeof adPresets.$inferSelect;
 
 export const voices = pgTable("voices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
