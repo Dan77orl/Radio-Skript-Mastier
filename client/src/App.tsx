@@ -12,7 +12,6 @@ import Generator from "@/pages/generator";
 import Schedule from "@/pages/schedule";
 import NewsSources from "@/pages/news-sources";
 import AdsPage from "@/pages/ads";
-import AdPresetsPage from "@/pages/ad-presets";
 import VoicesPage from "@/pages/voices";
 import ShowsPage from "@/pages/shows";
 import AutomationsPage from "@/pages/automations";
@@ -27,7 +26,6 @@ function Router() {
       <Route path="/schedule" component={Schedule} />
       <Route path="/news-sources" component={NewsSources} />
       <Route path="/ads" component={AdsPage} />
-      <Route path="/ad-presets" component={AdPresetsPage} />
       <Route path="/voices" component={VoicesPage} />
       <Route path="/shows" component={ShowsPage} />
       <Route path="/automations" component={AutomationsPage} />

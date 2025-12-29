@@ -41,10 +41,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { 
   Sparkles, Loader2, Trash2, Play, Building2, ChevronRight, 
   Check, RefreshCw, Volume2, Music, FileText, Link, Instagram,
-  Clock, PauseCircle, PlayCircle, ArrowLeft, Upload, X, File
+  Clock, PauseCircle, PlayCircle, ArrowLeft, Upload, X, File,
+  Plus, Pencil, Users, User, Mic, Settings2, FileStack
 } from "lucide-react";
 import type { Ad, Voice, AdPreset } from "@shared/schema";
 
@@ -650,6 +661,136 @@ export default function AdsPage() {
     }
   };
 
+  const [activeTab, setActiveTab] = useState("create");
+  const [editingPreset, setEditingPreset] = useState<AdPreset | null>(null);
+  const [isPresetDialogOpen, setIsPresetDialogOpen] = useState(false);
+
+  const presetFormSchema = z.object({
+    name: z.string().min(2, "Название должно быть не менее 2 символов"),
+    description: z.string().optional(),
+    miniPrompt: z.string().min(10, "Промпт должен быть не менее 10 символов"),
+    contentType: z.string().default("single"),
+    speakersCount: z.number().min(1).max(3).default(1),
+    voiceIds: z.array(z.string()).optional(),
+    announcerVoiceId: z.string().optional(),
+    defaultTargetDurationSeconds: z.number().min(10).max(180).default(30),
+    defaultCategory: z.string().default("general"),
+    elevenLabsTags: z.string().optional(),
+    isActive: z.boolean().default(true),
+  });
+
+  const presetForm = useForm<z.infer<typeof presetFormSchema>>({
+    resolver: zodResolver(presetFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      miniPrompt: "",
+      contentType: "single",
+      speakersCount: 1,
+      voiceIds: [],
+      announcerVoiceId: "",
+      defaultTargetDurationSeconds: 30,
+      defaultCategory: "general",
+      elevenLabsTags: "",
+      isActive: true,
+    },
+  });
+
+  const contentTypes = [
+    { value: "single", label: "Один голос", icon: User, description: "Простое объявление одним голосом" },
+    { value: "dialog", label: "Диалог", icon: Users, description: "Диалог между двумя ведущими" },
+    { value: "dialog_with_announcer", label: "Диалог + подводка", icon: Mic, description: "Диалог с подводкой ведущего" },
+  ];
+
+  const createPresetMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof presetFormSchema>) => {
+      const response = await apiRequest("POST", "/api/ad-presets", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ad-presets"] });
+      setIsPresetDialogOpen(false);
+      presetForm.reset();
+      toast({ title: "Пресет создан" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updatePresetMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<z.infer<typeof presetFormSchema>> }) => {
+      const response = await apiRequest("PATCH", `/api/ad-presets/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ad-presets"] });
+      setIsPresetDialogOpen(false);
+      setEditingPreset(null);
+      presetForm.reset();
+      toast({ title: "Пресет обновлен" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deletePresetMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/ad-presets/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ad-presets"] });
+      toast({ title: "Пресет удален" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const onPresetSubmit = (data: z.infer<typeof presetFormSchema>) => {
+    if (editingPreset) {
+      updatePresetMutation.mutate({ id: editingPreset.id, data });
+    } else {
+      createPresetMutation.mutate(data);
+    }
+  };
+
+  const openEditPresetDialog = (preset: AdPreset) => {
+    setEditingPreset(preset);
+    presetForm.reset({
+      name: preset.name,
+      description: preset.description || "",
+      miniPrompt: preset.miniPrompt,
+      contentType: preset.contentType || "single",
+      speakersCount: preset.speakersCount || 1,
+      voiceIds: preset.voiceIds || [],
+      announcerVoiceId: preset.announcerVoiceId || "",
+      defaultTargetDurationSeconds: preset.defaultTargetDurationSeconds || 30,
+      defaultCategory: preset.defaultCategory || "general",
+      elevenLabsTags: preset.elevenLabsTags || "",
+      isActive: preset.isActive !== false,
+    });
+    setIsPresetDialogOpen(true);
+  };
+
+  const openNewPresetDialog = () => {
+    setEditingPreset(null);
+    presetForm.reset();
+    setIsPresetDialogOpen(true);
+  };
+
+  const watchContentType = presetForm.watch("contentType");
+
+  const getVoiceName = (voiceId: string) => {
+    const voice = voices?.find(v => v.elevenLabsVoiceId === voiceId || v.id === voiceId);
+    return voice?.name || voiceId;
+  };
+
+  const getContentTypeInfo = (type: string) => {
+    return contentTypes.find(t => t.value === type) || contentTypes[0];
+  };
+
   return (
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -665,7 +806,20 @@ export default function AdsPage() {
         )}
       </div>
 
-      {currentAd ? (
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="create" data-testid="tab-create">
+            <Sparkles className="mr-2 h-4 w-4" />
+            Создание
+          </TabsTrigger>
+          <TabsTrigger value="presets" data-testid="tab-presets">
+            <FileStack className="mr-2 h-4 w-4" />
+            Пресеты
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="create" className="mt-6">
+          {currentAd ? (
         <>
           {renderStageProgress()}
           {currentAd.status === "generating" ? (
@@ -1030,6 +1184,442 @@ export default function AdsPage() {
           </Card>
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="presets" className="mt-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+            <div>
+              <h2 className="text-xl font-semibold">Пресеты рекламы</h2>
+              <p className="text-muted-foreground text-sm">Шаблоны для быстрого создания рекламных роликов</p>
+            </div>
+            <Dialog open={isPresetDialogOpen} onOpenChange={setIsPresetDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={openNewPresetDialog} data-testid="button-new-preset">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Новый пресет
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingPreset ? "Редактировать пресет" : "Создать пресет"}</DialogTitle>
+                  <DialogDescription>
+                    Настройте шаблон для быстрого создания рекламы
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...presetForm}>
+                  <form onSubmit={presetForm.handleSubmit(onPresetSubmit)} className="space-y-4">
+                    <FormField
+                      control={presetForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Название пресета</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Например: Имиджевая реклама" {...field} data-testid="input-preset-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={presetForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Описание</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Краткое описание для чего этот пресет" {...field} data-testid="input-preset-description" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={presetForm.control}
+                      name="contentType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Тип контента</FormLabel>
+                          <Select onValueChange={(val) => {
+                            field.onChange(val);
+                            if (val === "single") presetForm.setValue("speakersCount", 1);
+                            else if (val === "dialog") presetForm.setValue("speakersCount", 2);
+                            else presetForm.setValue("speakersCount", 3);
+                          }} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-content-type">
+                                <SelectValue placeholder="Выберите тип" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {contentTypes.map((type) => (
+                                <SelectItem key={type.value} value={type.value} data-testid={`select-content-type-${type.value}`}>
+                                  <div className="flex items-center gap-2">
+                                    <type.icon className="h-4 w-4" />
+                                    <span>{type.label}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            {getContentTypeInfo(field.value || "single").description}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {voices && voices.length > 0 && (
+                      <>
+                        {(watchContentType === "single") && (
+                          <FormField
+                            control={presetForm.control}
+                            name="voiceIds"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Голос</FormLabel>
+                                <Select 
+                                  onValueChange={(val) => field.onChange([val])} 
+                                  value={field.value?.[0] || ""}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-voice">
+                                      <SelectValue placeholder="Выберите голос" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {voices.filter(v => v.isActive).map((voice) => (
+                                      <SelectItem key={voice.id} value={voice.elevenLabsVoiceId} data-testid={`select-voice-${voice.id}`}>
+                                        {voice.name} {voice.personaName && `(${voice.personaName})`}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+
+                        {(watchContentType === "dialog" || watchContentType === "dialog_with_announcer") && (
+                          <div className="space-y-4">
+                            <FormField
+                              control={presetForm.control}
+                              name="voiceIds"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Голоса диалога</FormLabel>
+                                  <div className="grid gap-2 sm:grid-cols-2">
+                                    <Select 
+                                      onValueChange={(val) => {
+                                        const current = field.value || [];
+                                        field.onChange([val, current[1] || ""]);
+                                      }} 
+                                      value={field.value?.[0] || ""}
+                                    >
+                                      <SelectTrigger data-testid="select-voice-1">
+                                        <SelectValue placeholder="Первый голос" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {voices.filter(v => v.isActive).map((voice) => (
+                                          <SelectItem key={voice.id} value={voice.elevenLabsVoiceId}>
+                                            {voice.name} {voice.personaName && `(${voice.personaName})`}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Select 
+                                      onValueChange={(val) => {
+                                        const current = field.value || [];
+                                        field.onChange([current[0] || "", val]);
+                                      }} 
+                                      value={field.value?.[1] || ""}
+                                    >
+                                      <SelectTrigger data-testid="select-voice-2">
+                                        <SelectValue placeholder="Второй голос" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {voices.filter(v => v.isActive).map((voice) => (
+                                          <SelectItem key={voice.id} value={voice.elevenLabsVoiceId}>
+                                            {voice.name} {voice.personaName && `(${voice.personaName})`}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            {watchContentType === "dialog_with_announcer" && (
+                              <FormField
+                                control={presetForm.control}
+                                name="announcerVoiceId"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Голос подводки</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                                      <FormControl>
+                                        <SelectTrigger data-testid="select-announcer-voice">
+                                          <SelectValue placeholder="Выберите голос ведущего" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {voices.filter(v => v.isActive).map((voice) => (
+                                          <SelectItem key={voice.id} value={voice.elevenLabsVoiceId}>
+                                            {voice.name} {voice.personaName && `(${voice.personaName})`}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormDescription>Голос для подводки в начале или конце</FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <FormField
+                        control={presetForm.control}
+                        name="defaultCategory"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Категория</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-category">
+                                  <SelectValue placeholder="Выберите категорию" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {categories.map((cat) => (
+                                  <SelectItem key={cat.value} value={cat.value}>
+                                    {cat.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={presetForm.control}
+                        name="defaultTargetDurationSeconds"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Длительность (сек)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={10}
+                                max={180}
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 30)}
+                                data-testid="input-duration"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={presetForm.control}
+                      name="miniPrompt"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Промпт для генерации</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Инструкции для ИИ как генерировать текст рекламы..."
+                              rows={4}
+                              {...field}
+                              data-testid="textarea-prompt"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Базовые инструкции для генерации текста рекламы
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={presetForm.control}
+                      name="elevenLabsTags"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Разметка ElevenLabs (опционально)</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="<break time='0.5s'/> для паузы, эмоциональные теги..."
+                              rows={3}
+                              {...field}
+                              data-testid="textarea-elevenlabs-tags"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            SSML-теги для управления интонацией и паузами
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={presetForm.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                          <div className="space-y-0.5">
+                            <FormLabel>Активен</FormLabel>
+                            <FormDescription>
+                              Отображать пресет при создании рекламы
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-active"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex justify-end gap-2 pt-4">
+                      <Button type="button" variant="outline" onClick={() => setIsPresetDialogOpen(false)}>
+                        Отмена
+                      </Button>
+                      <Button 
+                        type="submit" 
+                        disabled={createPresetMutation.isPending || updatePresetMutation.isPending}
+                        data-testid="button-save-preset"
+                      >
+                        {editingPreset ? "Сохранить" : "Создать"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {adPresets && adPresets.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {adPresets.map((preset) => {
+                const typeInfo = getContentTypeInfo(preset.contentType || "single");
+                const TypeIcon = typeInfo.icon;
+                return (
+                  <Card key={preset.id} className={!preset.isActive ? "opacity-60" : ""} data-testid={`card-preset-${preset.id}`}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1">
+                          <CardTitle className="flex items-center gap-2 text-base">
+                            <TypeIcon className="h-4 w-4" />
+                            {preset.name}
+                          </CardTitle>
+                          {preset.description && (
+                            <CardDescription className="text-sm">{preset.description}</CardDescription>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditPresetDialog(preset)}
+                            data-testid={`button-edit-${preset.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-delete-${preset.id}`}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Удалить пресет?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Это действие нельзя отменить
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Отмена</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deletePresetMutation.mutate(preset.id)}>
+                                  Удалить
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline">{typeInfo.label}</Badge>
+                        <Badge variant="secondary">{preset.defaultTargetDurationSeconds}с</Badge>
+                        {preset.defaultCategory && (
+                          <Badge variant="secondary">
+                            {categories.find(c => c.value === preset.defaultCategory)?.label || preset.defaultCategory}
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      {preset.voiceIds && preset.voiceIds.length > 0 && (
+                        <div className="text-sm text-muted-foreground">
+                          Голоса: {preset.voiceIds.map(id => getVoiceName(id)).join(", ")}
+                        </div>
+                      )}
+
+                      <p className="text-sm text-muted-foreground line-clamp-3">
+                        {preset.miniPrompt}
+                      </p>
+
+                      {!preset.isActive && (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          Неактивен
+                        </Badge>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-12">
+                <div className="flex flex-col items-center justify-center text-center">
+                  <Settings2 className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Нет пресетов</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Создайте первый пресет для быстрого создания рекламы
+                  </p>
+                  <Button onClick={openNewPresetDialog}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Создать пресет
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
