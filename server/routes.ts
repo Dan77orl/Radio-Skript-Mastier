@@ -1407,10 +1407,9 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
           title: parsed.title || "Реклама",
           clientName: clientName || null,
           prompt: prompt,
-          maleText: parsed.maleText,
-          femaleText: parsed.femaleText,
-          scriptText: `${parsed.maleText}\n\n${parsed.femaleText}`,
-          status: "pending",
+          scriptText: parsed.scriptText || `${parsed.maleText || ""}\n\n${parsed.femaleText || ""}`,
+          status: "draft",
+          stage: "prompt",
           category: category || "general",
         });
 
@@ -1438,10 +1437,9 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         title: parsed.title || "Реклама",
         clientName: clientName || null,
         prompt: prompt,
-        maleText: parsed.maleText,
-        femaleText: parsed.femaleText,
-        scriptText: `${parsed.maleText}\n\n${parsed.femaleText}`,
-        status: "pending",
+        scriptText: parsed.scriptText || `${parsed.maleText || ""}\n\n${parsed.femaleText || ""}`,
+        status: "draft",
+        stage: "prompt",
         category: category || "general",
       });
 
@@ -1449,6 +1447,282 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
     } catch (error) {
       console.error("Error generating ad:", error);
       res.status(500).json({ error: "Failed to generate ad" });
+    }
+  });
+
+  app.post("/api/ads/:id/generate-variants", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const ad = await storage.getAd(id);
+      if (!ad) {
+        return res.status(404).json({ error: "Ad not found" });
+      }
+
+      const { variantsCount = 5 } = req.body;
+      const ctx = await buildStationContext();
+      
+      const systemPrompt = `Ты - креативный копирайтер для радио "${ctx.stationName}".
+Твоя задача - создать ${variantsCount} РАЗНЫХ вариантов рекламного ролика.
+
+Информация о рекламе:
+- Описание: ${ad.prompt}
+${ad.websiteUrl ? `- Сайт: ${ad.websiteUrl}` : ""}
+${ad.instagramUrl ? `- Instagram: ${ad.instagramUrl}` : ""}
+${ad.clientName ? `- Клиент: ${ad.clientName}` : ""}
+- Целевая длительность: ${ad.targetDurationSeconds || 30} секунд при чтении
+
+Каждый вариант должен быть уникальным по стилю и подаче:
+1. Вариант с юмором
+2. Эмоциональный вариант
+3. Информационный вариант
+4. Динамичный вариант
+5. Нестандартный/креативный вариант
+
+ВАЖНО: Ответ в формате JSON массива строк:
+{
+  "variants": [
+    "Полный текст варианта 1...",
+    "Полный текст варианта 2...",
+    "Полный текст варианта 3...",
+    "Полный текст варианта 4...",
+    "Полный текст варианта 5..."
+  ],
+  "speakersCount": 1 или 2 (рекомендуемое количество ведущих)
+}
+
+Каждый вариант - это готовый текст для озвучки, без разметки на голоса.`;
+
+      const anthropic = await getAnthropicClient();
+      
+      if (anthropic) {
+        const response = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [{ role: "user", content: "Создай 5 вариантов рекламного ролика" }],
+        });
+
+        const textContent = response.content.find(c => c.type === "text");
+        if (!textContent || textContent.type !== "text") {
+          return res.status(500).json({ error: "No response from Claude" });
+        }
+
+        const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          return res.status(500).json({ error: "Invalid response format" });
+        }
+
+        const parsed = JSON.parse(jsonMatch[0]);
+        
+        const updated = await storage.updateAd(id, {
+          variants: parsed.variants,
+          speakersCount: parsed.speakersCount || 1,
+          stage: "variants",
+        });
+
+        return res.json(updated);
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4.1",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: "Создай 5 вариантов рекламного ролика" }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 4096,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "No response from AI" });
+      }
+
+      const parsed = JSON.parse(content);
+      
+      const updated = await storage.updateAd(id, {
+        variants: parsed.variants,
+        speakersCount: parsed.speakersCount || 1,
+        stage: "variants",
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error generating ad variants:", error);
+      res.status(500).json({ error: "Failed to generate variants" });
+    }
+  });
+
+  app.post("/api/ads/:id/select-variant", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { variantIndex } = req.body;
+      
+      const ad = await storage.getAd(id);
+      if (!ad) {
+        return res.status(404).json({ error: "Ad not found" });
+      }
+
+      if (!ad.variants || variantIndex >= ad.variants.length) {
+        return res.status(400).json({ error: "Invalid variant index" });
+      }
+
+      const updated = await storage.updateAd(id, {
+        selectedVariantIndex: variantIndex,
+        selectedVariantText: ad.variants[variantIndex],
+        scriptText: ad.variants[variantIndex],
+        stage: "voices",
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error selecting variant:", error);
+      res.status(500).json({ error: "Failed to select variant" });
+    }
+  });
+
+  app.post("/api/ads/:id/regenerate-variant", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { baseText, instructions } = req.body;
+      
+      const ad = await storage.getAd(id);
+      if (!ad) {
+        return res.status(404).json({ error: "Ad not found" });
+      }
+
+      const ctx = await buildStationContext();
+      
+      const systemPrompt = `Ты - креативный копирайтер для радио "${ctx.stationName}".
+Тебе дан текст рекламного ролика. Нужно создать новый вариант на его основе.
+
+Исходный текст:
+${baseText}
+
+Инструкции по изменению:
+${instructions || "Создай альтернативный вариант с другой подачей"}
+
+ВАЖНО: Верни только новый текст рекламы без JSON обертки.`;
+
+      const anthropic = await getAnthropicClient();
+      
+      if (anthropic) {
+        const response = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: [{ role: "user", content: "Создай новый вариант" }],
+        });
+
+        const textContent = response.content.find(c => c.type === "text");
+        if (!textContent || textContent.type !== "text") {
+          return res.status(500).json({ error: "No response from Claude" });
+        }
+
+        const newVariant = textContent.text.trim();
+        const variants = [...(ad.variants || []), newVariant];
+        
+        const updated = await storage.updateAd(id, { variants });
+        return res.json({ variant: newVariant, ad: updated });
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4.1",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: "Создай новый вариант" }
+        ],
+        max_completion_tokens: 1024,
+      });
+
+      const newVariant = response.choices[0]?.message?.content?.trim();
+      if (!newVariant) {
+        return res.status(500).json({ error: "No response from AI" });
+      }
+
+      const variants = [...(ad.variants || []), newVariant];
+      const updated = await storage.updateAd(id, { variants });
+      
+      res.json({ variant: newVariant, ad: updated });
+    } catch (error) {
+      console.error("Error regenerating variant:", error);
+      res.status(500).json({ error: "Failed to regenerate variant" });
+    }
+  });
+
+  app.post("/api/ads/:id/synthesize-audio", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { voiceIds } = req.body;
+      
+      const ad = await storage.getAd(id);
+      if (!ad) {
+        return res.status(404).json({ error: "Ad not found" });
+      }
+
+      if (!ad.selectedVariantText) {
+        return res.status(400).json({ error: "No variant selected" });
+      }
+
+      const settings = await storage.getSettings();
+      if (!settings?.elevenLabsApiKey) {
+        return res.status(400).json({ error: "ElevenLabs API key not configured" });
+      }
+
+      const voiceIdToUse = voiceIds?.[0] || settings.maleVoiceId || "onwK4e9ZLuTAKqWW03F9";
+
+      await storage.updateAd(id, { status: "generating", voiceIds });
+      res.json({ message: "Audio generation started" });
+
+      (async () => {
+        try {
+          const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceIdToUse}`, {
+            method: "POST",
+            headers: {
+              "xi-api-key": settings.elevenLabsApiKey!,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text: ad.selectedVariantText,
+              model_id: "eleven_v3",
+              voice_settings: {
+                stability: 0.5,
+                similarity_boost: 0.75,
+              },
+            }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
+          }
+
+          const arrayBuffer = await response.arrayBuffer();
+          const audioBuffer = Buffer.from(arrayBuffer);
+
+          const audioDir = path.join(process.cwd(), "public", "audio");
+          await fs.mkdir(audioDir, { recursive: true });
+
+          const timestamp = Date.now();
+          const audioFile = path.join(audioDir, `ad_${id}_${timestamp}.mp3`);
+          await fs.writeFile(audioFile, audioBuffer);
+
+          await storage.updateAd(id, {
+            audioUrl: `/audio/ad_${id}_${timestamp}.mp3`,
+            duration: Math.round((audioBuffer.length / 1024) * 0.5),
+            status: "ready",
+            stage: "audio",
+          });
+
+          console.log(`Audio generated for ad ${id}`);
+        } catch (error) {
+          console.error(`Error generating audio for ad ${id}:`, error);
+          await storage.updateAd(id, { status: "error" });
+        }
+      })();
+    } catch (error) {
+      console.error("Error starting audio synthesis:", error);
+      res.status(500).json({ error: "Failed to start audio synthesis" });
     }
   });
 
