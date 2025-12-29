@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertVoiceSchema } from "@shared/schema";
 import { z } from "zod";
 import { promises as fs } from "fs";
@@ -33,6 +34,14 @@ const upload = multer({
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
+
+const geminiAI = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+  httpOptions: {
+    apiVersion: "",
+    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+  },
 });
 
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
@@ -1829,6 +1838,49 @@ ${instructions || "Создай альтернативный вариант с �
     } catch (error) {
       console.error("Error extracting text:", error);
       res.status(500).json({ error: "Не удалось извлечь текст из файла" });
+    }
+  });
+
+  app.post("/api/transcribe-audio", upload.single("audio"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No audio file uploaded" });
+      }
+
+      const filePath = req.file.path;
+      const mimeType = req.file.mimetype;
+      
+      const audioBuffer = await fs.readFile(filePath);
+      const base64Audio = audioBuffer.toString("base64");
+
+      const response = await geminiAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                inlineData: {
+                  mimeType: mimeType,
+                  data: base64Audio,
+                },
+              },
+              {
+                text: "Транскрибируй это аудио. Верни только текст на русском языке без дополнительных комментариев.",
+              },
+            ],
+          },
+        ],
+      });
+
+      const transcript = response.text || "";
+      
+      await fs.unlink(filePath).catch(() => {});
+
+      res.json({ transcript: transcript.trim() });
+    } catch (error) {
+      console.error("Error transcribing audio:", error);
+      res.status(500).json({ error: "Не удалось транскрибировать аудио" });
     }
   });
 

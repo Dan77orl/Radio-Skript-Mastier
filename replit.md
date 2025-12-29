@@ -45,6 +45,10 @@ Preferred communication style: Simple, everyday language.
   - Uses claude-sonnet-4-20250514 model
 - **OpenAI** (via Replit AI Integrations): Fallback when Claude API key not configured
   - Configured through environment variables `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL`
+- **Gemini** (via Replit AI Integrations): Voice transcription
+  - Uses gemini-2.5-flash model for audio-to-text transcription
+  - Configured through `AI_INTEGRATIONS_GEMINI_API_KEY` and `AI_INTEGRATIONS_GEMINI_BASE_URL`
+  - Costs are billed to Replit credits (no separate API key needed)
 - Includes batch processing utilities with rate limiting and retries
 - Image generation capabilities available through gpt-image-1 model
 
