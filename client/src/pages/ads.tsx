@@ -771,7 +771,7 @@ export default function AdsPage() {
                             />
                           </FormControl>
                           <div className="flex flex-col gap-1">
-                            <VoiceInput onTranscript={(text) => field.onChange(field.value + " " + text)} />
+                            <VoiceInput onTranscript={(text) => field.onChange(text + (field.value ? "\n\n" + field.value : ""))} />
                             <input
                               ref={fileInputRef}
                               type="file"
