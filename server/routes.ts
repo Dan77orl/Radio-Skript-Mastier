@@ -2528,57 +2528,54 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
     }
   });
 
-  // Epidemic Sound API routes
-  const EPIDEMIC_API_BASE = "https://partner-content-api.epidemicsound.com/v0";
+  // Jamendo Music API routes (free royalty-free music)
+  const JAMENDO_CLIENT_ID = "b96c61f4";
+  const JAMENDO_API_BASE = "https://api.jamendo.com/v3.0";
   
-  app.get("/api/epidemic/search", async (req, res) => {
+  app.get("/api/music/search", async (req, res) => {
     try {
-      const token = process.env.EPIDEMIC_SOUND_TOKEN;
-      if (!token) {
-        return res.status(400).json({ error: "Epidemic Sound token not configured" });
-      }
-      
-      const { query, limit = 20 } = req.query;
+      const { query, limit = 10 } = req.query;
       if (!query) {
         return res.status(400).json({ error: "Query parameter is required" });
       }
       
-      const url = `${EPIDEMIC_API_BASE}/tracks/search?query=${encodeURIComponent(String(query))}&limit=${limit}`;
+      const url = `${JAMENDO_API_BASE}/tracks/?client_id=${JAMENDO_CLIENT_ID}&format=json&limit=${limit}&search=${encodeURIComponent(String(query))}&include=musicinfo`;
       const response = await fetch(url, {
-        headers: {
-          "Accept": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
+        headers: { "Accept": "application/json" },
       });
       
       if (!response.ok) {
-        const text = await response.text();
-        console.error("Epidemic API error:", response.status, text);
-        return res.status(response.status).json({ error: "Epidemic Sound API error" });
+        console.error("Jamendo API error:", response.status);
+        return res.status(response.status).json({ error: "Jamendo API error" });
       }
       
       const data = await response.json();
-      res.json(data);
+      const tracks = (data.results || []).map((t: any) => ({
+        id: t.id,
+        title: t.name,
+        mainArtists: [t.artist_name],
+        bpm: t.musicinfo?.tags?.vartags?.bpm || 120,
+        length: t.duration,
+        moods: t.musicinfo?.tags?.vartags?.moods?.map((m: string) => ({ name: m })) || [],
+        images: { default: t.album_image || t.image },
+        audioUrl: t.audio,
+        downloadUrl: t.audiodownload,
+        license: t.license_ccurl,
+      }));
+      
+      res.json({ tracks });
     } catch (error) {
-      console.error("Error searching Epidemic Sound:", error);
+      console.error("Error searching Jamendo:", error);
       res.status(500).json({ error: "Failed to search music" });
     }
   });
 
-  app.get("/api/epidemic/track/:trackId", async (req, res) => {
+  app.get("/api/music/track/:trackId/stream", async (req, res) => {
     try {
-      const token = process.env.EPIDEMIC_SOUND_TOKEN;
-      if (!token) {
-        return res.status(400).json({ error: "Epidemic Sound token not configured" });
-      }
-      
       const { trackId } = req.params;
-      const url = `${EPIDEMIC_API_BASE}/tracks/${trackId}`;
+      const url = `${JAMENDO_API_BASE}/tracks/?client_id=${JAMENDO_CLIENT_ID}&format=json&id=${trackId}`;
       const response = await fetch(url, {
-        headers: {
-          "Accept": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
+        headers: { "Accept": "application/json" },
       });
       
       if (!response.ok) {
@@ -2586,76 +2583,20 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       }
       
       const data = await response.json();
-      res.json(data);
-    } catch (error) {
-      console.error("Error getting track:", error);
-      res.status(500).json({ error: "Failed to get track" });
-    }
-  });
-
-  app.get("/api/epidemic/track/:trackId/stream", async (req, res) => {
-    try {
-      const token = process.env.EPIDEMIC_SOUND_TOKEN;
-      if (!token) {
-        return res.status(400).json({ error: "Epidemic Sound token not configured" });
+      const track = data.results?.[0];
+      if (!track) {
+        return res.status(404).json({ error: "Track not found" });
       }
       
-      const { trackId } = req.params;
-      const url = `${EPIDEMIC_API_BASE}/tracks/${trackId}/hls`;
-      const response = await fetch(url, {
-        headers: {
-          "Accept": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-      });
-      
-      if (!response.ok) {
-        return res.status(response.status).json({ error: "Stream not available" });
-      }
-      
-      const data = await response.json();
-      res.json(data);
+      res.json({ url: track.audio });
     } catch (error) {
       console.error("Error getting stream URL:", error);
       res.status(500).json({ error: "Failed to get stream" });
     }
   });
 
-  app.get("/api/epidemic/track/:trackId/download", async (req, res) => {
+  app.post("/api/music/auto-select", async (req, res) => {
     try {
-      const token = process.env.EPIDEMIC_SOUND_TOKEN;
-      if (!token) {
-        return res.status(400).json({ error: "Epidemic Sound token not configured" });
-      }
-      
-      const { trackId } = req.params;
-      const url = `${EPIDEMIC_API_BASE}/tracks/${trackId}/download`;
-      const response = await fetch(url, {
-        headers: {
-          "Accept": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-      });
-      
-      if (!response.ok) {
-        return res.status(response.status).json({ error: "Download not available" });
-      }
-      
-      const data = await response.json();
-      res.json(data);
-    } catch (error) {
-      console.error("Error getting download URL:", error);
-      res.status(500).json({ error: "Failed to get download" });
-    }
-  });
-
-  app.post("/api/epidemic/auto-select", async (req, res) => {
-    try {
-      const token = process.env.EPIDEMIC_SOUND_TOKEN;
-      if (!token) {
-        return res.status(400).json({ error: "Epidemic Sound token not configured" });
-      }
-
       const { adText, category, title } = req.body;
       if (!adText) {
         return res.status(400).json({ error: "Ad text is required" });
@@ -2683,7 +2624,7 @@ ${adText}
 КАТЕГОРИЯ: ${categoryLabels[category] || category}
 ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
-Твоя задача - определить подходящие поисковые запросы для поиска фоновой музыки на Epidemic Sound.
+Твоя задача - определить подходящие поисковые запросы для поиска фоновой музыки на Jamendo (бесплатная библиотека).
 
 Учитывай:
 - Настроение текста (радостное, спокойное, энергичное, элегантное)
@@ -2693,13 +2634,12 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
 Ответь ТОЛЬКО в формате JSON:
 {
-  "primaryQuery": "основной поисковый запрос на английском (1-3 слова, mood/genre)",
-  "secondaryQuery": "дополнительный запрос на английском (1-2 слова)",
-  "suggestedBpm": "slow/medium/fast",
+  "primaryQuery": "основной поисковый запрос на английском (1-2 слова, жанр или настроение)",
+  "secondaryQuery": "дополнительный запрос на английском (1 слово)",
   "reasoning": "краткое объяснение выбора на русском (1 предложение)"
 }
 
-Примеры хороших запросов: "upbeat corporate", "chill acoustic", "happy pop", "elegant piano", "energetic electronic", "warm jazz"`;
+Примеры хороших запросов: "upbeat", "happy", "corporate", "electronic", "acoustic", "jazz", "pop", "energetic", "calm"`;
 
       const claudeResponse = await anthropic.messages.create({
         model: CLAUDE_MODEL,
@@ -2721,45 +2661,61 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
         }
       } catch {
         analysis = {
-          primaryQuery: "upbeat corporate",
-          secondaryQuery: "positive",
-          suggestedBpm: "medium",
+          primaryQuery: "upbeat",
+          secondaryQuery: "corporate",
           reasoning: "Стандартный выбор для рекламы",
         };
       }
 
       const searchResults: any[] = [];
       
-      const primaryUrl = `${EPIDEMIC_API_BASE}/tracks/search?query=${encodeURIComponent(analysis.primaryQuery)}&limit=5`;
+      const primaryUrl = `${JAMENDO_API_BASE}/tracks/?client_id=${JAMENDO_CLIENT_ID}&format=json&limit=5&search=${encodeURIComponent(analysis.primaryQuery)}&include=musicinfo`;
       const primaryResponse = await fetch(primaryUrl, {
-        headers: {
-          "Accept": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
+        headers: { "Accept": "application/json" },
       });
       
       if (primaryResponse.ok) {
         const primaryData = await primaryResponse.json();
-        if (primaryData.tracks) {
-          searchResults.push(...primaryData.tracks);
+        if (primaryData.results) {
+          const mapped = primaryData.results.map((t: any) => ({
+            id: t.id,
+            title: t.name,
+            mainArtists: [t.artist_name],
+            bpm: t.musicinfo?.tags?.vartags?.bpm || 120,
+            length: t.duration,
+            moods: [],
+            images: { default: t.album_image || t.image },
+            audioUrl: t.audio,
+            downloadUrl: t.audiodownload,
+          }));
+          searchResults.push(...mapped);
         }
       }
 
       if (analysis.secondaryQuery && searchResults.length < 5) {
-        const secondaryUrl = `${EPIDEMIC_API_BASE}/tracks/search?query=${encodeURIComponent(analysis.secondaryQuery)}&limit=3`;
+        const secondaryUrl = `${JAMENDO_API_BASE}/tracks/?client_id=${JAMENDO_CLIENT_ID}&format=json&limit=3&search=${encodeURIComponent(analysis.secondaryQuery)}&include=musicinfo`;
         const secondaryResponse = await fetch(secondaryUrl, {
-          headers: {
-            "Accept": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
+          headers: { "Accept": "application/json" },
         });
         
         if (secondaryResponse.ok) {
           const secondaryData = await secondaryResponse.json();
-          if (secondaryData.tracks) {
+          if (secondaryData.results) {
             const existingIds = new Set(searchResults.map(t => t.id));
-            const newTracks = secondaryData.tracks.filter((t: any) => !existingIds.has(t.id));
-            searchResults.push(...newTracks);
+            const mapped = secondaryData.results
+              .filter((t: any) => !existingIds.has(t.id))
+              .map((t: any) => ({
+                id: t.id,
+                title: t.name,
+                mainArtists: [t.artist_name],
+                bpm: t.musicinfo?.tags?.vartags?.bpm || 120,
+                length: t.duration,
+                moods: [],
+                images: { default: t.album_image || t.image },
+                audioUrl: t.audio,
+                downloadUrl: t.audiodownload,
+              }));
+            searchResults.push(...mapped);
           }
         }
       }

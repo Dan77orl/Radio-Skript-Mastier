@@ -321,7 +321,7 @@ export default function AdsPage() {
     if (!musicSearchQuery.trim()) return;
     setIsSearchingMusic(true);
     try {
-      const response = await fetch(`/api/epidemic/search?query=${encodeURIComponent(musicSearchQuery)}&limit=10`);
+      const response = await fetch(`/api/music/search?query=${encodeURIComponent(musicSearchQuery)}&limit=10`);
       if (!response.ok) throw new Error("Search failed");
       const data = await response.json();
       setMusicSearchResults(data.tracks || []);
@@ -346,7 +346,7 @@ export default function AdsPage() {
       return;
     }
     try {
-      const response = await fetch(`/api/epidemic/track/${trackId}/stream`);
+      const response = await fetch(`/api/music/track/${trackId}/stream`);
       if (!response.ok) throw new Error("Stream failed");
       const data = await response.json();
       if (data.url) {
@@ -372,7 +372,7 @@ export default function AdsPage() {
     setIsAutoSelectingMusic(true);
     setAutoSelectReasoning(null);
     try {
-      const response = await fetch("/api/epidemic/auto-select", {
+      const response = await fetch("/api/music/auto-select", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
