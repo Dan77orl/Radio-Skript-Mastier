@@ -47,6 +47,7 @@ export const settings = pgTable("settings", {
   stationWebsite: text("station_website"),
   stationLocation: text("station_location").default("Аланья, Турция"),
   stationAttachments: text("station_attachments").array(),
+  freesoundApiKey: text("freesound_api_key"),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).omit({

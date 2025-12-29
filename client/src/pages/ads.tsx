@@ -323,8 +323,18 @@ export default function AdsPage() {
     setIsSearchingMusic(true);
     try {
       const response = await fetch(`/api/music/search?query=${encodeURIComponent(musicSearchQuery)}&limit=10`);
-      if (!response.ok) throw new Error("Search failed");
       const data = await response.json();
+      if (!response.ok) {
+        if (data.needsApiKey) {
+          toast({
+            title: "Требуется API ключ",
+            description: "Добавьте Freesound API ключ в Настройках",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw new Error(data.error || "Search failed");
+      }
       setMusicSearchResults(data.tracks || []);
     } catch (error) {
       console.error("Music search error:", error);
@@ -393,8 +403,18 @@ export default function AdsPage() {
           title: currentAd.title,
         }),
       });
-      if (!response.ok) throw new Error("Auto-select failed");
       const data = await response.json();
+      if (!response.ok) {
+        if (data.needsApiKey) {
+          toast({
+            title: "Требуется API ключ",
+            description: "Добавьте Freesound API ключ в Настройках",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw new Error(data.error || "Auto-select failed");
+      }
       setMusicSearchResults(data.tracks || []);
       if (data.recommendedTrack) {
         setSelectedMusicTrack(data.recommendedTrack.id);

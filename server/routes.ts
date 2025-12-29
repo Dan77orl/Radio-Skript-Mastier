@@ -2528,34 +2528,50 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
     }
   });
 
-  // Built-in royalty-free music library for radio ads
-  const musicLibrary = [
-    { id: "upbeat1", title: "Upbeat Corporate", mood: "upbeat", category: "corporate", bpm: 120, length: 120, audioUrl: "https://cdn.pixabay.com/audio/2024/11/29/audio_e26d5d5f1a.mp3" },
-    { id: "upbeat2", title: "Happy Day", mood: "happy", category: "pop", bpm: 115, length: 90, audioUrl: "https://cdn.pixabay.com/audio/2024/02/09/audio_f2f0f57f3b.mp3" },
-    { id: "upbeat3", title: "Positive Energy", mood: "energetic", category: "electronic", bpm: 128, length: 105, audioUrl: "https://cdn.pixabay.com/audio/2024/03/05/audio_0e88cf35cf.mp3" },
-    { id: "calm1", title: "Calm Piano", mood: "calm", category: "piano", bpm: 70, length: 180, audioUrl: "https://cdn.pixabay.com/audio/2024/01/18/audio_81b9f4f5c4.mp3" },
-    { id: "calm2", title: "Relaxing Acoustic", mood: "relaxing", category: "acoustic", bpm: 80, length: 150, audioUrl: "https://cdn.pixabay.com/audio/2023/10/30/audio_96e38df80e.mp3" },
-    { id: "jazz1", title: "Smooth Jazz", mood: "elegant", category: "jazz", bpm: 90, length: 140, audioUrl: "https://cdn.pixabay.com/audio/2024/04/22/audio_ed08dd1f69.mp3" },
-    { id: "electronic1", title: "Tech Groove", mood: "modern", category: "electronic", bpm: 125, length: 110, audioUrl: "https://cdn.pixabay.com/audio/2024/05/15/audio_6f58e1a67c.mp3" },
-    { id: "pop1", title: "Summer Vibes", mood: "cheerful", category: "pop", bpm: 118, length: 95, audioUrl: "https://cdn.pixabay.com/audio/2024/06/10/audio_3c5b4f8d91.mp3" },
-    { id: "corporate1", title: "Business Success", mood: "professional", category: "corporate", bpm: 110, length: 130, audioUrl: "https://cdn.pixabay.com/audio/2024/07/08/audio_2d9f1a5e83.mp3" },
-    { id: "motivational1", title: "Inspiration", mood: "inspiring", category: "motivational", bpm: 105, length: 145, audioUrl: "https://cdn.pixabay.com/audio/2024/08/20/audio_4e7b2c9f10.mp3" },
-  ];
+  // Freesound API for royalty-free music
+  const FREESOUND_API_BASE = "https://freesound.org/apiv2";
+  
+  async function getFreesoundApiKey(): Promise<string | null> {
+    const settings = await storage.getSettings();
+    return settings?.freesoundApiKey || null;
+  }
   
   app.get("/api/music/search", async (req, res) => {
     try {
       const { query } = req.query;
-      if (!query) {
-        return res.json({ tracks: musicLibrary });
+      const apiKey = await getFreesoundApiKey();
+      
+      if (!apiKey) {
+        return res.status(400).json({ 
+          error: "Freesound API key not configured",
+          needsApiKey: true 
+        });
       }
       
-      const searchTerms = String(query).toLowerCase().split(/\s+/);
-      const filtered = musicLibrary.filter(track => {
-        const searchable = `${track.title} ${track.mood} ${track.category}`.toLowerCase();
-        return searchTerms.some(term => searchable.includes(term));
-      });
+      const searchQuery = query ? String(query) : "background music";
+      const url = `${FREESOUND_API_BASE}/search/text/?query=${encodeURIComponent(searchQuery)}&filter=duration:[30 TO 300] tag:music&fields=id,name,duration,tags,previews,username,license&page_size=20&token=${apiKey}`;
       
-      res.json({ tracks: filtered.length > 0 ? filtered : musicLibrary });
+      const response = await fetch(url);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Freesound API error:", errorText);
+        return res.status(response.status).json({ error: "Freesound API error" });
+      }
+      
+      const data = await response.json();
+      const tracks = (data.results || []).map((sound: any) => ({
+        id: String(sound.id),
+        title: sound.name,
+        mainArtists: [sound.username],
+        bpm: 0,
+        length: Math.round(sound.duration),
+        moods: sound.tags?.slice(0, 5).map((t: string) => ({ name: t })) || [],
+        images: { default: "" },
+        audioUrl: sound.previews?.["preview-hq-mp3"] || sound.previews?.["preview-lq-mp3"] || "",
+        license: sound.license,
+      }));
+      
+      res.json({ tracks });
     } catch (error) {
       console.error("Error searching music:", error);
       res.status(500).json({ error: "Failed to search music" });
@@ -2565,11 +2581,23 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
   app.get("/api/music/track/:trackId/stream", async (req, res) => {
     try {
       const { trackId } = req.params;
-      const track = musicLibrary.find(t => t.id === trackId);
-      if (!track) {
+      const apiKey = await getFreesoundApiKey();
+      
+      if (!apiKey) {
+        return res.status(400).json({ error: "Freesound API key not configured" });
+      }
+      
+      const url = `${FREESOUND_API_BASE}/sounds/${trackId}/?fields=previews&token=${apiKey}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
         return res.status(404).json({ error: "Track not found" });
       }
-      res.json({ url: track.audioUrl });
+      
+      const data = await response.json();
+      const audioUrl = data.previews?.["preview-hq-mp3"] || data.previews?.["preview-lq-mp3"];
+      
+      res.json({ url: audioUrl });
     } catch (error) {
       console.error("Error getting stream URL:", error);
       res.status(500).json({ error: "Failed to get stream" });
@@ -2588,6 +2616,14 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         return res.status(400).json({ error: "Claude API key not configured" });
       }
 
+      const freesoundKey = await getFreesoundApiKey();
+      if (!freesoundKey) {
+        return res.status(400).json({ 
+          error: "Freesound API key not configured",
+          needsApiKey: true 
+        });
+      }
+
       const categoryLabels: Record<string, string> = {
         general: "общая реклама",
         restaurant: "ресторан/кафе",
@@ -2597,10 +2633,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         events: "мероприятия/события",
       };
 
-      const availableMoods = musicLibrary.map(t => t.mood).join(", ");
-      const availableCategories = Array.from(new Set(musicLibrary.map(t => t.category))).join(", ");
-
-      const analysisPrompt = `Проанализируй рекламный текст и подбери подходящую фоновую музыку из библиотеки.
+      const analysisPrompt = `Проанализируй рекламный текст и определи подходящий поисковый запрос для фоновой музыки.
 
 РЕКЛАМНЫЙ ТЕКСТ:
 ${adText}
@@ -2608,10 +2641,7 @@ ${adText}
 КАТЕГОРИЯ РЕКЛАМЫ: ${categoryLabels[category] || category}
 ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
-ДОСТУПНЫЕ НАСТРОЕНИЯ МУЗЫКИ: ${availableMoods}
-ДОСТУПНЫЕ ЖАНРЫ: ${availableCategories}
-
-Твоя задача - выбрать наиболее подходящее настроение или жанр из доступных.
+Твоя задача - сформулировать поисковый запрос на английском для поиска фоновой музыки в библиотеке Freesound.
 
 Учитывай:
 - Настроение текста (радостное, спокойное, энергичное, элегантное)
@@ -2621,10 +2651,11 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
 Ответь ТОЛЬКО в формате JSON:
 {
-  "selectedMood": "одно слово из доступных настроений на английском",
-  "selectedCategory": "одно слово из доступных жанров на английском", 
+  "searchQuery": "поисковый запрос на английском (2-4 слова, жанр + настроение)",
   "reasoning": "краткое объяснение выбора на русском (1 предложение)"
-}`;
+}
+
+Примеры хороших запросов: "upbeat corporate background", "calm piano ambient", "happy pop music", "elegant jazz lounge"`;
 
       const claudeResponse = await anthropic.messages.create({
         model: CLAUDE_MODEL,
@@ -2646,43 +2677,39 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
         }
       } catch {
         analysis = {
-          selectedMood: "upbeat",
-          selectedCategory: "corporate",
+          searchQuery: "upbeat background music",
           reasoning: "Стандартный выбор для рекламы",
         };
       }
 
-      const searchTerms = [analysis.selectedMood, analysis.selectedCategory].filter(Boolean);
-      let matchedTracks = musicLibrary.filter(track => {
-        return searchTerms.some(term => 
-          track.mood.toLowerCase().includes(term.toLowerCase()) ||
-          track.category.toLowerCase().includes(term.toLowerCase())
-        );
-      });
-
-      if (matchedTracks.length === 0) {
-        matchedTracks = musicLibrary.slice(0, 5);
+      const searchUrl = `${FREESOUND_API_BASE}/search/text/?query=${encodeURIComponent(analysis.searchQuery)}&filter=duration:[30 TO 180] tag:music&fields=id,name,duration,tags,previews,username,license&page_size=10&token=${freesoundKey}`;
+      
+      const searchResponse = await fetch(searchUrl);
+      let tracks: any[] = [];
+      
+      if (searchResponse.ok) {
+        const data = await searchResponse.json();
+        tracks = (data.results || []).map((sound: any) => ({
+          id: String(sound.id),
+          title: sound.name,
+          mainArtists: [sound.username],
+          bpm: 0,
+          length: Math.round(sound.duration),
+          moods: sound.tags?.slice(0, 5).map((t: string) => ({ name: t })) || [],
+          images: { default: "" },
+          audioUrl: sound.previews?.["preview-hq-mp3"] || sound.previews?.["preview-lq-mp3"] || "",
+          license: sound.license,
+        }));
       }
 
-      const formattedTracks = matchedTracks.map(t => ({
-        id: t.id,
-        title: t.title,
-        mainArtists: ["Royalty Free"],
-        bpm: t.bpm,
-        length: t.length,
-        moods: [{ name: t.mood }],
-        images: { default: "" },
-        audioUrl: t.audioUrl,
-      }));
-
       res.json({
-        tracks: formattedTracks,
+        tracks,
         analysis: {
-          primaryQuery: analysis.selectedMood,
-          secondaryQuery: analysis.selectedCategory,
+          primaryQuery: analysis.searchQuery,
+          secondaryQuery: "",
           reasoning: analysis.reasoning,
         },
-        recommendedTrack: formattedTracks[0] || null,
+        recommendedTrack: tracks[0] || null,
       });
     } catch (error) {
       console.error("Error auto-selecting music:", error);

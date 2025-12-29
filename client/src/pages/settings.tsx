@@ -21,6 +21,7 @@ const settingsFormSchema = z.object({
   elevenLabsApiKey: z.string().optional(),
   anthropicApiKey: z.string().optional(),
   yandexDiskToken: z.string().optional(),
+  freesoundApiKey: z.string().optional(),
   maleVoiceId: z.string().min(1, "Укажите ID голоса"),
   femaleVoiceId: z.string().min(1, "Укажите ID голоса"),
   dailyDialogsCount: z.coerce.number().min(1).max(50),
@@ -40,6 +41,7 @@ export default function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showYandexToken, setShowYandexToken] = useState(false);
+  const [showFreesoundKey, setShowFreesoundKey] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
@@ -54,6 +56,7 @@ export default function SettingsPage() {
       elevenLabsApiKey: "",
       anthropicApiKey: "",
       yandexDiskToken: "",
+      freesoundApiKey: "",
       maleVoiceId: "onwK4e9ZLuTAKqWW03F9",
       femaleVoiceId: "EXAVITQu4vr4xnSDxMaL",
       dailyDialogsCount: 12,
@@ -76,6 +79,7 @@ export default function SettingsPage() {
         elevenLabsApiKey: settings.elevenLabsApiKey || "",
         anthropicApiKey: settings.anthropicApiKey || "",
         yandexDiskToken: settings.yandexDiskToken || "",
+        freesoundApiKey: settings.freesoundApiKey || "",
         maleVoiceId: settings.maleVoiceId || "onwK4e9ZLuTAKqWW03F9",
         femaleVoiceId: settings.femaleVoiceId || "EXAVITQu4vr4xnSDxMaL",
         dailyDialogsCount: settings.dailyDialogsCount || 12,
@@ -465,6 +469,56 @@ export default function SettingsPage() {
                     </div>
                     <FormDescription>
                       Токен для загрузки файлов на Яндекс.Диск
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="freesoundApiKey"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Globe className="h-4 w-4" />
+                      Freesound API Key
+                    </FormLabel>
+                    <div className="flex gap-2 items-center">
+                      <FormControl>
+                        <Input
+                          type={showFreesoundKey ? "text" : "password"}
+                          placeholder="Введите API ключ Freesound"
+                          {...field}
+                          data-testid="input-freesound-key"
+                          className="flex-1"
+                        />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowFreesoundKey(!showFreesoundKey)}
+                      >
+                        {showFreesoundKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => saveFieldMutation.mutate({ freesoundApiKey: field.value })}
+                        disabled={saveFieldMutation.isPending || !field.value}
+                        data-testid="button-save-freesound"
+                      >
+                        {saveFieldMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    <FormDescription>
+                      Для подбора фоновой музыки. Получите ключ на freesound.org/apiv2/apply
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
