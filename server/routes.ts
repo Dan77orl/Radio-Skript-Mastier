@@ -1743,9 +1743,33 @@ ${instructions || "Создай альтернативный вариант с �
 
       if (mimeType === "application/pdf" || ext === ".pdf") {
         const pdfBuffer = await fs.readFile(filePath);
-        const pdfParseLib = require("pdf-parse");
-        const pdfData = await pdfParseLib(pdfBuffer);
-        extractedText = pdfData.text;
+        const base64Pdf = pdfBuffer.toString("base64");
+        const dataUrl = `data:application/pdf;base64,${base64Pdf}`;
+
+        const response = await openai.chat.completions.create({
+          model: "gpt-4.1",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: "Извлеки весь текст из этого PDF документа. Если это рекламный материал или листовка, опиши также визуальное содержание (логотипы, продукты, стиль, цвета). Ответ на русском языке. Верни только извлеченный текст и описание.",
+                },
+                {
+                  type: "file",
+                  file: {
+                    filename: req.file!.originalname,
+                    file_data: dataUrl,
+                  },
+                } as any,
+              ],
+            },
+          ],
+          max_tokens: 3000,
+        });
+
+        extractedText = response.choices[0]?.message?.content || "";
       } else if (
         mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
         ext === ".docx"
