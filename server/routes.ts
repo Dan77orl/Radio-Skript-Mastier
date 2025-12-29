@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
-import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertVoiceSchema } from "@shared/schema";
+import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertAdPresetSchema, insertVoiceSchema } from "@shared/schema";
 import { z } from "zod";
 import { promises as fs } from "fs";
 import path from "path";
@@ -1348,20 +1348,11 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
   app.post("/api/ad-presets", async (req, res) => {
     try {
-      const { name, description, miniPrompt, defaultVoiceId, defaultTargetDurationSeconds, defaultCategory } = req.body;
-      if (!name || !miniPrompt) {
-        return res.status(400).json({ error: "Name and miniPrompt are required" });
+      const parsed = insertAdPresetSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
       }
-      const preset = await storage.createAdPreset({
-        name,
-        description,
-        miniPrompt,
-        defaultVoiceId,
-        defaultTargetDurationSeconds: defaultTargetDurationSeconds || 30,
-        defaultCategory: defaultCategory || "general",
-        isActive: true,
-        sortOrder: 0,
-      });
+      const preset = await storage.createAdPreset(parsed.data);
       res.json(preset);
     } catch (error) {
       console.error("Error creating ad preset:", error);
@@ -1371,7 +1362,12 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
   app.patch("/api/ad-presets/:id", async (req, res) => {
     try {
-      const updated = await storage.updateAdPreset(req.params.id, req.body);
+      const partialSchema = insertAdPresetSchema.partial();
+      const parsed = partialSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const updated = await storage.updateAdPreset(req.params.id, parsed.data);
       if (!updated) {
         return res.status(404).json({ error: "Preset not found" });
       }

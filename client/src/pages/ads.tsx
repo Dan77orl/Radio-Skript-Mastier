@@ -46,7 +46,7 @@ import {
   Check, RefreshCw, Volume2, Music, FileText, Link, Instagram,
   Clock, PauseCircle, PlayCircle, ArrowLeft, Upload, X, File
 } from "lucide-react";
-import type { Ad, Voice } from "@shared/schema";
+import type { Ad, Voice, AdPreset } from "@shared/schema";
 
 interface ExtractedFile {
   filename: string;
@@ -108,6 +108,40 @@ export default function AdsPage() {
     queryKey: ["/api/elevenlabs/voices"],
   });
 
+  const { data: adPresets } = useQuery<AdPreset[]>({
+    queryKey: ["/api/ad-presets"],
+  });
+
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+
+  const handlePresetSelect = (presetId: string) => {
+    if (presetId === "none") {
+      setSelectedPresetId(null);
+      return;
+    }
+    const preset = adPresets?.find(p => p.id === presetId);
+    if (preset) {
+      setSelectedPresetId(presetId);
+      const currentCategory = form.getValues("category");
+      if (preset.defaultCategory && (!currentCategory || currentCategory === "general")) {
+        form.setValue("category", preset.defaultCategory);
+      }
+      const currentDuration = form.getValues("targetDurationSeconds");
+      if (preset.defaultTargetDurationSeconds && currentDuration === 30) {
+        form.setValue("targetDurationSeconds", preset.defaultTargetDurationSeconds);
+      }
+      if (preset.miniPrompt) {
+        const currentPrompt = form.getValues("prompt");
+        if (!currentPrompt || currentPrompt.trim() === "") {
+          form.setValue("prompt", preset.miniPrompt);
+        }
+      }
+      if (preset.defaultVoiceId && !selectedVoiceId) {
+        setSelectedVoiceId(preset.defaultVoiceId);
+      }
+    }
+  };
+
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -134,6 +168,8 @@ export default function AdsPage() {
       const response = await apiRequest("POST", "/api/ads", {
         title: data.clientName || "Новая реклама",
         ...data,
+        presetId: selectedPresetId || undefined,
+        voiceIds: selectedVoiceId ? [selectedVoiceId] : undefined,
         status: "draft",
         stage: "prompt",
       });
@@ -667,6 +703,33 @@ export default function AdsPage() {
             <CardContent>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  {adPresets && adPresets.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Пресет</label>
+                      <Select 
+                        value={selectedPresetId || "none"} 
+                        onValueChange={handlePresetSelect}
+                      >
+                        <SelectTrigger data-testid="select-preset">
+                          <SelectValue placeholder="Выберите пресет" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none" data-testid="select-preset-none">Без пресета</SelectItem>
+                          {adPresets.filter(p => p.isActive).map((preset) => (
+                            <SelectItem key={preset.id} value={preset.id} data-testid={`select-preset-${preset.id}`}>
+                              {preset.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedPresetId && (
+                        <p className="text-xs text-muted-foreground" data-testid="text-preset-description">
+                          {adPresets.find(p => p.id === selectedPresetId)?.description}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <FormField
                     control={form.control}
                     name="clientName"
