@@ -1744,32 +1744,39 @@ ${instructions || "Создай альтернативный вариант с �
       if (mimeType === "application/pdf" || ext === ".pdf") {
         const pdfBuffer = await fs.readFile(filePath);
         const base64Pdf = pdfBuffer.toString("base64");
-        const dataUrl = `data:application/pdf;base64,${base64Pdf}`;
 
-        const response = await openai.chat.completions.create({
-          model: "gpt-4.1",
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: "Извлеки весь текст из этого PDF документа. Если это рекламный материал или листовка, опиши также визуальное содержание (логотипы, продукты, стиль, цвета). Ответ на русском языке. Верни только извлеченный текст и описание.",
-                },
-                {
-                  type: "file",
-                  file: {
-                    filename: req.file!.originalname,
-                    file_data: dataUrl,
+        const settings = await storage.getSettings();
+        const anthropicApiKey = settings?.anthropicApiKey;
+
+        if (anthropicApiKey) {
+          const anthropic = new Anthropic({ apiKey: anthropicApiKey });
+          const response = await anthropic.messages.create({
+            model: CLAUDE_MODEL,
+            max_tokens: 3000,
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "document",
+                    source: {
+                      type: "base64",
+                      media_type: "application/pdf",
+                      data: base64Pdf,
+                    },
                   },
-                } as any,
-              ],
-            },
-          ],
-          max_tokens: 3000,
-        });
-
-        extractedText = response.choices[0]?.message?.content || "";
+                  {
+                    type: "text",
+                    text: "Извлеки весь текст из этого PDF документа. Если это рекламный материал или листовка, опиши также визуальное содержание (логотипы, продукты, стиль, цвета). Ответ на русском языке. Верни только извлеченный текст и описание.",
+                  },
+                ],
+              },
+            ],
+          });
+          extractedText = response.content[0].type === "text" ? response.content[0].text : "";
+        } else {
+          return res.status(400).json({ error: "Для обработки PDF требуется API ключ Anthropic. Добавьте его в настройках." });
+        }
       } else if (
         mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
         ext === ".docx"
