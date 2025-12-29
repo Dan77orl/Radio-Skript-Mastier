@@ -8,6 +8,7 @@ import { z } from "zod";
 import { promises as fs } from "fs";
 import path from "path";
 import multer from "multer";
+import mammoth from "mammoth";
 
 const uploadDir = path.join(process.cwd(), "public", "uploads");
 
@@ -1723,6 +1724,77 @@ ${instructions || "Создай альтернативный вариант с �
     } catch (error) {
       console.error("Error starting audio synthesis:", error);
       res.status(500).json({ error: "Failed to start audio synthesis" });
+    }
+  });
+
+  app.post("/api/extract-text", upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const filePath = req.file.path;
+      const mimeType = req.file.mimetype;
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      let extractedText = "";
+
+      if (mimeType === "application/pdf" || ext === ".pdf") {
+        const pdfBuffer = await fs.readFile(filePath);
+        const pdfParse = (await import("pdf-parse")).default;
+        const pdfData = await pdfParse(pdfBuffer);
+        extractedText = pdfData.text;
+      } else if (
+        mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        ext === ".docx"
+      ) {
+        const result = await mammoth.extractRawText({ path: filePath });
+        extractedText = result.value;
+      } else if (mimeType === "application/msword" || ext === ".doc") {
+        return res.status(400).json({ error: "Формат .doc не поддерживается. Используйте .docx" });
+      } else if (mimeType.startsWith("image/")) {
+        const imageBuffer = await fs.readFile(filePath);
+        const base64Image = imageBuffer.toString("base64");
+        const dataUrl = `data:${mimeType};base64,${base64Image}`;
+
+        const response = await openai.chat.completions.create({
+          model: "gpt-4.1",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: "Извлеки весь текст с этого изображения. Если это рекламный материал, опиши также визуальное содержание (логотипы, продукты, стиль). Ответ на русском языке.",
+                },
+                {
+                  type: "image_url",
+                  image_url: { url: dataUrl },
+                },
+              ],
+            },
+          ],
+          max_tokens: 2000,
+        });
+
+        extractedText = response.choices[0]?.message?.content || "";
+      } else if (mimeType === "text/plain" || ext === ".txt") {
+        extractedText = await fs.readFile(filePath, "utf-8");
+      } else {
+        return res.status(400).json({ 
+          error: `Формат файла не поддерживается: ${mimeType}. Поддерживаются: PDF, DOCX, изображения (JPG, PNG), TXT` 
+        });
+      }
+
+      await fs.unlink(filePath).catch(() => {});
+
+      res.json({ 
+        text: extractedText.trim(),
+        filename: req.file.originalname,
+        mimeType,
+      });
+    } catch (error) {
+      console.error("Error extracting text:", error);
+      res.status(500).json({ error: "Не удалось извлечь текст из файла" });
     }
   });
 

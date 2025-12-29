@@ -44,9 +44,14 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Sparkles, Loader2, Trash2, Play, Building2, ChevronRight, 
   Check, RefreshCw, Volume2, Music, FileText, Link, Instagram,
-  Clock, PauseCircle, PlayCircle, ArrowLeft
+  Clock, PauseCircle, PlayCircle, ArrowLeft, Upload, X, File
 } from "lucide-react";
 import type { Ad, Voice } from "@shared/schema";
+
+interface ExtractedFile {
+  filename: string;
+  text: string;
+}
 
 const adFormSchema = z.object({
   prompt: z.string().min(10, "Описание должно быть не менее 10 символов"),
@@ -82,6 +87,9 @@ export default function AdsPage() {
   const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(null);
   const [playingAudio, setPlayingAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [extractedFiles, setExtractedFiles] = useState<ExtractedFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const { data: ads, isLoading } = useQuery<Ad[]>({
     queryKey: ["/api/ads"],
@@ -232,6 +240,56 @@ export default function AdsPage() {
 
   const getCategoryLabel = (value: string) => {
     return categories.find(c => c.value === value)?.label || value;
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    const file = files[0];
+    
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/extract-text", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Не удалось обработать файл");
+      }
+
+      const data = await response.json();
+      setExtractedFiles(prev => [...prev, { filename: data.filename, text: data.text }]);
+      
+      const currentPrompt = form.getValues("prompt");
+      const separator = currentPrompt ? "\n\n--- Из файла " + data.filename + " ---\n" : "";
+      form.setValue("prompt", currentPrompt + separator + data.text);
+      
+      toast({ 
+        title: "Файл обработан", 
+        description: `Текст из "${data.filename}" добавлен в описание` 
+      });
+    } catch (error) {
+      toast({ 
+        title: "Ошибка", 
+        description: error instanceof Error ? error.message : "Не удалось обработать файл",
+        variant: "destructive" 
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const removeExtractedFile = (index: number) => {
+    setExtractedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const getCurrentStageIndex = () => {
@@ -712,7 +770,31 @@ export default function AdsPage() {
                               className="flex-1"
                             />
                           </FormControl>
-                          <VoiceInput onTranscript={(text) => field.onChange(field.value + " " + text)} />
+                          <div className="flex flex-col gap-1">
+                            <VoiceInput onTranscript={(text) => field.onChange(field.value + " " + text)} />
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept=".pdf,.docx,.doc,.txt,.jpg,.jpeg,.png,.gif,.webp"
+                              onChange={handleFileUpload}
+                              className="hidden"
+                              data-testid="input-file-upload"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={isUploading}
+                              title="Загрузить файл (PDF, Word, изображение)"
+                            >
+                              {isUploading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Upload className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
                         </div>
                         <FormDescription>
                           ИИ создаст 5 вариантов текста на выбор
@@ -721,6 +803,29 @@ export default function AdsPage() {
                       </FormItem>
                     )}
                   />
+
+                  {extractedFiles.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Загруженные файлы:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {extractedFiles.map((file, index) => (
+                          <Badge key={index} variant="secondary" className="gap-1 pr-1">
+                            <File className="h-3 w-3" />
+                            {file.filename}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-4 w-4 ml-1"
+                              onClick={() => removeExtractedFile(index)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <Button
                     type="submit"
