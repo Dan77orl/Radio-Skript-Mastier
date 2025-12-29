@@ -103,6 +103,20 @@ export default function AdsPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedVariantForEdit, setSelectedVariantForEdit] = useState<number | null>(null);
   const [editInstructions, setEditInstructions] = useState("");
+  const [musicSearchQuery, setMusicSearchQuery] = useState("");
+  const [isSearchingMusic, setIsSearchingMusic] = useState(false);
+  const [musicSearchResults, setMusicSearchResults] = useState<Array<{
+    id: string;
+    title: string;
+    mainArtists: string[];
+    bpm: number;
+    length: number;
+    moods?: Array<{ name: string }>;
+    images?: { default?: string };
+  }>>([]);
+  const [selectedMusicTrack, setSelectedMusicTrack] = useState<string | null>(null);
+  const [playingMusicTrackId, setPlayingMusicTrackId] = useState<string | null>(null);
+  const musicAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: ads, isLoading } = useQuery<Ad[]>({
     queryKey: ["/api/ads"],
@@ -299,6 +313,56 @@ export default function AdsPage() {
     audio.play().catch(console.error);
     setPlayingAudio(true);
     audio.onended = () => setPlayingAudio(false);
+  };
+
+  const searchMusic = async () => {
+    if (!musicSearchQuery.trim()) return;
+    setIsSearchingMusic(true);
+    try {
+      const response = await fetch(`/api/epidemic/search?query=${encodeURIComponent(musicSearchQuery)}&limit=10`);
+      if (!response.ok) throw new Error("Search failed");
+      const data = await response.json();
+      setMusicSearchResults(data.tracks || []);
+    } catch (error) {
+      console.error("Music search error:", error);
+      toast({
+        title: "Ошибка поиска",
+        description: "Не удалось найти музыку",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSearchingMusic(false);
+    }
+  };
+
+  const playMusicPreview = async (trackId: string) => {
+    if (musicAudioRef.current) {
+      musicAudioRef.current.pause();
+    }
+    if (playingMusicTrackId === trackId) {
+      setPlayingMusicTrackId(null);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/epidemic/track/${trackId}/stream`);
+      if (!response.ok) throw new Error("Stream failed");
+      const data = await response.json();
+      if (data.url) {
+        const audio = new Audio(data.url);
+        musicAudioRef.current = audio;
+        audio.play().catch(console.error);
+        setPlayingMusicTrackId(trackId);
+        audio.onended = () => setPlayingMusicTrackId(null);
+      }
+    } catch (error) {
+      console.error("Music preview error:", error);
+    }
+  };
+
+  const formatMusicDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const getCategoryLabel = (value: string) => {
@@ -714,15 +778,89 @@ export default function AdsPage() {
                 <p className="text-sm">{currentAd.selectedVariantText}</p>
               </div>
 
-              <Button
-                variant="outline"
-                className="w-full"
-                disabled
-                data-testid="button-add-music"
-              >
-                <Music className="mr-2 h-4 w-4" />
-                Добавить музыку (скоро)
-              </Button>
+              <div className="space-y-4 border-t pt-4">
+                <div className="flex items-center gap-2">
+                  <Music className="h-4 w-4" />
+                  <span className="font-medium">Добавить фоновую музыку</span>
+                </div>
+                
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Поиск музыки (happy, chill, upbeat...)"
+                    value={musicSearchQuery}
+                    onChange={(e) => setMusicSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && searchMusic()}
+                    data-testid="input-music-search"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={searchMusic}
+                    disabled={isSearchingMusic}
+                    data-testid="button-search-music"
+                  >
+                    {isSearchingMusic ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Найти"
+                    )}
+                  </Button>
+                </div>
+
+                {musicSearchResults.length > 0 && (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {musicSearchResults.map((track) => (
+                      <div
+                        key={track.id}
+                        className={`flex items-center gap-3 p-2 rounded-md hover-elevate cursor-pointer ${
+                          selectedMusicTrack === track.id ? "bg-primary/10 border border-primary" : "bg-muted"
+                        }`}
+                        onClick={() => setSelectedMusicTrack(track.id === selectedMusicTrack ? null : track.id)}
+                        data-testid={`track-item-${track.id}`}
+                      >
+                        {track.images?.default && (
+                          <img
+                            src={track.images.default}
+                            alt={track.title}
+                            className="h-10 w-10 rounded"
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{track.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {track.mainArtists?.join(", ")} • {formatMusicDuration(track.length)} • {track.bpm} BPM
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            playMusicPreview(track.id);
+                          }}
+                          data-testid={`button-play-track-${track.id}`}
+                        >
+                          {playingMusicTrackId === track.id ? (
+                            <PauseCircle className="h-5 w-5" />
+                          ) : (
+                            <PlayCircle className="h-5 w-5" />
+                          )}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {selectedMusicTrack && (
+                  <Button
+                    className="w-full"
+                    disabled
+                    data-testid="button-mix-audio"
+                  >
+                    <Music className="mr-2 h-4 w-4" />
+                    Смикшировать (скоро)
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
         );

@@ -2528,5 +2528,126 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
     }
   });
 
+  // Epidemic Sound API routes
+  const EPIDEMIC_API_BASE = "https://partner-content-api.epidemicsound.com/v0";
+  
+  app.get("/api/epidemic/search", async (req, res) => {
+    try {
+      const token = process.env.EPIDEMIC_SOUND_TOKEN;
+      if (!token) {
+        return res.status(400).json({ error: "Epidemic Sound token not configured" });
+      }
+      
+      const { query, limit = 20 } = req.query;
+      if (!query) {
+        return res.status(400).json({ error: "Query parameter is required" });
+      }
+      
+      const url = `${EPIDEMIC_API_BASE}/tracks/search?query=${encodeURIComponent(String(query))}&limit=${limit}`;
+      const response = await fetch(url, {
+        headers: {
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("Epidemic API error:", response.status, text);
+        return res.status(response.status).json({ error: "Epidemic Sound API error" });
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Error searching Epidemic Sound:", error);
+      res.status(500).json({ error: "Failed to search music" });
+    }
+  });
+
+  app.get("/api/epidemic/track/:trackId", async (req, res) => {
+    try {
+      const token = process.env.EPIDEMIC_SOUND_TOKEN;
+      if (!token) {
+        return res.status(400).json({ error: "Epidemic Sound token not configured" });
+      }
+      
+      const { trackId } = req.params;
+      const url = `${EPIDEMIC_API_BASE}/tracks/${trackId}`;
+      const response = await fetch(url, {
+        headers: {
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        return res.status(response.status).json({ error: "Track not found" });
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Error getting track:", error);
+      res.status(500).json({ error: "Failed to get track" });
+    }
+  });
+
+  app.get("/api/epidemic/track/:trackId/stream", async (req, res) => {
+    try {
+      const token = process.env.EPIDEMIC_SOUND_TOKEN;
+      if (!token) {
+        return res.status(400).json({ error: "Epidemic Sound token not configured" });
+      }
+      
+      const { trackId } = req.params;
+      const url = `${EPIDEMIC_API_BASE}/tracks/${trackId}/hls`;
+      const response = await fetch(url, {
+        headers: {
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        return res.status(response.status).json({ error: "Stream not available" });
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Error getting stream URL:", error);
+      res.status(500).json({ error: "Failed to get stream" });
+    }
+  });
+
+  app.get("/api/epidemic/track/:trackId/download", async (req, res) => {
+    try {
+      const token = process.env.EPIDEMIC_SOUND_TOKEN;
+      if (!token) {
+        return res.status(400).json({ error: "Epidemic Sound token not configured" });
+      }
+      
+      const { trackId } = req.params;
+      const url = `${EPIDEMIC_API_BASE}/tracks/${trackId}/download`;
+      const response = await fetch(url, {
+        headers: {
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        return res.status(response.status).json({ error: "Download not available" });
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Error getting download URL:", error);
+      res.status(500).json({ error: "Failed to get download" });
+    }
+  });
+
   return httpServer;
 }
