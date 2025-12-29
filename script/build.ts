@@ -30,6 +30,8 @@ const allowlist = [
   "xlsx",
   "zod",
   "zod-validation-error",
+  "pdf-parse",
+  "mammoth",
 ];
 
 async function buildAll() {
