@@ -93,6 +93,11 @@ export default function AdsPage() {
 
   const { data: ads, isLoading } = useQuery<Ad[]>({
     queryKey: ["/api/ads"],
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      const hasGenerating = data?.some(ad => ad.status === "generating");
+      return hasGenerating ? 2000 : false;
+    },
   });
 
   const { data: voices } = useQuery<Voice[]>({
@@ -218,6 +223,15 @@ export default function AdsPage() {
       toast({ title: "Ошибка", description: error.message, variant: "destructive" });
     },
   });
+
+  useEffect(() => {
+    if (currentAd && ads) {
+      const updated = ads.find(a => a.id === currentAd.id);
+      if (updated && (updated.stage !== currentAd.stage || updated.status !== currentAd.status || updated.audioUrl !== currentAd.audioUrl)) {
+        setCurrentAd(updated);
+      }
+    }
+  }, [ads, currentAd]);
 
   const onSubmit = (data: AdFormValues) => {
     createAdMutation.mutate(data);
