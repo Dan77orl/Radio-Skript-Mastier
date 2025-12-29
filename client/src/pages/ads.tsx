@@ -673,13 +673,17 @@ export default function AdsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Название клиента</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Например: Ресторан У Моря"
-                            {...field}
-                            data-testid="input-client-name"
-                          />
-                        </FormControl>
+                        <div className="flex gap-1 items-center">
+                          <FormControl>
+                            <Input
+                              placeholder="Например: Ресторан У Моря"
+                              {...field}
+                              data-testid="input-client-name"
+                              className="flex-1"
+                            />
+                          </FormControl>
+                          <VoiceInput onTranscript={(text) => field.onChange((field.value || "") + text)} />
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
