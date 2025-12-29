@@ -40,13 +40,16 @@ Preferred communication style: Simple, everyday language.
 3. **Dialogs** - Generated radio scripts with status tracking (pending, generating, ready, error)
 
 ### AI Integration Pattern
-- **Claude (Anthropic)**: Primary AI for text generation (better quality Russian texts)
+- **Claude (Anthropic)**: Primary AI for ALL text generation
+  - Dialog scripts, ad variants, prompt improvement, document extraction (PDF/images)
   - API key stored in database settings, entered via admin UI
   - Uses claude-sonnet-4-20250514 model
+  - Note: Claude API does NOT support direct audio input
 - **OpenAI** (via Replit AI Integrations): Fallback when Claude API key not configured
   - Configured through environment variables `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL`
-- **Gemini** (via Replit AI Integrations): Voice transcription
+- **Gemini** (via Replit AI Integrations): Voice transcription ONLY
   - Uses gemini-2.5-flash model for audio-to-text transcription
+  - Only service that handles audio input (Claude doesn't support it)
   - Configured through `AI_INTEGRATIONS_GEMINI_API_KEY` and `AI_INTEGRATIONS_GEMINI_BASE_URL`
   - Costs are billed to Replit credits (no separate API key needed)
 - Includes batch processing utilities with rate limiting and retries
