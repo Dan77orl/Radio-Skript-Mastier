@@ -101,6 +101,8 @@ export default function AdsPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [extractedFiles, setExtractedFiles] = useState<ExtractedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedVariantForEdit, setSelectedVariantForEdit] = useState<number | null>(null);
+  const [editInstructions, setEditInstructions] = useState("");
 
   const { data: ads, isLoading } = useQuery<Ad[]>({
     queryKey: ["/api/ads"],
@@ -455,39 +457,96 @@ export default function AdsPage() {
             <CardHeader>
               <CardTitle>Шаг 2: Выберите вариант</CardTitle>
               <CardDescription>
-                Нажмите на лучший вариант или создайте новый на основе выбранного
+                Выберите вариант для доработки или сразу отправьте на озвучку
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[500px]">
+            <CardContent className="space-y-4">
+              {selectedVariantForEdit !== null && (
+                <div className="rounded-lg border border-primary bg-primary/5 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <Badge>Выбран вариант {selectedVariantForEdit + 1}</Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedVariantForEdit(null)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground line-clamp-3">
+                    {currentAd.variants?.[selectedVariantForEdit]}
+                  </p>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Что изменить или добавить?</label>
+                    <div className="flex gap-2">
+                      <div className="flex-1 flex gap-1 items-center">
+                        <Textarea
+                          value={editInstructions}
+                          onChange={(e) => setEditInstructions(e.target.value)}
+                          placeholder="Добавить номер телефона, сделать текст короче, изменить тон..."
+                          rows={2}
+                          className="flex-1"
+                          data-testid="textarea-edit-instructions"
+                        />
+                        <VoiceInput onTranscript={(text) => setEditInstructions(prev => prev + " " + text)} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        regenerateVariantMutation.mutate({
+                          adId: currentAd.id,
+                          baseText: currentAd.variants?.[selectedVariantForEdit] || "",
+                          instructions: editInstructions,
+                        });
+                        setEditInstructions("");
+                        setSelectedVariantForEdit(null);
+                      }}
+                      disabled={regenerateVariantMutation.isPending}
+                      data-testid="button-regenerate"
+                    >
+                      {regenerateVariantMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                      )}
+                      Доработать (5 новых)
+                    </Button>
+                    <Button
+                      variant="default"
+                      onClick={() => {
+                        selectVariantMutation.mutate({ 
+                          adId: currentAd.id, 
+                          variantIndex: selectedVariantForEdit 
+                        });
+                      }}
+                      disabled={selectVariantMutation.isPending}
+                      data-testid="button-use-variant"
+                    >
+                      <Check className="mr-2 h-4 w-4" />
+                      Использовать этот
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <ScrollArea className="h-[400px]">
                 <div className="space-y-4 pr-4">
                   {currentAd.variants?.map((variant, index) => (
                     <div
                       key={index}
                       className={`rounded-lg border p-4 cursor-pointer transition-colors hover-elevate ${
-                        currentAd.selectedVariantIndex === index ? "border-primary bg-primary/5" : ""
+                        selectedVariantForEdit === index ? "border-primary bg-primary/5" : ""
                       }`}
-                      onClick={() => selectVariantMutation.mutate({ adId: currentAd.id, variantIndex: index })}
+                      onClick={() => setSelectedVariantForEdit(index)}
                       data-testid={`variant-${index}`}
                     >
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <Badge variant="outline">Вариант {index + 1}</Badge>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              regenerateVariantMutation.mutate({
-                                adId: currentAd.id,
-                                baseText: variant,
-                              });
-                            }}
-                            disabled={regenerateVariantMutation.isPending}
-                          >
-                            <RefreshCw className="h-3 w-3" />
-                          </Button>
-                        </div>
+                        {selectedVariantForEdit === index && (
+                          <Badge variant="secondary">Выбран</Badge>
+                        )}
                       </div>
                       <p className="text-sm whitespace-pre-wrap">{variant}</p>
                     </div>
