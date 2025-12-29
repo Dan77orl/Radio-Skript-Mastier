@@ -55,7 +55,7 @@ import {
   Sparkles, Loader2, Trash2, Play, Building2, ChevronRight, 
   Check, RefreshCw, Volume2, Music, FileText, Link, Instagram,
   Clock, PauseCircle, PlayCircle, ArrowLeft, Upload, X, File,
-  Plus, Pencil, Users, User, Mic, Settings2, FileStack
+  Plus, Pencil, Users, User, Mic, Settings2, FileStack, Download
 } from "lucide-react";
 import type { Ad, Voice, AdPreset } from "@shared/schema";
 
@@ -682,18 +682,30 @@ export default function AdsPage() {
                     </div>
                   </div>
                   {currentAd.audioUrl && (
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => playAudio(currentAd.audioUrl!)}
-                      data-testid="button-play-audio"
-                    >
-                      {playingAudio ? (
-                        <PauseCircle className="h-5 w-5" />
-                      ) : (
-                        <PlayCircle className="h-5 w-5" />
-                      )}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => playAudio(currentAd.audioUrl!)}
+                        data-testid="button-play-audio"
+                      >
+                        {playingAudio ? (
+                          <PauseCircle className="h-5 w-5" />
+                        ) : (
+                          <PlayCircle className="h-5 w-5" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        asChild
+                        data-testid="button-download-audio"
+                      >
+                        <a href={currentAd.audioUrl} download={`${currentAd.title || "ad"}.mp3`}>
+                          <Download className="h-5 w-5" />
+                        </a>
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
