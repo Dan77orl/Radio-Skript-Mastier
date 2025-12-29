@@ -1793,7 +1793,7 @@ ${instructions || "Создай альтернативный вариант с �
 
           await storage.updateAd(id, {
             audioUrl: `/audio/ad_${id}_${timestamp}.mp3`,
-            duration: Math.round((audioBuffer.length / 1024) * 0.5),
+            duration: Math.round(audioBuffer.length / 24000),
             status: "ready",
             stage: "audio",
           });
