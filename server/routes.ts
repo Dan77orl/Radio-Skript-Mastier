@@ -9,6 +9,9 @@ import { promises as fs } from "fs";
 import path from "path";
 import multer from "multer";
 import mammoth from "mammoth";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
 
 const uploadDir = path.join(process.cwd(), "public", "uploads");
 
