@@ -2528,44 +2528,36 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
     }
   });
 
-  // Jamendo Music API routes (free royalty-free music)
-  const JAMENDO_CLIENT_ID = "b96c61f4";
-  const JAMENDO_API_BASE = "https://api.jamendo.com/v3.0";
+  // Built-in royalty-free music library for radio ads
+  const musicLibrary = [
+    { id: "upbeat1", title: "Upbeat Corporate", mood: "upbeat", category: "corporate", bpm: 120, length: 120, audioUrl: "https://cdn.pixabay.com/audio/2024/11/29/audio_e26d5d5f1a.mp3" },
+    { id: "upbeat2", title: "Happy Day", mood: "happy", category: "pop", bpm: 115, length: 90, audioUrl: "https://cdn.pixabay.com/audio/2024/02/09/audio_f2f0f57f3b.mp3" },
+    { id: "upbeat3", title: "Positive Energy", mood: "energetic", category: "electronic", bpm: 128, length: 105, audioUrl: "https://cdn.pixabay.com/audio/2024/03/05/audio_0e88cf35cf.mp3" },
+    { id: "calm1", title: "Calm Piano", mood: "calm", category: "piano", bpm: 70, length: 180, audioUrl: "https://cdn.pixabay.com/audio/2024/01/18/audio_81b9f4f5c4.mp3" },
+    { id: "calm2", title: "Relaxing Acoustic", mood: "relaxing", category: "acoustic", bpm: 80, length: 150, audioUrl: "https://cdn.pixabay.com/audio/2023/10/30/audio_96e38df80e.mp3" },
+    { id: "jazz1", title: "Smooth Jazz", mood: "elegant", category: "jazz", bpm: 90, length: 140, audioUrl: "https://cdn.pixabay.com/audio/2024/04/22/audio_ed08dd1f69.mp3" },
+    { id: "electronic1", title: "Tech Groove", mood: "modern", category: "electronic", bpm: 125, length: 110, audioUrl: "https://cdn.pixabay.com/audio/2024/05/15/audio_6f58e1a67c.mp3" },
+    { id: "pop1", title: "Summer Vibes", mood: "cheerful", category: "pop", bpm: 118, length: 95, audioUrl: "https://cdn.pixabay.com/audio/2024/06/10/audio_3c5b4f8d91.mp3" },
+    { id: "corporate1", title: "Business Success", mood: "professional", category: "corporate", bpm: 110, length: 130, audioUrl: "https://cdn.pixabay.com/audio/2024/07/08/audio_2d9f1a5e83.mp3" },
+    { id: "motivational1", title: "Inspiration", mood: "inspiring", category: "motivational", bpm: 105, length: 145, audioUrl: "https://cdn.pixabay.com/audio/2024/08/20/audio_4e7b2c9f10.mp3" },
+  ];
   
   app.get("/api/music/search", async (req, res) => {
     try {
-      const { query, limit = 10 } = req.query;
+      const { query } = req.query;
       if (!query) {
-        return res.status(400).json({ error: "Query parameter is required" });
+        return res.json({ tracks: musicLibrary });
       }
       
-      const url = `${JAMENDO_API_BASE}/tracks/?client_id=${JAMENDO_CLIENT_ID}&format=json&limit=${limit}&search=${encodeURIComponent(String(query))}&include=musicinfo`;
-      const response = await fetch(url, {
-        headers: { "Accept": "application/json" },
+      const searchTerms = String(query).toLowerCase().split(/\s+/);
+      const filtered = musicLibrary.filter(track => {
+        const searchable = `${track.title} ${track.mood} ${track.category}`.toLowerCase();
+        return searchTerms.some(term => searchable.includes(term));
       });
       
-      if (!response.ok) {
-        console.error("Jamendo API error:", response.status);
-        return res.status(response.status).json({ error: "Jamendo API error" });
-      }
-      
-      const data = await response.json();
-      const tracks = (data.results || []).map((t: any) => ({
-        id: t.id,
-        title: t.name,
-        mainArtists: [t.artist_name],
-        bpm: t.musicinfo?.tags?.vartags?.bpm || 120,
-        length: t.duration,
-        moods: t.musicinfo?.tags?.vartags?.moods?.map((m: string) => ({ name: m })) || [],
-        images: { default: t.album_image || t.image },
-        audioUrl: t.audio,
-        downloadUrl: t.audiodownload,
-        license: t.license_ccurl,
-      }));
-      
-      res.json({ tracks });
+      res.json({ tracks: filtered.length > 0 ? filtered : musicLibrary });
     } catch (error) {
-      console.error("Error searching Jamendo:", error);
+      console.error("Error searching music:", error);
       res.status(500).json({ error: "Failed to search music" });
     }
   });
@@ -2573,22 +2565,11 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
   app.get("/api/music/track/:trackId/stream", async (req, res) => {
     try {
       const { trackId } = req.params;
-      const url = `${JAMENDO_API_BASE}/tracks/?client_id=${JAMENDO_CLIENT_ID}&format=json&id=${trackId}`;
-      const response = await fetch(url, {
-        headers: { "Accept": "application/json" },
-      });
-      
-      if (!response.ok) {
-        return res.status(response.status).json({ error: "Track not found" });
-      }
-      
-      const data = await response.json();
-      const track = data.results?.[0];
+      const track = musicLibrary.find(t => t.id === trackId);
       if (!track) {
         return res.status(404).json({ error: "Track not found" });
       }
-      
-      res.json({ url: track.audio });
+      res.json({ url: track.audioUrl });
     } catch (error) {
       console.error("Error getting stream URL:", error);
       res.status(500).json({ error: "Failed to get stream" });
@@ -2616,15 +2597,21 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         events: "мероприятия/события",
       };
 
-      const analysisPrompt = `Проанализируй рекламный текст и подбери подходящую фоновую музыку.
+      const availableMoods = musicLibrary.map(t => t.mood).join(", ");
+      const availableCategories = Array.from(new Set(musicLibrary.map(t => t.category))).join(", ");
+
+      const analysisPrompt = `Проанализируй рекламный текст и подбери подходящую фоновую музыку из библиотеки.
 
 РЕКЛАМНЫЙ ТЕКСТ:
 ${adText}
 
-КАТЕГОРИЯ: ${categoryLabels[category] || category}
+КАТЕГОРИЯ РЕКЛАМЫ: ${categoryLabels[category] || category}
 ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
-Твоя задача - определить подходящие поисковые запросы для поиска фоновой музыки на Jamendo (бесплатная библиотека).
+ДОСТУПНЫЕ НАСТРОЕНИЯ МУЗЫКИ: ${availableMoods}
+ДОСТУПНЫЕ ЖАНРЫ: ${availableCategories}
+
+Твоя задача - выбрать наиболее подходящее настроение или жанр из доступных.
 
 Учитывай:
 - Настроение текста (радостное, спокойное, энергичное, элегантное)
@@ -2634,12 +2621,10 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
 Ответь ТОЛЬКО в формате JSON:
 {
-  "primaryQuery": "основной поисковый запрос на английском (1-2 слова, жанр или настроение)",
-  "secondaryQuery": "дополнительный запрос на английском (1 слово)",
+  "selectedMood": "одно слово из доступных настроений на английском",
+  "selectedCategory": "одно слово из доступных жанров на английском", 
   "reasoning": "краткое объяснение выбора на русском (1 предложение)"
-}
-
-Примеры хороших запросов: "upbeat", "happy", "corporate", "electronic", "acoustic", "jazz", "pop", "energetic", "calm"`;
+}`;
 
       const claudeResponse = await anthropic.messages.create({
         model: CLAUDE_MODEL,
@@ -2661,75 +2646,43 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
         }
       } catch {
         analysis = {
-          primaryQuery: "upbeat",
-          secondaryQuery: "corporate",
+          selectedMood: "upbeat",
+          selectedCategory: "corporate",
           reasoning: "Стандартный выбор для рекламы",
         };
       }
 
-      const searchResults: any[] = [];
-      
-      const primaryUrl = `${JAMENDO_API_BASE}/tracks/?client_id=${JAMENDO_CLIENT_ID}&format=json&limit=5&search=${encodeURIComponent(analysis.primaryQuery)}&include=musicinfo`;
-      const primaryResponse = await fetch(primaryUrl, {
-        headers: { "Accept": "application/json" },
+      const searchTerms = [analysis.selectedMood, analysis.selectedCategory].filter(Boolean);
+      let matchedTracks = musicLibrary.filter(track => {
+        return searchTerms.some(term => 
+          track.mood.toLowerCase().includes(term.toLowerCase()) ||
+          track.category.toLowerCase().includes(term.toLowerCase())
+        );
       });
-      
-      if (primaryResponse.ok) {
-        const primaryData = await primaryResponse.json();
-        if (primaryData.results) {
-          const mapped = primaryData.results.map((t: any) => ({
-            id: t.id,
-            title: t.name,
-            mainArtists: [t.artist_name],
-            bpm: t.musicinfo?.tags?.vartags?.bpm || 120,
-            length: t.duration,
-            moods: [],
-            images: { default: t.album_image || t.image },
-            audioUrl: t.audio,
-            downloadUrl: t.audiodownload,
-          }));
-          searchResults.push(...mapped);
-        }
+
+      if (matchedTracks.length === 0) {
+        matchedTracks = musicLibrary.slice(0, 5);
       }
 
-      if (analysis.secondaryQuery && searchResults.length < 5) {
-        const secondaryUrl = `${JAMENDO_API_BASE}/tracks/?client_id=${JAMENDO_CLIENT_ID}&format=json&limit=3&search=${encodeURIComponent(analysis.secondaryQuery)}&include=musicinfo`;
-        const secondaryResponse = await fetch(secondaryUrl, {
-          headers: { "Accept": "application/json" },
-        });
-        
-        if (secondaryResponse.ok) {
-          const secondaryData = await secondaryResponse.json();
-          if (secondaryData.results) {
-            const existingIds = new Set(searchResults.map(t => t.id));
-            const mapped = secondaryData.results
-              .filter((t: any) => !existingIds.has(t.id))
-              .map((t: any) => ({
-                id: t.id,
-                title: t.name,
-                mainArtists: [t.artist_name],
-                bpm: t.musicinfo?.tags?.vartags?.bpm || 120,
-                length: t.duration,
-                moods: [],
-                images: { default: t.album_image || t.image },
-                audioUrl: t.audio,
-                downloadUrl: t.audiodownload,
-              }));
-            searchResults.push(...mapped);
-          }
-        }
-      }
-
-      const uniqueTracks = searchResults.slice(0, 8);
+      const formattedTracks = matchedTracks.map(t => ({
+        id: t.id,
+        title: t.title,
+        mainArtists: ["Royalty Free"],
+        bpm: t.bpm,
+        length: t.length,
+        moods: [{ name: t.mood }],
+        images: { default: "" },
+        audioUrl: t.audioUrl,
+      }));
 
       res.json({
-        tracks: uniqueTracks,
+        tracks: formattedTracks,
         analysis: {
-          primaryQuery: analysis.primaryQuery,
-          secondaryQuery: analysis.secondaryQuery,
+          primaryQuery: analysis.selectedMood,
+          secondaryQuery: analysis.selectedCategory,
           reasoning: analysis.reasoning,
         },
-        recommendedTrack: uniqueTracks[0] || null,
+        recommendedTrack: formattedTracks[0] || null,
       });
     } catch (error) {
       console.error("Error auto-selecting music:", error);

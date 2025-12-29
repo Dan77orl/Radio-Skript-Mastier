@@ -113,6 +113,7 @@ export default function AdsPage() {
     length: number;
     moods?: Array<{ name: string }>;
     images?: { default?: string };
+    audioUrl?: string;
   }>>([]);
   const [selectedMusicTrack, setSelectedMusicTrack] = useState<string | null>(null);
   const [playingMusicTrackId, setPlayingMusicTrackId] = useState<string | null>(null);
@@ -346,11 +347,22 @@ export default function AdsPage() {
       return;
     }
     try {
-      const response = await fetch(`/api/music/track/${trackId}/stream`);
-      if (!response.ok) throw new Error("Stream failed");
-      const data = await response.json();
-      if (data.url) {
-        const audio = new Audio(data.url);
+      const track = musicSearchResults.find(t => t.id === trackId);
+      const audioUrl = track?.audioUrl;
+      
+      if (!audioUrl) {
+        const response = await fetch(`/api/music/track/${trackId}/stream`);
+        if (!response.ok) throw new Error("Stream failed");
+        const data = await response.json();
+        if (data.url) {
+          const audio = new Audio(data.url);
+          musicAudioRef.current = audio;
+          audio.play().catch(console.error);
+          setPlayingMusicTrackId(trackId);
+          audio.onended = () => setPlayingMusicTrackId(null);
+        }
+      } else {
+        const audio = new Audio(audioUrl);
         musicAudioRef.current = audio;
         audio.play().catch(console.error);
         setPlayingMusicTrackId(trackId);
