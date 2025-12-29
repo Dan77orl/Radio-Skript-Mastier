@@ -535,6 +535,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
           body: JSON.stringify({
             text,
             model_id: "eleven_v3",
+            output_format: "mp3_44100_192",
             voice_settings: {
               stability: 0.5,
               similarity_boost: 0.75,
@@ -934,6 +935,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
           body: JSON.stringify({
             text,
             model_id: "eleven_v3",
+            output_format: "mp3_44100_192",
             voice_settings: {
               stability: 0.5,
               similarity_boost: 0.75,
@@ -1698,6 +1700,7 @@ ${instructions || "Создай альтернативный вариант с �
             body: JSON.stringify({
               text: ad.selectedVariantText,
               model_id: "eleven_v3",
+              output_format: "mp3_44100_192",
               voice_settings: {
                 stability: 0.5,
                 similarity_boost: 0.75,
@@ -2182,7 +2185,8 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         },
         body: JSON.stringify({
           text: program.scriptText,
-          model_id: "eleven_multilingual_v2",
+          model_id: "eleven_v3",
+          output_format: "mp3_44100_192",
           voice_settings: {
             stability: 0.5,
             similarity_boost: 0.75,
