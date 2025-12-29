@@ -306,6 +306,21 @@ export default function AdsPage() {
     setExtractedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  const insertVoiceText = (currentValue: string, newText: string): string => {
+    const fileMarkerPattern = /\n\n--- Из файла /;
+    const match = currentValue.match(fileMarkerPattern);
+    
+    if (match && match.index !== undefined) {
+      const beforeFiles = currentValue.substring(0, match.index);
+      const filesSection = currentValue.substring(match.index);
+      const separator = beforeFiles ? " " : "";
+      return beforeFiles + separator + newText + filesSection;
+    } else {
+      const separator = currentValue ? " " : "";
+      return currentValue + separator + newText;
+    }
+  };
+
   const getCurrentStageIndex = () => {
     if (!currentAd?.stage) return 0;
     return stages.findIndex(s => s.key === currentAd.stage) || 0;
@@ -785,7 +800,7 @@ export default function AdsPage() {
                             />
                           </FormControl>
                           <div className="flex flex-col gap-1">
-                            <VoiceInput onTranscript={(text) => field.onChange(text + (field.value ? "\n\n" + field.value : ""))} />
+                            <VoiceInput onTranscript={(text) => field.onChange(insertVoiceText(field.value || "", text))} />
                             <input
                               ref={fileInputRef}
                               type="file"
