@@ -1,6 +1,6 @@
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { LayoutDashboard, Mic, Calendar, Settings, Radio, Newspaper, Megaphone, Users, Podcast, Zap } from "lucide-react";
+import { LayoutDashboard, Mic, Calendar, Settings, Radio, Newspaper, Megaphone, Users, Podcast, Zap, FileStack } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -50,6 +50,11 @@ const menuItems = [
     title: "Реклама",
     url: "/ads",
     icon: Megaphone,
+  },
+  {
+    title: "Пресеты рекламы",
+    url: "/ad-presets",
+    icon: FileStack,
   },
   {
     title: "Голоса",
