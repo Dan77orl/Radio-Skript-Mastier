@@ -8,6 +8,8 @@ import { VoiceInput } from "@/components/voice-input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -42,52 +44,116 @@ import {
   Radio,
   Loader2,
   Volume2,
-  Edit
+  Settings,
+  Zap,
+  MapPin,
+  Brain,
+  Clock,
+  Calendar,
+  Megaphone,
 } from "lucide-react";
-import type { ProgramType, Program, Settings } from "@shared/schema";
+import type { ProgramType, Program, Settings as AppSettings, Voice } from "@shared/schema";
 
 const getDefaultProgramTypes = (stationName: string) => [
-  {
-    name: "Прогноз погоды",
-    slug: "weather",
-    description: "Прогноз погоды для Аланьи",
-    icon: "cloud-sun",
-    defaultPrompt: `Создай краткий прогноз погоды для радио "${stationName}".
-Город: Аланья, Турция
-Стиль: дружелюбный, неформальный
-Длительность: 20-30 секунд при чтении
-Включи: текущую погоду, прогноз на день, совет слушателям`,
-  },
   {
     name: "Новости",
     slug: "news",
     description: "Новостной выпуск",
     icon: "newspaper",
+    dailyCount: 4,
+    slotDescriptions: [
+      "Утренний выпуск: главные новости дня, что произошло за ночь",
+      "Дневной выпуск: актуальные события первой половины дня",
+      "Вечерний выпуск: итоги дня, важные события",
+      "Ночной выпуск: краткий обзор дня, что ожидать завтра",
+    ],
     defaultPrompt: `Создай краткий новостной выпуск для радио "${stationName}".
 Тематика: местные новости Аланьи и Турции, интересные мировые события
-Стиль: информативный, но не сухой
-Длительность: 40-60 секунд при чтении
-Включи: 3-4 новости с краткими комментариями`,
-  },
-  {
-    name: "Светские новости",
-    slug: "celebrity",
-    description: "Новости шоу-бизнеса",
-    icon: "sparkles",
-    defaultPrompt: `Создай выпуск светских новостей для радио "${stationName}".
-Тематика: интересные события из мира звезд, забавные факты
-Стиль: легкий, с юмором
-Длительность: 30-40 секунд при чтении`,
+Стиль: информативный, но не сухой, дайджест-формат
+Длительность: 30-40 секунд при чтении
+Включи: 3-4 новости коротко, четко, интересно`,
   },
   {
     name: "Дайджест",
     slug: "digest",
     description: "Обзор интересных событий",
     icon: "file-text",
+    dailyCount: 2,
+    slotDescriptions: [
+      "Утренний дайджест: интересные факты и события на сегодня",
+      "Вечерний дайджест: что интересного произошло, полезные советы",
+    ],
     defaultPrompt: `Создай дайджест интересных событий для радио "${stationName}".
 Тематика: события в Аланье, полезные советы для экспатов
-Стиль: информативный и дружелюбный
-Длительность: 40-50 секунд при чтении`,
+Стиль: информативный и дружелюбный, коротко и ёмко
+Длительность: 30-40 секунд при чтении`,
+  },
+  {
+    name: "Новости ИИ",
+    slug: "ai-news",
+    description: "Новости искусственного интеллекта",
+    icon: "brain",
+    dailyCount: 2,
+    slotDescriptions: [
+      "Утренний выпуск: главные новости мира ИИ и технологий",
+      "Вечерний выпуск: интересные разработки и тренды ИИ",
+    ],
+    defaultPrompt: `Создай краткий выпуск новостей искусственного интеллекта для радио "${stationName}".
+Тематика: новые модели ИИ, интересные применения, тренды технологий
+Стиль: доступный, без сложных терминов, с примерами из жизни
+Длительность: 25-35 секунд при чтении
+Формат: дайджест, коротко, четко, прикольно`,
+  },
+  {
+    name: "Светские новости",
+    slug: "celebrity",
+    description: "Новости шоу-бизнеса",
+    icon: "sparkles",
+    dailyCount: 6,
+    slotDescriptions: [
+      "Утро #1: свежие новости шоу-бизнеса",
+      "Утро #2: интересные факты о звёздах",
+      "День #1: скандалы и сенсации",
+      "День #2: новости кино и музыки",
+      "Вечер #1: светская хроника дня",
+      "Вечер #2: забавные истории из жизни знаменитостей",
+    ],
+    defaultPrompt: `Создай выпуск светских новостей для радио "${stationName}".
+Тематика: интересные события из мира звёзд, забавные факты
+Стиль: лёгкий, с юмором, дайджест-формат
+Длительность: 20-30 секунд при чтении
+Формат: коротко, ярко, запоминающеся`,
+  },
+  {
+    name: "Прогноз погоды",
+    slug: "weather",
+    description: "Прогноз погоды для Аланьи",
+    icon: "cloud-sun",
+    dailyCount: 2,
+    slotDescriptions: [
+      "Утренний прогноз: какая погода сегодня днём, вечером, совет слушателям",
+      "Вечерний прогноз: какая погода ночью и завтра, прогноз на завтра",
+    ],
+    defaultPrompt: `Создай краткий прогноз погоды для радио "${stationName}".
+Город: Аланья, Турция
+Стиль: дружелюбный, неформальный
+Длительность: 20-30 секунд при чтении
+Включи: текущую погоду, прогноз, совет слушателям`,
+  },
+  {
+    name: "Куда сходить в Аланье",
+    slug: "alanya-guide",
+    description: "Рекомендации мест и развлечений",
+    icon: "map-pin",
+    dailyCount: 1,
+    slotDescriptions: [
+      "Рекомендация дня: интересное место, ресторан или мероприятие в Аланье",
+    ],
+    defaultPrompt: `Создай рекомендацию для рубрики "Куда сходить в Аланье" для радио "${stationName}".
+Тематика: интересные места, рестораны, кафе, мероприятия, пляжи, экскурсии
+Стиль: дружелюбный, как совет от друга-экспата
+Длительность: 25-35 секунд при чтении
+Включи: название места, почему стоит посетить, практические советы (время, цены, как добраться)`,
   },
 ];
 
@@ -97,29 +163,38 @@ const iconMap: Record<string, typeof Radio> = {
   "sparkles": Sparkles,
   "file-text": FileText,
   "radio": Radio,
+  "brain": Brain,
+  "map-pin": MapPin,
+  "zap": Zap,
+  "megaphone": Megaphone,
 };
 
 export default function ShowsPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [isAddTypeDialogOpen, setIsAddTypeDialogOpen] = useState(false);
-  const [isAddProgramDialogOpen, setIsAddProgramDialogOpen] = useState(false);
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [isEditPromptDialogOpen, setIsEditPromptDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState<ProgramType | null>(null);
+  const [settingsType, setSettingsType] = useState<ProgramType | null>(null);
   const [newTypeName, setNewTypeName] = useState("");
   const [newTypeSlug, setNewTypeSlug] = useState("");
   const [newTypeDescription, setNewTypeDescription] = useState("");
   const [newTypePrompt, setNewTypePrompt] = useState("");
-  const [newProgramTitle, setNewProgramTitle] = useState("");
-  const [newProgramPrompt, setNewProgramPrompt] = useState("");
+  const [newTypeDailyCount, setNewTypeDailyCount] = useState(1);
   const [playingProgramId, setPlayingProgramId] = useState<string | null>(null);
+  const [slotInputs, setSlotInputs] = useState<string[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const { data: settings } = useQuery<Settings>({
+  const { data: appSettings } = useQuery<AppSettings>({
     queryKey: ["/api/settings"],
   });
 
-  const stationName = settings?.stationName || "Радио";
+  const { data: voices } = useQuery<Voice[]>({
+    queryKey: ["/api/voices"],
+  });
+
+  const stationName = appSettings?.stationName || "Радио";
   const defaultProgramTypes = getDefaultProgramTypes(stationName);
 
   const { data: programTypes, isLoading: isLoadingTypes } = useQuery<ProgramType[]>({
@@ -132,19 +207,18 @@ export default function ShowsPage() {
   });
 
   const filteredPrograms = programs?.filter(p => p.programTypeId === activeTab) || [];
+  const today = new Date().toISOString().split("T")[0];
+  const todayPrograms = filteredPrograms.filter(p => p.scheduledDate === today);
 
   const createTypeMutation = useMutation({
-    mutationFn: async (data: { name: string; slug: string; description: string; defaultPrompt: string }) => {
+    mutationFn: async (data: { name: string; slug: string; description: string; defaultPrompt: string; dailyCount?: number; slotDescriptions?: string[] }) => {
       const response = await apiRequest("POST", "/api/program-types", data);
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/program-types"] });
       setIsAddTypeDialogOpen(false);
-      setNewTypeName("");
-      setNewTypeSlug("");
-      setNewTypeDescription("");
-      setNewTypePrompt("");
+      resetNewTypeForm();
       toast({ title: "Тип передачи создан" });
     },
     onError: (error: Error) => {
@@ -160,39 +234,24 @@ export default function ShowsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/program-types"] });
       setIsEditPromptDialogOpen(false);
+      setIsSettingsDialogOpen(false);
       setEditingType(null);
-      toast({ title: "Промпт обновлен" });
+      setSettingsType(null);
+      toast({ title: "Настройки обновлены" });
     },
     onError: (error: Error) => {
       toast({ title: "Ошибка", description: error.message, variant: "destructive" });
     },
   });
 
-  const createProgramMutation = useMutation({
-    mutationFn: async (data: { programTypeId: string; title: string; prompt?: string }) => {
-      const response = await apiRequest("POST", "/api/programs", data);
+  const autoCreateMutation = useMutation({
+    mutationFn: async (typeId: string) => {
+      const response = await apiRequest("POST", `/api/programs/auto-create/${typeId}`);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
-      setIsAddProgramDialogOpen(false);
-      setNewProgramTitle("");
-      setNewProgramPrompt("");
-      toast({ title: "Передача создана" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const generateScriptMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await apiRequest("POST", `/api/programs/${id}/generate`);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
-      toast({ title: "Скрипт сгенерирован" });
+      toast({ title: "Передача создана", description: data.title });
     },
     onError: (error: Error) => {
       toast({ title: "Ошибка", description: error.message, variant: "destructive" });
@@ -213,6 +272,20 @@ export default function ShowsPage() {
     },
   });
 
+  const generateScriptMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("POST", `/api/programs/${id}/generate`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
+      toast({ title: "Скрипт сгенерирован" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    },
+  });
+
   const deleteProgramMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest("DELETE", `/api/programs/${id}`);
@@ -220,6 +293,20 @@ export default function ShowsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
       toast({ title: "Передача удалена" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteTypeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/program-types/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/program-types"] });
+      setActiveTab(null);
+      toast({ title: "Тип передачи удалён" });
     },
     onError: (error: Error) => {
       toast({ title: "Ошибка", description: error.message, variant: "destructive" });
@@ -240,6 +327,14 @@ export default function ShowsPage() {
       }
     };
   }, []);
+
+  const resetNewTypeForm = () => {
+    setNewTypeName("");
+    setNewTypeSlug("");
+    setNewTypeDescription("");
+    setNewTypePrompt("");
+    setNewTypeDailyCount(1);
+  };
 
   const seedDefaultTypes = async () => {
     for (const type of defaultProgramTypes) {
@@ -271,6 +366,27 @@ export default function ShowsPage() {
     };
     const config = variants[status] || variants.pending;
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const openSettingsDialog = (type: ProgramType) => {
+    setSettingsType({ ...type });
+    setSlotInputs(type.slotDescriptions || []);
+    setIsSettingsDialogOpen(true);
+  };
+
+  const saveSettings = () => {
+    if (!settingsType) return;
+    updateTypeMutation.mutate({
+      id: settingsType.id,
+      data: {
+        dailyCount: settingsType.dailyCount,
+        slotDescriptions: slotInputs.filter(s => s.trim()),
+        sponsorName: settingsType.sponsorName,
+        sponsorText: settingsType.sponsorText,
+        assignedVoiceIds: settingsType.assignedVoiceIds,
+        defaultDurationSeconds: settingsType.defaultDurationSeconds,
+      },
+    });
   };
 
   if (isLoadingTypes) {
@@ -312,96 +428,122 @@ export default function ShowsPage() {
               )}
             </Button>
             <span className="text-sm text-muted-foreground">или</span>
-            <Dialog open={isAddTypeDialogOpen} onOpenChange={setIsAddTypeDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" data-testid="button-create-custom-type">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Создать свой тип
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Новый тип передачи</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Название</label>
-                    <div className="flex gap-1">
-                      <Input
-                        placeholder="Например: Прогноз погоды"
-                        value={newTypeName}
-                        onChange={(e) => setNewTypeName(e.target.value)}
-                        className="flex-1"
-                      />
-                      <VoiceInput onTranscript={(text) => setNewTypeName(prev => prev + text)} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Slug (для URL)</label>
-                    <Input
-                      placeholder="weather"
-                      value={newTypeSlug}
-                      onChange={(e) => setNewTypeSlug(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Описание</label>
-                    <div className="flex gap-1">
-                      <Input
-                        placeholder="Краткое описание"
-                        value={newTypeDescription}
-                        onChange={(e) => setNewTypeDescription(e.target.value)}
-                        className="flex-1"
-                      />
-                      <VoiceInput onTranscript={(text) => setNewTypeDescription(prev => prev + text)} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Промпт по умолчанию</label>
-                    <div className="flex gap-1 items-start">
-                      <Textarea
-                        placeholder="Промпт для генерации..."
-                        value={newTypePrompt}
-                        onChange={(e) => setNewTypePrompt(e.target.value)}
-                        rows={5}
-                        className="flex-1"
-                      />
-                      <VoiceInput onTranscript={(text) => setNewTypePrompt(prev => prev + " " + text)} />
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsAddTypeDialogOpen(false)}>
-                    Отмена
-                  </Button>
-                  <Button
-                    onClick={() => createTypeMutation.mutate({
-                      name: newTypeName,
-                      slug: newTypeSlug,
-                      description: newTypeDescription,
-                      defaultPrompt: newTypePrompt,
-                    })}
-                    disabled={!newTypeName || !newTypeSlug || !newTypePrompt || createTypeMutation.isPending}
-                  >
-                    Создать
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <Button variant="outline" onClick={() => setIsAddTypeDialogOpen(true)} data-testid="button-create-custom-type">
+              <Plus className="mr-2 h-4 w-4" />
+              Создать свой тип
+            </Button>
           </CardContent>
         </Card>
+        {renderAddTypeDialog()}
       </div>
     );
   }
 
   const currentType = programTypes?.find(t => t.id === activeTab);
   const IconComponent = currentType?.icon ? iconMap[currentType.icon] || Radio : Radio;
+  const dailyCount = currentType?.dailyCount || 1;
+  const todayCreated = todayPrograms.length;
+  const canCreateMore = todayCreated < dailyCount;
+
+  function renderAddTypeDialog() {
+    return (
+      <Dialog open={isAddTypeDialogOpen} onOpenChange={setIsAddTypeDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Новый тип передачи</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Название</Label>
+              <div className="flex gap-1">
+                <Input
+                  placeholder="Например: Прогноз погоды"
+                  value={newTypeName}
+                  onChange={(e) => {
+                    setNewTypeName(e.target.value);
+                    if (!newTypeSlug) {
+                      setNewTypeSlug(e.target.value.toLowerCase().replace(/[^a-zа-я0-9]/g, "-").replace(/-+/g, "-"));
+                    }
+                  }}
+                  className="flex-1"
+                />
+                <VoiceInput onTranscript={(text) => setNewTypeName(prev => prev + text)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Slug (для URL)</Label>
+              <Input
+                placeholder="weather"
+                value={newTypeSlug}
+                onChange={(e) => setNewTypeSlug(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Описание</Label>
+              <div className="flex gap-1">
+                <Input
+                  placeholder="Краткое описание"
+                  value={newTypeDescription}
+                  onChange={(e) => setNewTypeDescription(e.target.value)}
+                  className="flex-1"
+                />
+                <VoiceInput onTranscript={(text) => setNewTypeDescription(prev => prev + text)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Выпусков в день</Label>
+              <Select value={String(newTypeDailyCount)} onValueChange={(v) => setNewTypeDailyCount(Number(v))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Промпт по умолчанию</Label>
+              <div className="flex gap-1 items-start">
+                <Textarea
+                  placeholder="Промпт для генерации..."
+                  value={newTypePrompt}
+                  onChange={(e) => setNewTypePrompt(e.target.value)}
+                  rows={5}
+                  className="flex-1"
+                />
+                <VoiceInput onTranscript={(text) => setNewTypePrompt(prev => prev + " " + text)} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddTypeDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button
+              onClick={() => createTypeMutation.mutate({
+                name: newTypeName,
+                slug: newTypeSlug,
+                description: newTypeDescription,
+                defaultPrompt: newTypePrompt,
+                dailyCount: newTypeDailyCount,
+              })}
+              disabled={!newTypeName || !newTypeSlug || !newTypePrompt || createTypeMutation.isPending}
+            >
+              Создать
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">Передачи</h1>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">Передачи</h1>
           <p className="text-muted-foreground">Генерация контента для радиопередач</p>
         </div>
       </div>
@@ -419,290 +561,219 @@ export default function ShowsPage() {
               );
             })}
           </TabsList>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Dialog open={isAddTypeDialogOpen} onOpenChange={setIsAddTypeDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" data-testid="button-add-type">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Новый тип
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Новый тип передачи</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Название</label>
-                    <div className="flex gap-1">
-                      <Input
-                        placeholder="Например: Прогноз погоды"
-                        value={newTypeName}
-                        onChange={(e) => setNewTypeName(e.target.value)}
-                        className="flex-1"
-                      />
-                      <VoiceInput onTranscript={(text) => setNewTypeName(prev => prev + text)} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Slug</label>
-                    <Input
-                      placeholder="weather"
-                      value={newTypeSlug}
-                      onChange={(e) => setNewTypeSlug(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Описание</label>
-                    <div className="flex gap-1">
-                      <Input
-                        placeholder="Краткое описание"
-                        value={newTypeDescription}
-                        onChange={(e) => setNewTypeDescription(e.target.value)}
-                        className="flex-1"
-                      />
-                      <VoiceInput onTranscript={(text) => setNewTypeDescription(prev => prev + text)} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Промпт по умолчанию</label>
-                    <div className="flex gap-1 items-start">
-                      <Textarea
-                        placeholder="Промпт для генерации..."
-                        value={newTypePrompt}
-                        onChange={(e) => setNewTypePrompt(e.target.value)}
-                        rows={5}
-                        className="flex-1"
-                      />
-                      <VoiceInput onTranscript={(text) => setNewTypePrompt(prev => prev + " " + text)} />
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsAddTypeDialogOpen(false)}>
-                    Отмена
-                  </Button>
-                  <Button
-                    onClick={() => createTypeMutation.mutate({
-                      name: newTypeName,
-                      slug: newTypeSlug,
-                      description: newTypeDescription,
-                      defaultPrompt: newTypePrompt,
-                    })}
-                    disabled={!newTypeName || !newTypeSlug || !newTypePrompt || createTypeMutation.isPending}
-                  >
-                    Создать
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
+          <Button variant="outline" size="sm" onClick={() => setIsAddTypeDialogOpen(true)} data-testid="button-add-type">
+            <Plus className="mr-2 h-4 w-4" />
+            Новый тип
+          </Button>
         </div>
 
-        {programTypes?.map((type) => (
-          <TabsContent key={type.id} value={type.id} className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <CardTitle className="flex items-center gap-2">
-                    <IconComponent className="h-5 w-5" />
-                    {type.name}
-                  </CardTitle>
-                  <CardDescription>{type.description}</CardDescription>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setEditingType(type);
-                      setIsEditPromptDialogOpen(true);
-                    }}
-                  >
-                    <Edit className="mr-2 h-4 w-4" />
-                    Редактировать промпт
-                  </Button>
-                  <Dialog open={isAddProgramDialogOpen} onOpenChange={setIsAddProgramDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Создать передачу
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Новая передача: {type.name}</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Название</label>
-                          <div className="flex gap-1">
-                            <Input
-                              placeholder="Название передачи"
-                              value={newProgramTitle}
-                              onChange={(e) => setNewProgramTitle(e.target.value)}
-                              data-testid="input-program-title"
-                              className="flex-1"
-                            />
-                            <VoiceInput onTranscript={(text) => setNewProgramTitle(prev => prev + text)} />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Промпт (опционально)</label>
-                          <div className="flex gap-1 items-start">
-                            <Textarea
-                              placeholder={`Оставьте пустым для использования промпта по умолчанию`}
-                              value={newProgramPrompt}
-                              onChange={(e) => setNewProgramPrompt(e.target.value)}
-                              rows={4}
-                              data-testid="textarea-program-prompt"
-                              className="flex-1"
-                            />
-                            <VoiceInput onTranscript={(text) => setNewProgramPrompt(prev => prev + " " + text)} />
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Промпт по умолчанию: {type.defaultPrompt.substring(0, 100)}...
-                          </p>
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsAddProgramDialogOpen(false)}>
-                          Отмена
-                        </Button>
-                        <Button
-                          onClick={() => createProgramMutation.mutate({
-                            programTypeId: type.id,
-                            title: newProgramTitle,
-                            prompt: newProgramPrompt || undefined,
-                          })}
-                          disabled={!newProgramTitle || createProgramMutation.isPending}
-                          data-testid="button-create-program"
-                        >
-                          {createProgramMutation.isPending ? "Создание..." : "Создать"}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </CardHeader>
-            </Card>
+        {programTypes?.map((type) => {
+          const Icon = type.icon ? iconMap[type.icon] || Radio : Radio;
+          const typeDaily = type.dailyCount || 1;
+          const typeTodayPrograms = (programs?.filter(p => p.programTypeId === type.id && p.scheduledDate === today) || []);
+          const typeTodayCount = typeTodayPrograms.length;
+          const typeCanCreate = typeTodayCount < typeDaily;
+          const currentSlotDesc = type.slotDescriptions?.[typeTodayCount] || "";
 
-            {isLoadingPrograms ? (
-              <div className="space-y-3">
-                {Array.from({ length: 3 }, (_, i) => (
-                  <Skeleton key={i} className="h-20 w-full" />
-                ))}
-              </div>
-            ) : filteredPrograms.length === 0 ? (
+          return (
+            <TabsContent key={type.id} value={type.id} className="space-y-4">
               <Card>
-                <CardContent className="py-8 text-center">
-                  <Volume2 className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                  <p className="text-muted-foreground">Нет передач этого типа</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Нажмите "Создать передачу" для начала
-                  </p>
-                </CardContent>
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
+                  <div className="space-y-2 flex-1 min-w-0">
+                    <CardTitle className="flex items-center gap-2 flex-wrap">
+                      <Icon className="h-5 w-5" />
+                      {type.name}
+                    </CardTitle>
+                    <CardDescription>{type.description}</CardDescription>
+                    <div className="flex items-center gap-3 flex-wrap text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5" />
+                        {typeTodayCount}/{typeDaily} на сегодня
+                      </span>
+                      {type.sponsorName && (
+                        <span className="flex items-center gap-1">
+                          <Megaphone className="h-3.5 w-3.5" />
+                          Спонсор: {type.sponsorName}
+                        </span>
+                      )}
+                      {currentSlotDesc && typeCanCreate && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5" />
+                          След.: {currentSlotDesc.length > 50 ? currentSlotDesc.substring(0, 50) + "..." : currentSlotDesc}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditingType(type);
+                        setIsEditPromptDialogOpen(true);
+                      }}
+                      data-testid="button-edit-prompt"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Промпт
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openSettingsDialog(type)}
+                      data-testid="button-type-settings"
+                    >
+                      <Settings className="mr-2 h-4 w-4" />
+                      Настройки
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => autoCreateMutation.mutate(type.id)}
+                      disabled={autoCreateMutation.isPending || !typeCanCreate}
+                      data-testid="button-auto-create"
+                    >
+                      {autoCreateMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Zap className="mr-2 h-4 w-4" />
+                      )}
+                      {typeCanCreate 
+                        ? `Создать #${typeTodayCount + 1}`
+                        : "Все на сегодня готовы"}
+                    </Button>
+                  </div>
+                </CardHeader>
               </Card>
-            ) : (
-              <div className="space-y-3">
-                {filteredPrograms.map((program) => (
-                  <Card key={program.id}>
-                    <CardContent className="py-4">
-                      <div className="flex items-center justify-between gap-4 flex-wrap">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-medium truncate">{program.title}</h3>
-                            {getStatusBadge(program.status)}
+
+              {isLoadingPrograms ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }, (_, i) => (
+                    <Skeleton key={i} className="h-20 w-full" />
+                  ))}
+                </div>
+              ) : filteredPrograms.length === 0 ? (
+                <Card>
+                  <CardContent className="py-8 text-center">
+                    <Volume2 className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                    <p className="text-muted-foreground">Нет передач этого типа</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Нажмите "Создать" для автоматической генерации
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {filteredPrograms.map((program) => (
+                    <Card key={program.id}>
+                      <CardContent className="py-4">
+                        <div className="flex items-center justify-between gap-4 flex-wrap">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-medium truncate" data-testid={`text-program-title-${program.id}`}>{program.title}</h3>
+                              {getStatusBadge(program.status)}
+                              {program.slotNumber && (
+                                <Badge variant="outline" className="text-xs">
+                                  #{program.slotNumber}
+                                </Badge>
+                              )}
+                            </div>
+                            {program.scriptText && (
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                {program.scriptText.substring(0, 200)}...
+                              </p>
+                            )}
+                            {program.scheduledDate && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {program.scheduledDate}
+                              </p>
+                            )}
                           </div>
-                          {program.scriptText && (
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                              {program.scriptText.substring(0, 150)}...
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {program.status === "pending" && (
-                            <Button
-                              size="sm"
-                              onClick={() => generateScriptMutation.mutate(program.id)}
-                              disabled={generateScriptMutation.isPending}
-                              data-testid={`button-generate-script-${program.id}`}
-                            >
-                              {generateScriptMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                "Сгенерировать скрипт"
-                              )}
-                            </Button>
-                          )}
-                          {program.status === "script_ready" && (
-                            <Button
-                              size="sm"
-                              onClick={() => generateAudioMutation.mutate(program.id)}
-                              disabled={generateAudioMutation.isPending}
-                              data-testid={`button-generate-audio-${program.id}`}
-                            >
-                              {generateAudioMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                "Сгенерировать аудио"
-                              )}
-                            </Button>
-                          )}
-                          {program.audioUrl && (
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={() => playAudio(program.audioUrl!, program.id)}
-                              data-testid={`button-play-${program.id}`}
-                            >
-                              {playingProgramId === program.id ? (
-                                <Pause className="h-4 w-4" />
-                              ) : (
-                                <Play className="h-4 w-4" />
-                              )}
-                            </Button>
-                          )}
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" data-testid={`button-delete-${program.id}`}>
-                                <Trash2 className="h-4 w-4" />
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {program.status === "pending" && (
+                              <Button
+                                size="sm"
+                                onClick={() => generateScriptMutation.mutate(program.id)}
+                                disabled={generateScriptMutation.isPending}
+                                data-testid={`button-generate-script-${program.id}`}
+                              >
+                                {generateScriptMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  "Сгенерировать скрипт"
+                                )}
                               </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Удалить передачу?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Это действие нельзя отменить.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Отмена</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deleteProgramMutation.mutate(program.id)}
-                                >
-                                  Удалить
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                            )}
+                            {program.status === "script_ready" && (
+                              <Button
+                                size="sm"
+                                onClick={() => generateAudioMutation.mutate(program.id)}
+                                disabled={generateAudioMutation.isPending}
+                                data-testid={`button-generate-audio-${program.id}`}
+                              >
+                                {generateAudioMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  "Озвучить"
+                                )}
+                              </Button>
+                            )}
+                            {program.audioUrl && (
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => playAudio(program.audioUrl!, program.id)}
+                                data-testid={`button-play-${program.id}`}
+                              >
+                                {playingProgramId === program.id ? (
+                                  <Pause className="h-4 w-4" />
+                                ) : (
+                                  <Play className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="icon" variant="ghost" data-testid={`button-delete-${program.id}`}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Удалить передачу?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Это действие нельзя отменить.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Отмена</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteProgramMutation.mutate(program.id)}
+                                  >
+                                    Удалить
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        ))}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          );
+        })}
       </Tabs>
+
+      {renderAddTypeDialog()}
 
       <Dialog open={isEditPromptDialogOpen} onOpenChange={setIsEditPromptDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Редактировать промпт: {editingType?.name}</DialogTitle>
             <DialogDescription>
-              Этот промпт будет использоваться по умолчанию для всех новых передач этого типа
+              Этот промпт используется для генерации всех выпусков этого типа
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -710,7 +781,7 @@ export default function ShowsPage() {
               <Textarea
                 value={editingType?.defaultPrompt || ""}
                 onChange={(e) => setEditingType(prev => prev ? { ...prev, defaultPrompt: e.target.value } : null)}
-                rows={10}
+                rows={12}
                 className="font-mono text-sm flex-1"
               />
               <VoiceInput onTranscript={(text) => setEditingType(prev => prev ? { ...prev, defaultPrompt: prev.defaultPrompt + " " + text } : null)} />
@@ -727,6 +798,175 @@ export default function ShowsPage() {
               })}
               disabled={updateTypeMutation.isPending}
             >
+              {updateTypeMutation.isPending ? "Сохранение..." : "Сохранить"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Настройки: {settingsType?.name}</DialogTitle>
+            <DialogDescription>
+              Расписание, спонсоры, голоса и другие параметры
+            </DialogDescription>
+          </DialogHeader>
+          {settingsType && (
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Выпусков в день</Label>
+                  <Select
+                    value={String(settingsType.dailyCount || 1)}
+                    onValueChange={(v) => {
+                      const count = Number(v);
+                      setSettingsType(prev => prev ? { ...prev, dailyCount: count } : null);
+                      setSlotInputs(prev => {
+                        const arr = [...prev];
+                        while (arr.length < count) arr.push("");
+                        return arr.slice(0, count);
+                      });
+                    }}
+                  >
+                    <SelectTrigger data-testid="select-daily-count">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => (
+                        <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Длительность (сек)</Label>
+                  <Input
+                    type="number"
+                    value={settingsType.defaultDurationSeconds || 60}
+                    onChange={(e) => setSettingsType(prev => prev ? { ...prev, defaultDurationSeconds: Number(e.target.value) } : null)}
+                    data-testid="input-duration"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label>Описание слотов (что генерировать для каждого выпуска)</Label>
+                {Array.from({ length: settingsType.dailyCount || 1 }, (_, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <Badge variant="outline" className="mt-2 shrink-0">#{i + 1}</Badge>
+                    <div className="flex gap-1 flex-1">
+                      <Input
+                        placeholder={`Описание выпуска #${i + 1}...`}
+                        value={slotInputs[i] || ""}
+                        onChange={(e) => {
+                          const arr = [...slotInputs];
+                          arr[i] = e.target.value;
+                          setSlotInputs(arr);
+                        }}
+                        className="flex-1"
+                        data-testid={`input-slot-${i}`}
+                      />
+                      <VoiceInput onTranscript={(text) => {
+                        setSlotInputs(prev => {
+                          const arr = [...prev];
+                          arr[i] = (arr[i] || "") + text;
+                          return arr;
+                        });
+                      }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-3">
+                <Label>Спонсор</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Название спонсора</span>
+                    <Input
+                      placeholder="Компания или бренд"
+                      value={settingsType.sponsorName || ""}
+                      onChange={(e) => setSettingsType(prev => prev ? { ...prev, sponsorName: e.target.value } : null)}
+                      data-testid="input-sponsor-name"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Текст спонсора</span>
+                    <Input
+                      placeholder="Спонсор прогноза погоды..."
+                      value={settingsType.sponsorText || ""}
+                      onChange={(e) => setSettingsType(prev => prev ? { ...prev, sponsorText: e.target.value } : null)}
+                      data-testid="input-sponsor-text"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {voices && voices.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Назначенные голоса</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {voices.filter(v => v.isActive).map(voice => {
+                      const isSelected = settingsType.assignedVoiceIds?.includes(voice.id) || false;
+                      return (
+                        <Button
+                          key={voice.id}
+                          variant={isSelected ? "default" : "outline"}
+                          size="sm"
+                          className={isSelected ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
+                          onClick={() => {
+                            setSettingsType(prev => {
+                              if (!prev) return null;
+                              const current = prev.assignedVoiceIds || [];
+                              const updated = isSelected
+                                ? current.filter(id => id !== voice.id)
+                                : [...current, voice.id];
+                              return { ...prev, assignedVoiceIds: updated };
+                            });
+                          }}
+                          data-testid={`button-voice-${voice.id}`}
+                        >
+                          {voice.personaName || voice.name}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="w-full" data-testid="button-delete-type">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Удалить тип передачи
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Удалить "{settingsType.name}"?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Это удалит тип передачи и все связанные данные.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Отмена</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => {
+                      deleteTypeMutation.mutate(settingsType.id);
+                      setIsSettingsDialogOpen(false);
+                    }}>
+                      Удалить
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSettingsDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button onClick={saveSettings} disabled={updateTypeMutation.isPending}>
               {updateTypeMutation.isPending ? "Сохранение..." : "Сохранить"}
             </Button>
           </DialogFooter>

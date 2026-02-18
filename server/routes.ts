@@ -2162,6 +2162,97 @@ ${instructions || "Создай альтернативный вариант с �
     }
   });
 
+  app.post("/api/programs/auto-create/:typeId", async (req, res) => {
+    try {
+      const programType = await storage.getProgramType(req.params.typeId);
+      if (!programType) {
+        return res.status(404).json({ error: "Program type not found" });
+      }
+
+      const today = new Date();
+      const dateStr = today.toISOString().split("T")[0];
+      const dailyCount = programType.dailyCount || 1;
+
+      const existingPrograms = await storage.getProgramsByType(programType.id);
+      const todayPrograms = existingPrograms.filter(p => p.scheduledDate === dateStr);
+      const nextSlot = todayPrograms.length + 1;
+
+      if (nextSlot > dailyCount) {
+        return res.status(400).json({ 
+          error: `Все ${dailyCount} выпуск(ов) на сегодня уже созданы`,
+          todayCount: todayPrograms.length,
+          dailyCount,
+        });
+      }
+
+      const slotDesc = programType.slotDescriptions?.[nextSlot - 1] || "";
+      let prompt = programType.defaultPrompt;
+
+      if (slotDesc) {
+        prompt += `\n\nВременной слот: ${slotDesc}`;
+      }
+      if (programType.sponsorName) {
+        prompt += `\n\nСпонсор передачи: ${programType.sponsorName}`;
+        if (programType.sponsorText) {
+          prompt += `. ${programType.sponsorText}`;
+        }
+      }
+
+      prompt += `\n\nДата: ${dateStr}, выпуск #${nextSlot} из ${dailyCount}`;
+
+      const title = `${programType.name} ${dateStr} #${nextSlot}`;
+
+      const ctx = await buildStationContext();
+      const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
+${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
+Активные ведущие: ${ctx.personaList}.
+Создавай контент на русском языке в стиле радиостанции.`;
+
+      let scriptText = "";
+      const anthropic = await getAnthropicClient();
+
+      try {
+        if (anthropic) {
+          const message = await anthropic.messages.create({
+            model: CLAUDE_MODEL,
+            max_tokens: 1024,
+            system: systemPrompt,
+            messages: [{ role: "user", content: prompt }],
+          });
+          const textContent = message.content.find(c => c.type === "text");
+          scriptText = textContent?.text || "";
+        } else {
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: prompt }
+            ],
+          });
+          scriptText = response.choices[0]?.message?.content || "";
+        }
+      } catch (genError) {
+        console.error("Script generation failed:", genError);
+        return res.status(500).json({ error: "Не удалось сгенерировать скрипт. Слот не занят, попробуйте снова." });
+      }
+
+      const program = await storage.createProgram({
+        programTypeId: programType.id,
+        title,
+        prompt,
+        scheduledDate: dateStr,
+        slotNumber: nextSlot,
+        status: "script_ready",
+        scriptText,
+      });
+
+      res.json(program);
+    } catch (error) {
+      console.error("Error auto-creating program:", error);
+      res.status(500).json({ error: "Failed to auto-create program" });
+    }
+  });
+
   app.post("/api/programs/:id/generate", async (req, res) => {
     try {
       const program = await storage.getProgram(req.params.id);
