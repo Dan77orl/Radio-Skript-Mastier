@@ -191,6 +191,8 @@ export default function ShowsPage() {
   const [slotInputs, setSlotInputs] = useState<string[]>([]);
   const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
   const [batchUrl, setBatchUrl] = useState("");
+  const [batchText, setBatchText] = useState("");
+  const [batchMode, setBatchMode] = useState<"url" | "text">("text");
   const [batchCount, setBatchCount] = useState(10);
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchResult, setBatchResult] = useState<{ created: number; total: number; errors: string[] } | null>(null);
@@ -400,18 +402,33 @@ export default function ShowsPage() {
   };
 
   const startBatchGeneration = async () => {
-    if (!activeTab || !batchUrl.trim()) return;
+    if (!activeTab) return;
     setBatchGenerating(true);
     setBatchResult(null);
     try {
-      const urlResponse = await apiRequest("POST", "/api/fetch-url-content", { url: batchUrl.trim() });
-      const urlData = await urlResponse.json();
-      toast({ title: "Контент загружен", description: `${urlData.title || "Ссылка"} — ${Math.round(urlData.length / 1000)}K символов` });
+      let referenceContent = "";
+      let referenceUrl = "";
+
+      if (batchMode === "url" && batchUrl.trim()) {
+        const urlResponse = await apiRequest("POST", "/api/fetch-url-content", { url: batchUrl.trim() });
+        const urlData = await urlResponse.json();
+        referenceContent = urlData.text;
+        referenceUrl = batchUrl.trim();
+        toast({ title: "Контент загружен", description: `${Math.round(urlData.length / 1000)}K символов` });
+      } else if (batchMode === "text" && batchText.trim()) {
+        referenceContent = batchText.trim();
+      }
+
+      if (!referenceContent) {
+        toast({ title: "Нет контента", description: "Вставьте текст или укажите ссылку", variant: "destructive" });
+        setBatchGenerating(false);
+        return;
+      }
 
       const response = await apiRequest("POST", `/api/programs/batch-create/${activeTab}`, {
         count: batchCount,
-        referenceContent: urlData.text,
-        referenceUrl: batchUrl.trim(),
+        referenceContent,
+        referenceUrl: referenceUrl || null,
       });
       const data = await response.json();
       setBatchResult(data);
@@ -429,6 +446,8 @@ export default function ShowsPage() {
 
   const resetBatchDialog = () => {
     setBatchUrl("");
+    setBatchText("");
+    setBatchMode("text");
     setBatchCount(10);
     setBatchResult(null);
     setBatchGenerating(false);
@@ -1043,7 +1062,7 @@ export default function ShowsPage() {
               Пакетная генерация: {currentType?.name}
             </DialogTitle>
             <DialogDescription>
-              Вставьте ссылку — система сама прочитает и сгенерирует новые выпуски
+              Скопируйте текст из ChatGPT/Claude или вставьте ссылку на веб-страницу
             </DialogDescription>
           </DialogHeader>
 
@@ -1080,22 +1099,60 @@ export default function ShowsPage() {
             </div>
           ) : (
             <div className="space-y-5 py-4">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Link className="h-4 w-4" />
-                  Ссылка на ChatGPT / Claude / веб-страницу
-                </Label>
-                <Input
-                  placeholder="https://chatgpt.com/share/..."
-                  value={batchUrl}
-                  onChange={(e) => setBatchUrl(e.target.value)}
+              <div className="flex gap-1 mb-1">
+                <Button
+                  variant={batchMode === "text" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBatchMode("text")}
                   disabled={batchGenerating}
-                  data-testid="input-batch-url"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Вставьте ссылку на чат, где вы генерировали передачи. Система прочитает контент и создаст новые выпуски в таком же стиле.
-                </p>
+                  data-testid="button-batch-mode-text"
+                >
+                  Вставить текст
+                </Button>
+                <Button
+                  variant={batchMode === "url" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBatchMode("url")}
+                  disabled={batchGenerating}
+                  data-testid="button-batch-mode-url"
+                >
+                  Ссылка на страницу
+                </Button>
               </div>
+
+              {batchMode === "text" ? (
+                <div className="space-y-2">
+                  <Label>Скопируйте текст из ChatGPT / Claude</Label>
+                  <Textarea
+                    placeholder="Скопируйте и вставьте сюда текст из чата, где вы генерировали передачи..."
+                    value={batchText}
+                    onChange={(e) => setBatchText(e.target.value)}
+                    rows={8}
+                    disabled={batchGenerating}
+                    data-testid="input-batch-text"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Откройте чат в ChatGPT или Claude, выделите весь текст (Ctrl+A), скопируйте (Ctrl+C) и вставьте сюда
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Link className="h-4 w-4" />
+                    Ссылка на веб-страницу
+                  </Label>
+                  <Input
+                    placeholder="https://example.com/article..."
+                    value={batchUrl}
+                    onChange={(e) => setBatchUrl(e.target.value)}
+                    disabled={batchGenerating}
+                    data-testid="input-batch-url"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Работает с обычными веб-страницами, статьями, блогами. Ссылки ChatGPT/Claude не поддерживаются — используйте вставку текста.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Сколько выпусков создать</Label>
@@ -1119,7 +1176,7 @@ export default function ShowsPage() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm">Читаю ссылку и генерирую выпуски... Это может занять несколько минут</span>
+                    <span className="text-sm">Генерирую выпуски... Это может занять несколько минут</span>
                   </div>
                   <Progress value={undefined} className="h-2" />
                 </div>
@@ -1131,7 +1188,7 @@ export default function ShowsPage() {
                 </Button>
                 <Button
                   onClick={startBatchGeneration}
-                  disabled={batchGenerating || !batchUrl.trim()}
+                  disabled={batchGenerating || (batchMode === "url" ? !batchUrl.trim() : !batchText.trim())}
                   data-testid="button-start-batch"
                 >
                   {batchGenerating ? (
