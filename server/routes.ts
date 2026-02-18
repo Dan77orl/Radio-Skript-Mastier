@@ -2349,16 +2349,16 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const totalCount = Math.min(Math.max(count || 10, 5), 50);
 
       const existingPrograms = await storage.getProgramsByType(programType.id);
-      const existingScripts = existingPrograms
-        .filter(p => p.scriptText)
-        .slice(-10)
-        .map(p => p.scriptText)
-        .join("\n---\n");
+      const existingTitles = existingPrograms
+        .filter(p => p.title)
+        .slice(-20)
+        .map(p => p.title)
+        .join(", ");
 
       const ctx = await buildStationContext();
       const anthropic = await getAnthropicClient();
 
-      let analysisPrompt = `Изучи контент по ссылке и создай ${totalCount} новых уникальных выпусков передачи "${programType.name}" для радио "${ctx.stationName}" В ТОЧНО ТАКОМ ЖЕ стиле и формате.
+      let prompt = `Создай ${totalCount} ГОТОВЫХ сценариев для радиопередачи "${programType.name}" на радио "${ctx.stationName}".
 
 Базовый промпт передачи:
 ${programType.defaultPrompt}
@@ -2366,67 +2366,75 @@ ${programType.defaultPrompt}
 `;
 
       if (referenceContent) {
-        analysisPrompt += `\nЭТАЛОНЫЙ КОНТЕНТ — изучи стиль, формат, тон и темы, и сделай такие же выпуски:\n${referenceContent.substring(0, 30000)}\n`;
+        prompt += `\nЭТАЛОНЫЙ КОНТЕНТ — изучи стиль, формат, тон. Создай новые выпуски ТОЧНО В ТАКОМ ЖЕ стиле:\n${referenceContent.substring(0, 30000)}\n`;
       }
 
-      if (existingScripts) {
-        analysisPrompt += `\nРанее созданные выпуски (для избежания повторов):\n${existingScripts.substring(0, 10000)}\n`;
+      if (existingTitles) {
+        prompt += `\nУже есть выпуски (НЕ повторяй): ${existingTitles}\n`;
+      }
+
+      if (programType.sponsorName) {
+        prompt += `\nСпонсор: ${programType.sponsorName}`;
+        if (programType.sponsorText) prompt += `. ${programType.sponsorText}`;
+        prompt += "\n";
       }
 
       const { instructions } = req.body;
       if (instructions) {
-        analysisPrompt += `\nДополнительные инструкции: ${instructions}\n`;
+        prompt += `\nДополнительные инструкции: ${instructions}\n`;
       }
 
-      analysisPrompt += `
-Создай JSON массив из ${totalCount} объектов. Каждый объект:
-- "title": уникальное название выпуска на русском
-- "prompt": подробный промпт для генерации скрипта (тема, стиль, тон — как в эталонном контенте)
+      prompt += `
+Ответь ТОЛЬКО JSON массивом из ${totalCount} объектов. Каждый объект:
+- "title": уникальное короткое название выпуска
+- "script": ПОЛНЫЙ ГОТОВЫЙ сценарий выпуска (текст для озвучки, с репликами ведущих)
 
-Все темы разные, не повторяй ранее созданные. Стиль и формат — как в эталоне.
-Ответь ТОЛЬКО JSON массивом: [{"title":"...","prompt":"..."},...]`;
+Формат: [{"title":"...","script":"..."},...]
+Все ${totalCount} выпусков должны быть разными. Стиль и формат — как в эталоне.
+Ответь ТОЛЬКО JSON массивом, без пояснений.`;
 
       const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 Активные ведущие: ${ctx.personaList}.
-Создавай контент на русском языке. Отвечай ТОЛЬКО валидным JSON.`;
+Генерируй контент на русском языке. Отвечай ТОЛЬКО валидным JSON.`;
 
-      let batchPlan: Array<{ title: string; prompt: string }> = [];
+      let batchScripts: Array<{ title: string; script: string }> = [];
 
       try {
-        let planText = "";
+        let resultText = "";
         if (anthropic) {
           const message = await anthropic.messages.create({
             model: CLAUDE_MODEL,
-            max_tokens: 8192,
+            max_tokens: 16384,
             system: systemPrompt,
-            messages: [{ role: "user", content: analysisPrompt }],
+            messages: [{ role: "user", content: prompt }],
           });
           const textContent = message.content.find(c => c.type === "text");
-          planText = textContent?.text || "";
+          resultText = textContent?.text || "";
         } else {
           const response = await openai.chat.completions.create({
             model: "gpt-4o",
+            max_tokens: 16384,
             messages: [
               { role: "system", content: systemPrompt },
-              { role: "user", content: analysisPrompt },
+              { role: "user", content: prompt },
             ],
           });
-          planText = response.choices[0]?.message?.content || "";
+          resultText = response.choices[0]?.message?.content || "";
         }
 
-        const jsonMatch = planText.match(/\[[\s\S]*\]/);
+        const jsonMatch = resultText.match(/\[[\s\S]*\]/);
         if (!jsonMatch) {
-          return res.status(500).json({ error: "Не удалось распарсить план генерации" });
+          return res.status(500).json({ error: "Не удалось распарсить результат" });
         }
-        batchPlan = JSON.parse(jsonMatch[0]);
-      } catch (planError) {
-        console.error("Batch plan generation failed:", planError);
-        return res.status(500).json({ error: "Не удалось создать план генерации" });
+        batchScripts = JSON.parse(jsonMatch[0]);
+      } catch (genError) {
+        console.error("Batch generation failed:", genError);
+        return res.status(500).json({ error: "Ошибка генерации сценариев" });
       }
 
-      if (!Array.isArray(batchPlan) || batchPlan.length === 0) {
-        return res.status(500).json({ error: "Пустой план генерации" });
+      if (!Array.isArray(batchScripts) || batchScripts.length === 0) {
+        return res.status(500).json({ error: "Пустой результат генерации" });
       }
 
       const startDate = req.body.startDate;
@@ -2435,71 +2443,34 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const results: any[] = [];
       const errors: string[] = [];
 
-      for (let i = 0; i < batchPlan.length; i++) {
-        const item = batchPlan[i];
+      for (let i = 0; i < batchScripts.length; i++) {
+        const item = batchScripts[i];
         const dayOffset = Math.floor(i / dailyCount);
         const slotNumber = (i % dailyCount) + 1;
         const programDate = new Date(baseDate);
         programDate.setDate(programDate.getDate() + dayOffset);
         const dateStr = programDate.toISOString().split("T")[0];
 
-        let fullPrompt = item.prompt;
-        const slotDesc = programType.slotDescriptions?.[slotNumber - 1] || "";
-        if (slotDesc) {
-          fullPrompt += `\n\nВременной слот: ${slotDesc}`;
-        }
-        if (programType.sponsorName) {
-          fullPrompt += `\n\nСпонсор: ${programType.sponsorName}`;
-          if (programType.sponsorText) fullPrompt += `. ${programType.sponsorText}`;
-        }
-        fullPrompt += `\n\nДата: ${dateStr}, выпуск #${slotNumber} из ${dailyCount}`;
-
         try {
-          let scriptText = "";
-          if (anthropic) {
-            const message = await anthropic.messages.create({
-              model: CLAUDE_MODEL,
-              max_tokens: 1024,
-              system: `Ты - автор контента для радио "${ctx.stationName}". ${ctx.stationDescription || ""}. Активные ведущие: ${ctx.personaList}. Создавай контент на русском языке.`,
-              messages: [{ role: "user", content: fullPrompt }],
-            });
-            const textContent = message.content.find(c => c.type === "text");
-            scriptText = textContent?.text || "";
-          } else {
-            const response = await openai.chat.completions.create({
-              model: "gpt-4o",
-              messages: [
-                { role: "system", content: `Ты - автор контента для радио "${ctx.stationName}". Создавай контент на русском языке.` },
-                { role: "user", content: fullPrompt },
-              ],
-            });
-            scriptText = response.choices[0]?.message?.content || "";
-          }
-
           const program = await storage.createProgram({
             programTypeId: programType.id,
             title: item.title,
-            prompt: fullPrompt,
+            prompt: prompt.substring(0, 500),
             scheduledDate: dateStr,
             slotNumber,
             status: "script_ready",
-            scriptText,
+            scriptText: item.script,
           });
-
           results.push(program);
-        } catch (genError) {
-          console.error(`Batch item ${i} failed:`, genError);
-          errors.push(`#${i + 1} "${item.title}": ошибка генерации`);
-        }
-
-        if (i < batchPlan.length - 1 && i % 3 === 2) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (saveError) {
+          console.error(`Batch save ${i} failed:`, saveError);
+          errors.push(`#${i + 1} "${item.title}": ошибка сохранения`);
         }
       }
 
       res.json({
         created: results.length,
-        total: batchPlan.length,
+        total: batchScripts.length,
         errors,
         programs: results,
       });
