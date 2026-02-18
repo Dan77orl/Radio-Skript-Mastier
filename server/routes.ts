@@ -10,6 +10,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import multer from "multer";
 import mammoth from "mammoth";
+import * as cheerio from "cheerio";
 
 const uploadDir = path.join(process.cwd(), "public", "uploads");
 
@@ -2250,6 +2251,260 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
     } catch (error) {
       console.error("Error auto-creating program:", error);
       res.status(500).json({ error: "Failed to auto-create program" });
+    }
+  });
+
+  app.post("/api/fetch-url-content", async (req, res) => {
+    try {
+      const { url } = req.body;
+      if (!url || typeof url !== "string") {
+        return res.status(400).json({ error: "URL is required" });
+      }
+
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(url);
+      } catch {
+        return res.status(400).json({ error: "Некорректный URL" });
+      }
+
+      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+        return res.status(400).json({ error: "Разрешены только HTTP/HTTPS ссылки" });
+      }
+
+      const hostname = parsedUrl.hostname;
+      if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname.startsWith("10.") || hostname.startsWith("192.168.") || hostname.startsWith("172.") || hostname === "::1" || hostname.endsWith(".local") || hostname.endsWith(".internal")) {
+        return res.status(400).json({ error: "Внутренние адреса запрещены" });
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+
+      try {
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; RadioBot/1.0)",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          },
+          redirect: "follow",
+        });
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+          return res.status(400).json({ error: `Не удалось загрузить URL: ${response.status}` });
+        }
+
+        const html = await response.text();
+        const $ = cheerio.load(html);
+
+        $("script, style, nav, footer, header, noscript, iframe, svg, img, link, meta").remove();
+
+        let text = "";
+        const title = $("title").text().trim();
+
+        const mainSelectors = ["main", "article", "[role='main']", ".content", "#content", ".post-content", ".markdown-body", ".conversation-content"];
+        let mainContent = "";
+        for (const sel of mainSelectors) {
+          const el = $(sel);
+          if (el.length) {
+            mainContent = el.text().replace(/\s+/g, " ").trim();
+            if (mainContent.length > 100) break;
+          }
+        }
+
+        if (mainContent.length > 100) {
+          text = mainContent;
+        } else {
+          text = $("body").text().replace(/\s+/g, " ").trim();
+        }
+
+        const maxLength = 50000;
+        if (text.length > maxLength) {
+          text = text.substring(0, maxLength) + "...";
+        }
+
+        res.json({ title, text, url, length: text.length });
+      } catch (fetchError: any) {
+        clearTimeout(timeout);
+        if (fetchError.name === "AbortError") {
+          return res.status(408).json({ error: "Таймаут загрузки URL (30 сек)" });
+        }
+        throw fetchError;
+      }
+    } catch (error) {
+      console.error("Error fetching URL content:", error);
+      res.status(500).json({ error: "Не удалось загрузить контент по ссылке" });
+    }
+  });
+
+  app.post("/api/programs/batch-create/:typeId", async (req, res) => {
+    try {
+      const programType = await storage.getProgramType(req.params.typeId);
+      if (!programType) {
+        return res.status(404).json({ error: "Program type not found" });
+      }
+
+      const { count, referenceContent, referenceUrl, instructions, startDate } = req.body;
+      const totalCount = Math.min(Math.max(count || 10, 5), 50);
+
+      const existingPrograms = await storage.getProgramsByType(programType.id);
+      const existingScripts = existingPrograms
+        .filter(p => p.scriptText)
+        .slice(-10)
+        .map(p => p.scriptText)
+        .join("\n---\n");
+
+      const ctx = await buildStationContext();
+      const anthropic = await getAnthropicClient();
+
+      let analysisPrompt = `Проанализируй следующий контент и создай инструкцию для генерации ${totalCount} выпусков передачи "${programType.name}" для радио "${ctx.stationName}".
+
+Базовый промпт передачи:
+${programType.defaultPrompt}
+
+`;
+
+      if (referenceContent) {
+        analysisPrompt += `\nСодержимое по ссылке (${referenceUrl || "без URL"}):\n${referenceContent.substring(0, 30000)}\n`;
+      }
+
+      if (existingScripts) {
+        analysisPrompt += `\nПримеры ранее созданных выпусков:\n${existingScripts.substring(0, 10000)}\n`;
+      }
+
+      if (instructions) {
+        analysisPrompt += `\nДополнительные инструкции от пользователя: ${instructions}\n`;
+      }
+
+      analysisPrompt += `
+Создай JSON массив из ${totalCount} объектов для генерации выпусков.
+Каждый объект должен содержать:
+- "title": уникальное название выпуска на русском
+- "prompt": уникальный промпт для генерации скрипта (подробный, с темой и стилем)
+
+Учитывай стиль и формат из примеров. Все темы должны быть разными и уникальными.
+Ответь ТОЛЬКО JSON массивом, без дополнительного текста. Формат: [{"title":"...","prompt":"..."},...]`;
+
+      const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
+${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
+Активные ведущие: ${ctx.personaList}.
+Создавай контент на русском языке. Отвечай ТОЛЬКО валидным JSON.`;
+
+      let batchPlan: Array<{ title: string; prompt: string }> = [];
+
+      try {
+        let planText = "";
+        if (anthropic) {
+          const message = await anthropic.messages.create({
+            model: CLAUDE_MODEL,
+            max_tokens: 8192,
+            system: systemPrompt,
+            messages: [{ role: "user", content: analysisPrompt }],
+          });
+          const textContent = message.content.find(c => c.type === "text");
+          planText = textContent?.text || "";
+        } else {
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: analysisPrompt },
+            ],
+          });
+          planText = response.choices[0]?.message?.content || "";
+        }
+
+        const jsonMatch = planText.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+          return res.status(500).json({ error: "Не удалось распарсить план генерации" });
+        }
+        batchPlan = JSON.parse(jsonMatch[0]);
+      } catch (planError) {
+        console.error("Batch plan generation failed:", planError);
+        return res.status(500).json({ error: "Не удалось создать план генерации" });
+      }
+
+      if (!Array.isArray(batchPlan) || batchPlan.length === 0) {
+        return res.status(500).json({ error: "Пустой план генерации" });
+      }
+
+      const baseDate = startDate ? new Date(startDate) : new Date();
+      const dailyCount = programType.dailyCount || 1;
+      const results: any[] = [];
+      const errors: string[] = [];
+
+      for (let i = 0; i < batchPlan.length; i++) {
+        const item = batchPlan[i];
+        const dayOffset = Math.floor(i / dailyCount);
+        const slotNumber = (i % dailyCount) + 1;
+        const programDate = new Date(baseDate);
+        programDate.setDate(programDate.getDate() + dayOffset);
+        const dateStr = programDate.toISOString().split("T")[0];
+
+        let fullPrompt = item.prompt;
+        const slotDesc = programType.slotDescriptions?.[slotNumber - 1] || "";
+        if (slotDesc) {
+          fullPrompt += `\n\nВременной слот: ${slotDesc}`;
+        }
+        if (programType.sponsorName) {
+          fullPrompt += `\n\nСпонсор: ${programType.sponsorName}`;
+          if (programType.sponsorText) fullPrompt += `. ${programType.sponsorText}`;
+        }
+        fullPrompt += `\n\nДата: ${dateStr}, выпуск #${slotNumber} из ${dailyCount}`;
+
+        try {
+          let scriptText = "";
+          if (anthropic) {
+            const message = await anthropic.messages.create({
+              model: CLAUDE_MODEL,
+              max_tokens: 1024,
+              system: `Ты - автор контента для радио "${ctx.stationName}". ${ctx.stationDescription || ""}. Активные ведущие: ${ctx.personaList}. Создавай контент на русском языке.`,
+              messages: [{ role: "user", content: fullPrompt }],
+            });
+            const textContent = message.content.find(c => c.type === "text");
+            scriptText = textContent?.text || "";
+          } else {
+            const response = await openai.chat.completions.create({
+              model: "gpt-4o",
+              messages: [
+                { role: "system", content: `Ты - автор контента для радио "${ctx.stationName}". Создавай контент на русском языке.` },
+                { role: "user", content: fullPrompt },
+              ],
+            });
+            scriptText = response.choices[0]?.message?.content || "";
+          }
+
+          const program = await storage.createProgram({
+            programTypeId: programType.id,
+            title: item.title,
+            prompt: fullPrompt,
+            scheduledDate: dateStr,
+            slotNumber,
+            status: "script_ready",
+            scriptText,
+          });
+
+          results.push(program);
+        } catch (genError) {
+          console.error(`Batch item ${i} failed:`, genError);
+          errors.push(`#${i + 1} "${item.title}": ошибка генерации`);
+        }
+
+        if (i < batchPlan.length - 1 && i % 3 === 2) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      res.json({
+        created: results.length,
+        total: batchPlan.length,
+        errors,
+        programs: results,
+      });
+    } catch (error) {
+      console.error("Error batch-creating programs:", error);
+      res.status(500).json({ error: "Ошибка пакетной генерации" });
     }
   });
 

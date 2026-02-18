@@ -51,7 +51,12 @@ import {
   Clock,
   Calendar,
   Megaphone,
+  Link,
+  PackagePlus,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import type { ProgramType, Program, Settings as AppSettings, Voice } from "@shared/schema";
 
 const getDefaultProgramTypes = (stationName: string) => [
@@ -184,6 +189,15 @@ export default function ShowsPage() {
   const [newTypeDailyCount, setNewTypeDailyCount] = useState(1);
   const [playingProgramId, setPlayingProgramId] = useState<string | null>(null);
   const [slotInputs, setSlotInputs] = useState<string[]>([]);
+  const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
+  const [batchUrl, setBatchUrl] = useState("");
+  const [batchUrlContent, setBatchUrlContent] = useState<{ title: string; text: string; length: number } | null>(null);
+  const [batchUrlLoading, setBatchUrlLoading] = useState(false);
+  const [batchInstructions, setBatchInstructions] = useState("");
+  const [batchCount, setBatchCount] = useState(10);
+  const [batchStartDate, setBatchStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [batchGenerating, setBatchGenerating] = useState(false);
+  const [batchResult, setBatchResult] = useState<{ created: number; total: number; errors: string[] } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: appSettings } = useQuery<AppSettings>({
@@ -387,6 +401,57 @@ export default function ShowsPage() {
         defaultDurationSeconds: settingsType.defaultDurationSeconds,
       },
     });
+  };
+
+  const fetchUrlContent = async () => {
+    if (!batchUrl.trim()) return;
+    setBatchUrlLoading(true);
+    try {
+      const response = await apiRequest("POST", "/api/fetch-url-content", { url: batchUrl.trim() });
+      const data = await response.json();
+      setBatchUrlContent(data);
+      toast({ title: "Контент загружен", description: `${data.title || "Без заголовка"} (${Math.round(data.length / 1000)}K символов)` });
+    } catch (error) {
+      toast({ title: "Ошибка загрузки", description: error instanceof Error ? error.message : "Не удалось загрузить URL", variant: "destructive" });
+    } finally {
+      setBatchUrlLoading(false);
+    }
+  };
+
+  const startBatchGeneration = async () => {
+    if (!activeTab) return;
+    setBatchGenerating(true);
+    setBatchResult(null);
+    try {
+      const response = await apiRequest("POST", `/api/programs/batch-create/${activeTab}`, {
+        count: batchCount,
+        referenceContent: batchUrlContent?.text || null,
+        referenceUrl: batchUrl || null,
+        instructions: batchInstructions || null,
+        startDate: batchStartDate,
+      });
+      const data = await response.json();
+      setBatchResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
+      toast({ 
+        title: "Пакетная генерация завершена", 
+        description: `Создано ${data.created} из ${data.total} передач`,
+      });
+    } catch (error) {
+      toast({ title: "Ошибка", description: error instanceof Error ? error.message : "Ошибка пакетной генерации", variant: "destructive" });
+    } finally {
+      setBatchGenerating(false);
+    }
+  };
+
+  const resetBatchDialog = () => {
+    setBatchUrl("");
+    setBatchUrlContent(null);
+    setBatchInstructions("");
+    setBatchCount(10);
+    setBatchStartDate(new Date().toISOString().split("T")[0]);
+    setBatchResult(null);
+    setBatchGenerating(false);
   };
 
   if (isLoadingTypes) {
@@ -640,6 +705,18 @@ export default function ShowsPage() {
                       {typeCanCreate 
                         ? `Создать #${typeTodayCount + 1}`
                         : "Все на сегодня готовы"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        resetBatchDialog();
+                        setIsBatchDialogOpen(true);
+                      }}
+                      data-testid="button-batch-create"
+                    >
+                      <PackagePlus className="mr-2 h-4 w-4" />
+                      Пакетная
                     </Button>
                   </div>
                 </CardHeader>
@@ -970,6 +1047,189 @@ export default function ShowsPage() {
               {updateTypeMutation.isPending ? "Сохранение..." : "Сохранить"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBatchDialogOpen} onOpenChange={(open) => {
+        if (!batchGenerating) {
+          setIsBatchDialogOpen(open);
+          if (!open) resetBatchDialog();
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PackagePlus className="h-5 w-5" />
+              Пакетная генерация: {currentType?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Вставьте ссылку на пример контента и задайте инструкции голосом или текстом
+            </DialogDescription>
+          </DialogHeader>
+
+          {batchResult ? (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center gap-3">
+                {batchResult.errors.length === 0 ? (
+                  <CheckCircle2 className="h-8 w-8 text-green-500 shrink-0" />
+                ) : (
+                  <XCircle className="h-8 w-8 text-yellow-500 shrink-0" />
+                )}
+                <div>
+                  <p className="font-medium text-lg">
+                    Создано {batchResult.created} из {batchResult.total} передач
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Передачи распределены по дням начиная с {batchStartDate}
+                  </p>
+                </div>
+              </div>
+              {batchResult.errors.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-destructive">Ошибки:</p>
+                  {batchResult.errors.map((err, i) => (
+                    <p key={i} className="text-sm text-muted-foreground">{err}</p>
+                  ))}
+                </div>
+              )}
+              <DialogFooter>
+                <Button onClick={() => {
+                  setIsBatchDialogOpen(false);
+                  resetBatchDialog();
+                }}>
+                  Закрыть
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-5 py-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Link className="h-4 w-4" />
+                  Ссылка на пример (ChatGPT, веб-страница)
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://chatgpt.com/share/... или любая ссылка"
+                    value={batchUrl}
+                    onChange={(e) => setBatchUrl(e.target.value)}
+                    disabled={batchGenerating}
+                    className="flex-1"
+                    data-testid="input-batch-url"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={fetchUrlContent}
+                    disabled={!batchUrl.trim() || batchUrlLoading || batchGenerating}
+                    data-testid="button-fetch-url"
+                  >
+                    {batchUrlLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Загрузить"
+                    )}
+                  </Button>
+                </div>
+                {batchUrlContent && (
+                  <div className="text-sm text-muted-foreground bg-muted/50 rounded-md p-3">
+                    <p className="font-medium">{batchUrlContent.title || "Контент загружен"}</p>
+                    <p className="mt-1">{Math.round(batchUrlContent.length / 1000)}K символов извлечено</p>
+                    <p className="mt-1 line-clamp-3 text-xs">
+                      {batchUrlContent.text.substring(0, 300)}...
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Инструкции (текст или голос)</Label>
+                <div className="flex gap-1 items-start">
+                  <Textarea
+                    placeholder="Например: Сделай 30 передач в таком же стиле, как в примере. Темы должны быть про жизнь экспатов в Аланье..."
+                    value={batchInstructions}
+                    onChange={(e) => setBatchInstructions(e.target.value)}
+                    rows={4}
+                    disabled={batchGenerating}
+                    className="flex-1"
+                    data-testid="input-batch-instructions"
+                  />
+                  <VoiceInput
+                    onTranscript={(text) => setBatchInstructions(prev => prev ? prev + " " + text : text)}
+                    disabled={batchGenerating}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Количество передач</Label>
+                  <Select
+                    value={String(batchCount)}
+                    onValueChange={(v) => setBatchCount(Number(v))}
+                    disabled={batchGenerating}
+                  >
+                    <SelectTrigger data-testid="select-batch-count">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[5, 10, 15, 20, 25, 30, 40, 50].map(n => (
+                        <SelectItem key={n} value={String(n)}>{n} передач</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Начальная дата</Label>
+                  <Input
+                    type="date"
+                    value={batchStartDate}
+                    onChange={(e) => setBatchStartDate(e.target.value)}
+                    disabled={batchGenerating}
+                    data-testid="input-batch-start-date"
+                  />
+                </div>
+              </div>
+
+              {currentType && (
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p>{currentType.dailyCount || 1} выпуск(ов)/день = {Math.ceil(batchCount / (currentType.dailyCount || 1))} дн. контента</p>
+                </div>
+              )}
+
+              {batchGenerating && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Генерация... Это может занять несколько минут</span>
+                  </div>
+                  <Progress value={undefined} className="h-2" />
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsBatchDialogOpen(false)} disabled={batchGenerating}>
+                  Отмена
+                </Button>
+                <Button
+                  onClick={startBatchGeneration}
+                  disabled={batchGenerating || (!batchUrlContent && !batchInstructions.trim())}
+                  data-testid="button-start-batch"
+                >
+                  {batchGenerating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Генерация...
+                    </>
+                  ) : (
+                    <>
+                      <PackagePlus className="mr-2 h-4 w-4" />
+                      Создать {batchCount} передач
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

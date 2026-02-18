@@ -54,6 +54,7 @@ Preferred communication style: Simple, everyday language.
   - Costs are billed to Replit credits (no separate API key needed)
 - Includes batch processing utilities with rate limiting and retries
 - Image generation capabilities available through gpt-image-1 model
+- **Batch Program Generation**: Accepts a URL (ChatGPT share link, web page) + voice/text instructions to auto-generate 5-50 programs in batch. Uses cheerio for HTML content extraction. Programs distributed across days based on dailyCount settings.
 
 ## External Dependencies
 
