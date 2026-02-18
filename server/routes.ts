@@ -2345,7 +2345,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         return res.status(404).json({ error: "Program type not found" });
       }
 
-      const { count, referenceContent, referenceUrl, instructions, startDate } = req.body;
+      const { count, referenceContent, referenceUrl } = req.body;
       const totalCount = Math.min(Math.max(count || 10, 5), 50);
 
       const existingPrograms = await storage.getProgramsByType(programType.id);
@@ -2358,7 +2358,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const ctx = await buildStationContext();
       const anthropic = await getAnthropicClient();
 
-      let analysisPrompt = `Проанализируй следующий контент и создай инструкцию для генерации ${totalCount} выпусков передачи "${programType.name}" для радио "${ctx.stationName}".
+      let analysisPrompt = `Изучи контент по ссылке и создай ${totalCount} новых уникальных выпусков передачи "${programType.name}" для радио "${ctx.stationName}" В ТОЧНО ТАКОМ ЖЕ стиле и формате.
 
 Базовый промпт передачи:
 ${programType.defaultPrompt}
@@ -2366,25 +2366,25 @@ ${programType.defaultPrompt}
 `;
 
       if (referenceContent) {
-        analysisPrompt += `\nСодержимое по ссылке (${referenceUrl || "без URL"}):\n${referenceContent.substring(0, 30000)}\n`;
+        analysisPrompt += `\nЭТАЛОНЫЙ КОНТЕНТ — изучи стиль, формат, тон и темы, и сделай такие же выпуски:\n${referenceContent.substring(0, 30000)}\n`;
       }
 
       if (existingScripts) {
-        analysisPrompt += `\nПримеры ранее созданных выпусков:\n${existingScripts.substring(0, 10000)}\n`;
+        analysisPrompt += `\nРанее созданные выпуски (для избежания повторов):\n${existingScripts.substring(0, 10000)}\n`;
       }
 
+      const { instructions } = req.body;
       if (instructions) {
-        analysisPrompt += `\nДополнительные инструкции от пользователя: ${instructions}\n`;
+        analysisPrompt += `\nДополнительные инструкции: ${instructions}\n`;
       }
 
       analysisPrompt += `
-Создай JSON массив из ${totalCount} объектов для генерации выпусков.
-Каждый объект должен содержать:
+Создай JSON массив из ${totalCount} объектов. Каждый объект:
 - "title": уникальное название выпуска на русском
-- "prompt": уникальный промпт для генерации скрипта (подробный, с темой и стилем)
+- "prompt": подробный промпт для генерации скрипта (тема, стиль, тон — как в эталонном контенте)
 
-Учитывай стиль и формат из примеров. Все темы должны быть разными и уникальными.
-Ответь ТОЛЬКО JSON массивом, без дополнительного текста. Формат: [{"title":"...","prompt":"..."},...]`;
+Все темы разные, не повторяй ранее созданные. Стиль и формат — как в эталоне.
+Ответь ТОЛЬКО JSON массивом: [{"title":"...","prompt":"..."},...]`;
 
       const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
@@ -2429,6 +2429,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         return res.status(500).json({ error: "Пустой план генерации" });
       }
 
+      const startDate = req.body.startDate;
       const baseDate = startDate ? new Date(startDate) : new Date();
       const dailyCount = programType.dailyCount || 1;
       const results: any[] = [];

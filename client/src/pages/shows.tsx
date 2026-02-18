@@ -191,11 +191,7 @@ export default function ShowsPage() {
   const [slotInputs, setSlotInputs] = useState<string[]>([]);
   const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
   const [batchUrl, setBatchUrl] = useState("");
-  const [batchUrlContent, setBatchUrlContent] = useState<{ title: string; text: string; length: number } | null>(null);
-  const [batchUrlLoading, setBatchUrlLoading] = useState(false);
-  const [batchInstructions, setBatchInstructions] = useState("");
   const [batchCount, setBatchCount] = useState(10);
-  const [batchStartDate, setBatchStartDate] = useState(new Date().toISOString().split("T")[0]);
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchResult, setBatchResult] = useState<{ created: number; total: number; errors: string[] } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -403,42 +399,29 @@ export default function ShowsPage() {
     });
   };
 
-  const fetchUrlContent = async () => {
-    if (!batchUrl.trim()) return;
-    setBatchUrlLoading(true);
-    try {
-      const response = await apiRequest("POST", "/api/fetch-url-content", { url: batchUrl.trim() });
-      const data = await response.json();
-      setBatchUrlContent(data);
-      toast({ title: "Контент загружен", description: `${data.title || "Без заголовка"} (${Math.round(data.length / 1000)}K символов)` });
-    } catch (error) {
-      toast({ title: "Ошибка загрузки", description: error instanceof Error ? error.message : "Не удалось загрузить URL", variant: "destructive" });
-    } finally {
-      setBatchUrlLoading(false);
-    }
-  };
-
   const startBatchGeneration = async () => {
-    if (!activeTab) return;
+    if (!activeTab || !batchUrl.trim()) return;
     setBatchGenerating(true);
     setBatchResult(null);
     try {
+      const urlResponse = await apiRequest("POST", "/api/fetch-url-content", { url: batchUrl.trim() });
+      const urlData = await urlResponse.json();
+      toast({ title: "Контент загружен", description: `${urlData.title || "Ссылка"} — ${Math.round(urlData.length / 1000)}K символов` });
+
       const response = await apiRequest("POST", `/api/programs/batch-create/${activeTab}`, {
         count: batchCount,
-        referenceContent: batchUrlContent?.text || null,
-        referenceUrl: batchUrl || null,
-        instructions: batchInstructions || null,
-        startDate: batchStartDate,
+        referenceContent: urlData.text,
+        referenceUrl: batchUrl.trim(),
       });
       const data = await response.json();
       setBatchResult(data);
       queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
       toast({ 
-        title: "Пакетная генерация завершена", 
+        title: "Готово!", 
         description: `Создано ${data.created} из ${data.total} передач`,
       });
     } catch (error) {
-      toast({ title: "Ошибка", description: error instanceof Error ? error.message : "Ошибка пакетной генерации", variant: "destructive" });
+      toast({ title: "Ошибка", description: error instanceof Error ? error.message : "Ошибка генерации", variant: "destructive" });
     } finally {
       setBatchGenerating(false);
     }
@@ -446,10 +429,7 @@ export default function ShowsPage() {
 
   const resetBatchDialog = () => {
     setBatchUrl("");
-    setBatchUrlContent(null);
-    setBatchInstructions("");
     setBatchCount(10);
-    setBatchStartDate(new Date().toISOString().split("T")[0]);
     setBatchResult(null);
     setBatchGenerating(false);
   };
@@ -1063,7 +1043,7 @@ export default function ShowsPage() {
               Пакетная генерация: {currentType?.name}
             </DialogTitle>
             <DialogDescription>
-              Вставьте ссылку на пример контента и задайте инструкции голосом или текстом
+              Вставьте ссылку — система сама прочитает и сгенерирует новые выпуски
             </DialogDescription>
           </DialogHeader>
 
@@ -1078,9 +1058,6 @@ export default function ShowsPage() {
                 <div>
                   <p className="font-medium text-lg">
                     Создано {batchResult.created} из {batchResult.total} передач
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Передачи распределены по дням начиная с {batchStartDate}
                   </p>
                 </div>
               </div>
@@ -1106,101 +1083,43 @@ export default function ShowsPage() {
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Link className="h-4 w-4" />
-                  Ссылка на пример (ChatGPT, веб-страница)
+                  Ссылка на ChatGPT / Claude / веб-страницу
                 </Label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="https://chatgpt.com/share/... или любая ссылка"
-                    value={batchUrl}
-                    onChange={(e) => setBatchUrl(e.target.value)}
-                    disabled={batchGenerating}
-                    className="flex-1"
-                    data-testid="input-batch-url"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={fetchUrlContent}
-                    disabled={!batchUrl.trim() || batchUrlLoading || batchGenerating}
-                    data-testid="button-fetch-url"
-                  >
-                    {batchUrlLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      "Загрузить"
-                    )}
-                  </Button>
-                </div>
-                {batchUrlContent && (
-                  <div className="text-sm text-muted-foreground bg-muted/50 rounded-md p-3">
-                    <p className="font-medium">{batchUrlContent.title || "Контент загружен"}</p>
-                    <p className="mt-1">{Math.round(batchUrlContent.length / 1000)}K символов извлечено</p>
-                    <p className="mt-1 line-clamp-3 text-xs">
-                      {batchUrlContent.text.substring(0, 300)}...
-                    </p>
-                  </div>
-                )}
+                <Input
+                  placeholder="https://chatgpt.com/share/..."
+                  value={batchUrl}
+                  onChange={(e) => setBatchUrl(e.target.value)}
+                  disabled={batchGenerating}
+                  data-testid="input-batch-url"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Вставьте ссылку на чат, где вы генерировали передачи. Система прочитает контент и создаст новые выпуски в таком же стиле.
+                </p>
               </div>
 
               <div className="space-y-2">
-                <Label>Инструкции (текст или голос)</Label>
-                <div className="flex gap-1 items-start">
-                  <Textarea
-                    placeholder="Например: Сделай 30 передач в таком же стиле, как в примере. Темы должны быть про жизнь экспатов в Аланье..."
-                    value={batchInstructions}
-                    onChange={(e) => setBatchInstructions(e.target.value)}
-                    rows={4}
-                    disabled={batchGenerating}
-                    className="flex-1"
-                    data-testid="input-batch-instructions"
-                  />
-                  <VoiceInput
-                    onTranscript={(text) => setBatchInstructions(prev => prev ? prev + " " + text : text)}
-                    disabled={batchGenerating}
-                  />
-                </div>
+                <Label>Сколько выпусков создать</Label>
+                <Select
+                  value={String(batchCount)}
+                  onValueChange={(v) => setBatchCount(Number(v))}
+                  disabled={batchGenerating}
+                >
+                  <SelectTrigger data-testid="select-batch-count">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[5, 10, 15, 20, 25, 30, 40, 50].map(n => (
+                      <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Количество передач</Label>
-                  <Select
-                    value={String(batchCount)}
-                    onValueChange={(v) => setBatchCount(Number(v))}
-                    disabled={batchGenerating}
-                  >
-                    <SelectTrigger data-testid="select-batch-count">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[5, 10, 15, 20, 25, 30, 40, 50].map(n => (
-                        <SelectItem key={n} value={String(n)}>{n} передач</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Начальная дата</Label>
-                  <Input
-                    type="date"
-                    value={batchStartDate}
-                    onChange={(e) => setBatchStartDate(e.target.value)}
-                    disabled={batchGenerating}
-                    data-testid="input-batch-start-date"
-                  />
-                </div>
-              </div>
-
-              {currentType && (
-                <div className="text-sm text-muted-foreground space-y-1">
-                  <p>{currentType.dailyCount || 1} выпуск(ов)/день = {Math.ceil(batchCount / (currentType.dailyCount || 1))} дн. контента</p>
-                </div>
-              )}
 
               {batchGenerating && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm">Генерация... Это может занять несколько минут</span>
+                    <span className="text-sm">Читаю ссылку и генерирую выпуски... Это может занять несколько минут</span>
                   </div>
                   <Progress value={undefined} className="h-2" />
                 </div>
@@ -1212,7 +1131,7 @@ export default function ShowsPage() {
                 </Button>
                 <Button
                   onClick={startBatchGeneration}
-                  disabled={batchGenerating || (!batchUrlContent && !batchInstructions.trim())}
+                  disabled={batchGenerating || !batchUrl.trim()}
                   data-testid="button-start-batch"
                 >
                   {batchGenerating ? (
@@ -1223,7 +1142,7 @@ export default function ShowsPage() {
                   ) : (
                     <>
                       <PackagePlus className="mr-2 h-4 w-4" />
-                      Создать {batchCount} передач
+                      Создать {batchCount} выпусков
                     </>
                   )}
                 </Button>
