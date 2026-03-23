@@ -463,6 +463,9 @@ export default function ShowsPage() {
 
   const saveSettings = () => {
     if (!settingsType) return;
+    const voiceIdsFromAssignment = voices
+      ?.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(settingsType.id))
+      .map(v => v.id) || [];
     updateTypeMutation.mutate({
       id: settingsType.id,
       data: {
@@ -470,7 +473,7 @@ export default function ShowsPage() {
         slotDescriptions: slotInputs.filter(s => s.trim()),
         sponsorName: settingsType.sponsorName,
         sponsorText: settingsType.sponsorText,
-        assignedVoiceIds: settingsType.assignedVoiceIds,
+        assignedVoiceIds: voiceIdsFromAssignment,
         defaultDurationSeconds: settingsType.defaultDurationSeconds,
       },
     });
@@ -1077,37 +1080,27 @@ export default function ShowsPage() {
                 </div>
               </div>
 
-              {voices && voices.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Назначенные голоса</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {voices.filter(v => v.isActive).map(voice => {
-                      const isSelected = settingsType.assignedVoiceIds?.includes(voice.id) || false;
-                      return (
-                        <Button
-                          key={voice.id}
-                          variant={isSelected ? "default" : "outline"}
-                          size="sm"
-                          className={isSelected ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
-                          onClick={() => {
-                            setSettingsType(prev => {
-                              if (!prev) return null;
-                              const current = prev.assignedVoiceIds || [];
-                              const updated = isSelected
-                                ? current.filter(id => id !== voice.id)
-                                : [...current, voice.id];
-                              return { ...prev, assignedVoiceIds: updated };
-                            });
-                          }}
-                          data-testid={`button-voice-${voice.id}`}
-                        >
+              {voices && voices.length > 0 && (() => {
+                const assignedVoices = voices.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(settingsType.id));
+                return assignedVoices.length > 0 ? (
+                  <div className="space-y-2">
+                    <Label>Назначенные голоса</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {assignedVoices.map(voice => (
+                        <Badge key={voice.id} variant="secondary" className="text-sm py-1 px-3" data-testid={`badge-voice-${voice.id}`}>
                           {voice.personaName || voice.name}
-                        </Button>
-                      );
-                    })}
+                        </Badge>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Назначение голосов — на странице «Голоса»</p>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Назначенные голоса</Label>
+                    <p className="text-sm text-muted-foreground">Нет назначенных голосов. Назначьте на странице «Голоса».</p>
+                  </div>
+                );
+              })()}
 
               <AlertDialog>
                 <AlertDialogTrigger asChild>
