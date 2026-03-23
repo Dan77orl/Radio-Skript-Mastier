@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Wand2, Calendar } from "lucide-react";
+import { Wand2, Calendar, Settings2 } from "lucide-react";
 import Generator from "./generator";
 import Schedule from "./schedule";
+import ScheduleSettings from "./schedule-settings";
 
 export default function Podvodki() {
   const [tab, setTab] = useState("generator");
@@ -26,6 +27,10 @@ export default function Podvodki() {
             <Calendar className="h-4 w-4" />
             Расписание
           </TabsTrigger>
+          <TabsTrigger value="settings" className="gap-2" data-testid="tab-schedule-settings">
+            <Settings2 className="h-4 w-4" />
+            Настройка
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="generator" className="mt-4">
@@ -33,6 +38,9 @@ export default function Podvodki() {
         </TabsContent>
         <TabsContent value="schedule" className="mt-4">
           <Schedule embedded />
+        </TabsContent>
+        <TabsContent value="settings" className="mt-4">
+          <ScheduleSettings embedded />
         </TabsContent>
       </Tabs>
     </div>

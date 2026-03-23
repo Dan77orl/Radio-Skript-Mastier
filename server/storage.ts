@@ -1,4 +1,4 @@
-import { users, settings, dialogs, newsSources, newsItems, ads, adPresets, voices, programTypes, programs, automations, automationRuns, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdPreset, type InsertAdPreset, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun } from "@shared/schema";
+import { users, settings, dialogs, newsSources, newsItems, ads, adPresets, voices, programTypes, programs, automations, automationRuns, scheduleTemplates, hostShifts, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdPreset, type InsertAdPreset, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun, type ScheduleTemplate, type InsertScheduleTemplate, type HostShift, type InsertHostShift } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql } from "drizzle-orm";
 
@@ -69,6 +69,20 @@ export interface IStorage {
   createNewsItem(item: InsertNewsItem): Promise<NewsItem>;
   markNewsItemUsed(id: string): Promise<void>;
   clearOldNewsItems(daysOld: number): Promise<void>;
+
+  getScheduleTemplates(): Promise<ScheduleTemplate[]>;
+  getScheduleTemplate(id: string): Promise<ScheduleTemplate | undefined>;
+  createScheduleTemplate(template: InsertScheduleTemplate): Promise<ScheduleTemplate>;
+  updateScheduleTemplate(id: string, template: Partial<InsertScheduleTemplate>): Promise<ScheduleTemplate | undefined>;
+  deleteScheduleTemplate(id: string): Promise<boolean>;
+  getTemplateForWeekday(weekday: number): Promise<ScheduleTemplate | undefined>;
+
+  getHostShifts(templateId: string): Promise<HostShift[]>;
+  getHostShift(id: string): Promise<HostShift | undefined>;
+  createHostShift(shift: InsertHostShift): Promise<HostShift>;
+  updateHostShift(id: string, shift: Partial<InsertHostShift>): Promise<HostShift | undefined>;
+  deleteHostShift(id: string): Promise<boolean>;
+  deleteHostShiftsByTemplate(templateId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -406,6 +420,74 @@ export class DatabaseStorage implements IStorage {
     cutoffDate.setDate(cutoffDate.getDate() - daysOld);
     await db.delete(newsItems)
       .where(sql`${newsItems.createdAt} < ${cutoffDate}`);
+  }
+
+  async getScheduleTemplates(): Promise<ScheduleTemplate[]> {
+    return db.select().from(scheduleTemplates).orderBy(asc(scheduleTemplates.sortOrder));
+  }
+
+  async getScheduleTemplate(id: string): Promise<ScheduleTemplate | undefined> {
+    const [template] = await db.select().from(scheduleTemplates).where(eq(scheduleTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createScheduleTemplate(insertTemplate: InsertScheduleTemplate): Promise<ScheduleTemplate> {
+    const [template] = await db.insert(scheduleTemplates).values(insertTemplate).returning();
+    return template;
+  }
+
+  async updateScheduleTemplate(id: string, updates: Partial<InsertScheduleTemplate>): Promise<ScheduleTemplate | undefined> {
+    const [updated] = await db.update(scheduleTemplates)
+      .set(updates)
+      .where(eq(scheduleTemplates.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteScheduleTemplate(id: string): Promise<boolean> {
+    await db.delete(hostShifts).where(eq(hostShifts.templateId, id));
+    const result = await db.delete(scheduleTemplates).where(eq(scheduleTemplates.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getTemplateForWeekday(weekday: number): Promise<ScheduleTemplate | undefined> {
+    const all = await db.select().from(scheduleTemplates)
+      .where(eq(scheduleTemplates.isActive, true))
+      .orderBy(asc(scheduleTemplates.sortOrder));
+    return all.find(t => t.weekdays?.includes(weekday));
+  }
+
+  async getHostShifts(templateId: string): Promise<HostShift[]> {
+    return db.select().from(hostShifts)
+      .where(eq(hostShifts.templateId, templateId))
+      .orderBy(asc(hostShifts.sortOrder));
+  }
+
+  async getHostShift(id: string): Promise<HostShift | undefined> {
+    const [shift] = await db.select().from(hostShifts).where(eq(hostShifts.id, id));
+    return shift || undefined;
+  }
+
+  async createHostShift(insertShift: InsertHostShift): Promise<HostShift> {
+    const [shift] = await db.insert(hostShifts).values(insertShift).returning();
+    return shift;
+  }
+
+  async updateHostShift(id: string, updates: Partial<InsertHostShift>): Promise<HostShift | undefined> {
+    const [updated] = await db.update(hostShifts)
+      .set(updates)
+      .where(eq(hostShifts.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteHostShift(id: string): Promise<boolean> {
+    const result = await db.delete(hostShifts).where(eq(hostShifts.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async deleteHostShiftsByTemplate(templateId: string): Promise<void> {
+    await db.delete(hostShifts).where(eq(hostShifts.templateId, templateId));
   }
 }
 

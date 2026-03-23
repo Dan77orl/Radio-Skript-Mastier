@@ -74,6 +74,7 @@ export const dialogs = pgTable("dialogs", {
   moderationStatus: text("moderation_status").default("pending"),
   moderationNotes: text("moderation_notes"),
   moderatedAt: timestamp("moderated_at"),
+  hostVoiceIds: text("host_voice_ids").array(),
   newsSourceIds: text("news_source_ids").array(),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
@@ -329,6 +330,46 @@ export const insertAutomationRunSchema = createInsertSchema(automationRuns).omit
 
 export type InsertAutomationRun = z.infer<typeof insertAutomationRunSchema>;
 export type AutomationRun = typeof automationRuns.$inferSelect;
+
+export const scheduleTemplates = pgTable("schedule_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  weekdays: integer("weekdays").array().notNull(),
+  startHour: integer("start_hour").notNull().default(7),
+  endHour: integer("end_hour").notNull().default(22),
+  slotsPerHour: integer("slots_per_hour").notNull().default(1),
+  voiceIds: text("voice_ids").array(),
+  isActive: boolean("is_active").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertScheduleTemplateSchema = createInsertSchema(scheduleTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertScheduleTemplate = z.infer<typeof insertScheduleTemplateSchema>;
+export type ScheduleTemplate = typeof scheduleTemplates.$inferSelect;
+
+export const hostShifts = pgTable("host_shifts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").notNull(),
+  startHour: integer("start_hour").notNull(),
+  endHour: integer("end_hour").notNull(),
+  voiceIds: text("voice_ids").array().notNull(),
+  label: text("label"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertHostShiftSchema = createInsertSchema(hostShifts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertHostShift = z.infer<typeof insertHostShiftSchema>;
+export type HostShift = typeof hostShifts.$inferSelect;
 
 export const newsItems = pgTable("news_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

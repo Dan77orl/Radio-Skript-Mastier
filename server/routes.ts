@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
-import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertAdPresetSchema, insertVoiceSchema } from "@shared/schema";
+import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertAdPresetSchema, insertVoiceSchema, insertScheduleTemplateSchema, insertHostShiftSchema } from "@shared/schema";
+import { getHolidaysForDate, getHolidaysForYear, getHolidaysForMonth, getHolidayInfo } from "./holidays";
 import { z } from "zod";
 import { promises as fs } from "fs";
 import path from "path";
@@ -676,10 +677,10 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
   app.post("/api/generate-day-dialogs", async (req, res) => {
     try {
-      const { date, totalSlots, firecrawlContent } = req.body;
+      const { date, totalSlots: totalSlotsOverride, firecrawlContent } = req.body;
       
-      if (!date || !totalSlots) {
-        return res.status(400).json({ error: "Date and totalSlots are required" });
+      if (!date) {
+        return res.status(400).json({ error: "Date is required" });
       }
 
       const existingDialogs = await storage.getDialogs();
@@ -697,20 +698,21 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const unusedNews = newsItems.filter(n => !n.isUsed).slice(0, 5);
       
       const dateObj = new Date(date);
+      const jsDay = dateObj.getDay();
+      const isoWeekday = jsDay === 0 ? 7 : jsDay;
+      const template = await storage.getTemplateForWeekday(isoWeekday);
+      const shifts = template ? await storage.getHostShifts(template.id) : [];
+
+      const tplStartHour = template?.startHour ?? 7;
+      const tplEndHour = template?.endHour ?? 22;
+      const tplSlotsPerHour = template?.slotsPerHour ?? 1;
+      const totalSlots = totalSlotsOverride || (template ? (tplEndHour - tplStartHour) * tplSlotsPerHour : (settings?.dailyDialogsCount || 12));
+
       const weekdays = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
       const weekday = weekdays[dateObj.getDay()];
       const dateFormatted = dateObj.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
       
-      const holidays: Record<string, string> = {
-        "12-25": "Рождество (европейское)",
-        "12-31": "Канун Нового года",
-        "01-01": "Новый год",
-        "01-07": "Рождество (православное)",
-        "02-14": "День святого Валентина",
-        "03-08": "Международный женский день",
-      };
-      const monthDay = `${String(dateObj.getMonth() + 1).padStart(2, "0")}-${String(dateObj.getDate()).padStart(2, "0")}`;
-      const holiday = holidays[monthDay] || null;
+      const holiday = getHolidayInfo(date);
       
       const newsContext = unusedNews.length > 0 
         ? `\n\nАктуальные новости для использования:\n${unusedNews.map((n, i) => `${i + 1}. ${n.title}${n.summary ? `: ${n.summary}` : ""}`).join("\n")}`
@@ -720,16 +722,16 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const slotPrompts = settings?.slotPrompts || [];
       const learnings = settings?.accumulatedLearnings || "";
 
+      const allVoices = await storage.getVoices();
       const generatedDialogs = [];
 
       for (let slotNumber = 1; slotNumber <= totalSlots; slotNumber++) {
-        const startHour = 7;
-        const endHour = 22;
-        const hoursRange = endHour - startHour;
-        const slotDuration = hoursRange / totalSlots;
-        const slotHour = startHour + (slotNumber - 1) * slotDuration;
+        const slotHour = template 
+          ? tplStartHour + (slotNumber - 1) / tplSlotsPerHour
+          : 7 + (slotNumber - 1) * (15 / totalSlots);
         const hour = Math.floor(slotHour);
-        const timeLabel = `${hour.toString().padStart(2, "0")}:00`;
+        const minutes = Math.round((slotHour - hour) * 60);
+        const timeLabel = `${hour.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
         
         let timeOfDay = "день";
         if (hour < 10) timeOfDay = "утро";
@@ -739,11 +741,21 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
         const slotPrompt = slotPrompts[slotNumber - 1] || "";
         
+        const matchingShift = shifts.find(s => hour >= s.startHour && hour < s.endHour);
+        const slotVoiceIds = matchingShift?.voiceIds || template?.voiceIds || null;
+        const slotVoiceNames = slotVoiceIds 
+          ? allVoices.filter(v => slotVoiceIds.includes(v.id)).map(v => `${v.personaName || v.name} (${v.gender === "male" ? "мужчина" : "женщина"})`).join(", ")
+          : null;
+
         const firecrawlSection = firecrawlContent ? `\nАКТУАЛЬНАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА (используй в диалогах как факты):\n${firecrawlContent}\n` : "";
+        
+        const hostsLine = slotVoiceNames 
+          ? `Ведущие этого слота: ${slotVoiceNames}.`
+          : `Ведущие: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).`;
         
         const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}". 
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
-Ведущие: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
+${hostsLine}
 
 КОНТЕКСТ ДНЯ:
 - Дата: ${dateFormatted}, ${weekday}
@@ -828,6 +840,7 @@ ${hour >= 18 ? "Вечерний слот: расслабленный тон, и
               moderationStatus: "pending",
               moderationNotes: null,
               moderatedAt: null,
+              hostVoiceIds: slotVoiceIds,
               newsSourceIds: unusedNews.length > 0 ? unusedNews.map(n => n.id) : null,
             });
           } else {
@@ -847,6 +860,7 @@ ${hour >= 18 ? "Вечерний слот: расслабленный тон, и
               moderationStatus: "pending",
               moderationNotes: null,
               moderatedAt: null,
+              hostVoiceIds: slotVoiceIds,
               newsSourceIds: unusedNews.length > 0 ? unusedNews.map(n => n.id) : null,
             });
           }
@@ -3740,6 +3754,221 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
   app.post("/api/run-scheduler", async (_req, res) => {
     runAutoScheduler();
     res.json({ status: "Scheduler triggered" });
+  });
+
+  app.get("/api/holidays", async (req, res) => {
+    try {
+      const { year, month, date } = req.query;
+      if (date && typeof date === "string") {
+        const holidays = getHolidaysForDate(date);
+        return res.json(holidays);
+      }
+      if (year) {
+        const y = parseInt(year as string);
+        if (month) {
+          const m = parseInt(month as string);
+          return res.json(getHolidaysForMonth(y, m));
+        }
+        return res.json(getHolidaysForYear(y));
+      }
+      return res.json(getHolidaysForYear(new Date().getFullYear()));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get holidays" });
+    }
+  });
+
+  app.get("/api/schedule-templates", async (_req, res) => {
+    try {
+      const templates = await storage.getScheduleTemplates();
+      res.json(templates);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get schedule templates" });
+    }
+  });
+
+  app.get("/api/schedule-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.getScheduleTemplate(req.params.id);
+      if (!template) return res.status(404).json({ error: "Template not found" });
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get template" });
+    }
+  });
+
+  app.post("/api/schedule-templates", async (req, res) => {
+    try {
+      const parsed = insertScheduleTemplateSchema.parse(req.body);
+      if (parsed.startHour >= parsed.endHour) {
+        return res.status(400).json({ error: "startHour must be less than endHour" });
+      }
+      if (parsed.slotsPerHour < 1 || parsed.slotsPerHour > 4) {
+        return res.status(400).json({ error: "slotsPerHour must be between 1 and 4" });
+      }
+      if (!parsed.weekdays?.length || !parsed.weekdays.every(d => d >= 1 && d <= 7)) {
+        return res.status(400).json({ error: "weekdays must contain values 1-7" });
+      }
+      const template = await storage.createScheduleTemplate(parsed);
+      res.json(template);
+    } catch (error: any) {
+      if (error?.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid template data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create template" });
+    }
+  });
+
+  app.patch("/api/schedule-templates/:id", async (req, res) => {
+    try {
+      const parsed = insertScheduleTemplateSchema.partial().parse(req.body);
+      if (parsed.startHour !== undefined && parsed.endHour !== undefined && parsed.startHour >= parsed.endHour) {
+        return res.status(400).json({ error: "startHour must be less than endHour" });
+      }
+      if (parsed.slotsPerHour !== undefined && (parsed.slotsPerHour < 1 || parsed.slotsPerHour > 4)) {
+        return res.status(400).json({ error: "slotsPerHour must be between 1 and 4" });
+      }
+      if (parsed.weekdays !== undefined && (!parsed.weekdays.length || !parsed.weekdays.every(d => d >= 1 && d <= 7))) {
+        return res.status(400).json({ error: "weekdays must contain values 1-7" });
+      }
+      const template = await storage.updateScheduleTemplate(req.params.id, parsed);
+      if (!template) return res.status(404).json({ error: "Template not found" });
+      res.json(template);
+    } catch (error: any) {
+      if (error?.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid template data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update template" });
+    }
+  });
+
+  app.delete("/api/schedule-templates/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteScheduleTemplate(req.params.id);
+      if (!deleted) return res.status(404).json({ error: "Template not found" });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete template" });
+    }
+  });
+
+  app.get("/api/schedule-templates/:id/shifts", async (req, res) => {
+    try {
+      const shifts = await storage.getHostShifts(req.params.id);
+      res.json(shifts);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get host shifts" });
+    }
+  });
+
+  app.post("/api/host-shifts", async (req, res) => {
+    try {
+      const parsed = insertHostShiftSchema.parse(req.body);
+      if (parsed.startHour >= parsed.endHour) {
+        return res.status(400).json({ error: "startHour must be less than endHour" });
+      }
+      if (!parsed.voiceIds?.length) {
+        return res.status(400).json({ error: "voiceIds must not be empty" });
+      }
+      const shift = await storage.createHostShift(parsed);
+      res.json(shift);
+    } catch (error: any) {
+      if (error?.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid shift data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create host shift" });
+    }
+  });
+
+  app.patch("/api/host-shifts/:id", async (req, res) => {
+    try {
+      const parsed = insertHostShiftSchema.partial().parse(req.body);
+      if (parsed.startHour !== undefined && parsed.endHour !== undefined && parsed.startHour >= parsed.endHour) {
+        return res.status(400).json({ error: "startHour must be less than endHour" });
+      }
+      const shift = await storage.updateHostShift(req.params.id, parsed);
+      if (!shift) return res.status(404).json({ error: "Shift not found" });
+      res.json(shift);
+    } catch (error: any) {
+      if (error?.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid shift data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update shift" });
+    }
+  });
+
+  app.delete("/api/host-shifts/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteHostShift(req.params.id);
+      if (!deleted) return res.status(404).json({ error: "Shift not found" });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete shift" });
+    }
+  });
+
+  app.get("/api/resolve-slots", async (req, res) => {
+    try {
+      const { date } = req.query;
+      if (!date || typeof date !== "string") {
+        return res.status(400).json({ error: "date query parameter is required" });
+      }
+
+      const dateObj = new Date(date);
+      if (isNaN(dateObj.getTime())) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+      const jsDay = dateObj.getDay();
+      const weekday = jsDay === 0 ? 7 : jsDay;
+
+      const template = await storage.getTemplateForWeekday(weekday);
+      const settings = await storage.getSettings();
+
+      if (!template) {
+        const totalSlots = settings?.dailyDialogsCount || 12;
+        const slots = [];
+        for (let i = 1; i <= totalSlots; i++) {
+          const startHour = 7;
+          const endHour = 22;
+          const hoursRange = endHour - startHour;
+          const slotDuration = hoursRange / totalSlots;
+          const slotHour = startHour + (i - 1) * slotDuration;
+          const hour = Math.floor(slotHour);
+          const minutes = Math.round((slotHour - hour) * 60);
+          slots.push({
+            slotNumber: i,
+            time: `${hour.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`,
+            hour,
+            voiceIds: null,
+          });
+        }
+        return res.json({ template: null, slots, holidays: getHolidaysForDate(date) });
+      }
+
+      const shifts = await storage.getHostShifts(template.id);
+      const totalSlots = (template.endHour - template.startHour) * template.slotsPerHour;
+      const slots = [];
+
+      for (let i = 0; i < totalSlots; i++) {
+        const slotHour = template.startHour + i / template.slotsPerHour;
+        const hour = Math.floor(slotHour);
+        const minutes = Math.round((slotHour - hour) * 60);
+
+        const matchingShift = shifts.find(s => hour >= s.startHour && hour < s.endHour);
+        const voiceIds = matchingShift?.voiceIds || template.voiceIds || null;
+
+        slots.push({
+          slotNumber: i + 1,
+          time: `${hour.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`,
+          hour,
+          voiceIds,
+          shiftLabel: matchingShift?.label || null,
+        });
+      }
+
+      return res.json({ template, slots, holidays: getHolidaysForDate(date) });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to resolve slots" });
+    }
   });
 
   return httpServer;

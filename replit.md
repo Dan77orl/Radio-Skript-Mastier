@@ -38,6 +38,17 @@ Preferred communication style: Simple, everyday language.
 1. **Users** - Basic authentication support
 2. **Settings** - Application configuration (API keys, voice IDs, default prompts)
 3. **Dialogs** - Generated radio scripts with status tracking (pending, generating, ready, error)
+4. **Schedule Templates** - Per-weekday broadcast templates (name, weekdays, startHour, endHour, slotsPerHour, voiceIds)
+5. **Host Shifts** - Time-based host rotation within templates (templateId, startHour, endHour, voiceIds, label)
+
+### Schedule System
+- **Flexible Templates**: Each template covers specific weekdays with configurable broadcast hours and slot density (slots per hour)
+- **Host Rotation**: Host shifts define which voices are assigned to which time ranges within a template
+- **Holiday Calendar**: Static holiday data for Turkey and Russia (including Islamic holidays for 2025-2026) in `server/holidays.ts`
+- **Slot Resolution**: `GET /api/resolve-slots?date=YYYY-MM-DD` resolves the template for a given date, returns slot times with assigned voices and holiday info
+- **Generator Integration**: Generator page uses resolved slots to show time labels, host names, and shift labels per slot
+- **Schedule View**: Calendar week view shows holiday markers on each day
+- **UI**: "Настройка" (Settings) tab in Podvodki page for managing templates, weekday assignments, and host shifts with visual timeline
 
 ### AI Integration Pattern
 - **Claude (Anthropic)**: Primary AI for ALL text generation

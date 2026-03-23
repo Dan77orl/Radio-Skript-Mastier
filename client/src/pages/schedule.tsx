@@ -22,6 +22,13 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Dialog, Settings } from "@shared/schema";
 
+interface Holiday {
+  date: string;
+  nameRu: string;
+  isPublic: boolean;
+  country: string;
+}
+
 function getStatusInfo(status: string) {
   switch (status) {
     case "ready":
@@ -79,6 +86,21 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
   const { data: settings, isLoading: settingsLoading } = useQuery<Settings>({
     queryKey: ["/api/settings"],
   });
+
+  const year = currentDate.getFullYear();
+  const { data: holidays } = useQuery<Holiday[]>({
+    queryKey: ["/api/holidays", year],
+    queryFn: async () => {
+      const res = await fetch(`/api/holidays?year=${year}`);
+      if (!res.ok) throw new Error("Failed to fetch holidays");
+      return res.json();
+    },
+  });
+
+  const getHolidaysForDateStr = (dateStr: string): Holiday[] => {
+    if (!holidays) return [];
+    return holidays.filter(h => h.date === dateStr || h.date.endsWith(dateStr.slice(4)));
+  };
 
   const dailyCount = settings?.dailyDialogsCount || 12;
 
@@ -218,6 +240,15 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
                       <div className={`text-lg font-bold ${isCurrentDay ? "text-primary" : ""}`}>
                         {day.getDate()}
                       </div>
+                      {(() => {
+                        const dateStr = day.toISOString().split("T")[0];
+                        const dayHolidays = getHolidaysForDateStr(dateStr);
+                        return dayHolidays.length > 0 ? (
+                          <div className="text-[10px] leading-tight text-orange-600 dark:text-orange-400 font-medium mt-0.5 line-clamp-2" title={dayHolidays.map(h => h.nameRu).join(", ")}>
+                            {dayHolidays[0].nameRu}
+                          </div>
+                        ) : null;
+                      })()}
                       {dayDialogs.length > 0 && (
                         <Badge variant={readyCount === dailyCount ? "default" : "secondary"} className="mt-1">
                           {dayDialogs.length}/{dailyCount}

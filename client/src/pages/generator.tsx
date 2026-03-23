@@ -7,28 +7,31 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Wand2, Loader2, Calendar, Clock, User, CheckCircle, Edit3, Send, RefreshCw, ChevronDown, ChevronUp, Play, FileText, Save, Search, Globe, X, Trash2, Plus } from "lucide-react";
+import { Wand2, Loader2, Calendar, Clock, User, Users, CheckCircle, Edit3, Send, RefreshCw, ChevronDown, ChevronUp, Play, FileText, Save, Search, Globe, X, Trash2, Plus } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { VoiceInput } from "@/components/voice-input";
-import type { Settings, Dialog, NewsItem } from "@shared/schema";
+import type { Settings, Dialog, NewsItem, Voice } from "@shared/schema";
 
-function getSlotTimeLabel(slotNumber: number, totalSlots: number): string {
-  const startHour = 7;
-  const endHour = 22;
-  const hoursRange = endHour - startHour;
-  const slotDuration = hoursRange / totalSlots;
-  const slotHour = startHour + (slotNumber - 1) * slotDuration;
-  const hour = Math.floor(slotHour);
-  const minutes = Math.round((slotHour - hour) * 60);
-  return `${hour.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+interface SlotInfo {
+  slotNumber: number;
+  time: string;
+  hour: number;
+  voiceIds: string[] | null;
+  shiftLabel?: string | null;
 }
 
-function getTimeOfDay(slotNumber: number, totalSlots: number): string {
-  const position = slotNumber / totalSlots;
-  if (position <= 0.33) return "Утро";
-  if (position <= 0.66) return "День";
-  return "Вечер";
+interface ResolvedSlots {
+  template: any;
+  slots: SlotInfo[];
+  holidays: Array<{ nameRu: string; isPublic: boolean; country: string }>;
+}
+
+function getTimeOfDayFromHour(hour: number): string {
+  if (hour < 10) return "Утро";
+  if (hour < 14) return "День";
+  if (hour < 18) return "Вечер";
+  return "Поздний вечер";
 }
 
 function formatDate(dateString: string): string {
@@ -40,26 +43,6 @@ function formatDate(dateString: string): string {
     day: 'numeric' 
   };
   return date.toLocaleDateString('ru-RU', options);
-}
-
-function getHolidayInfo(dateString: string): string | null {
-  const date = new Date(dateString);
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  
-  if (month === 12 && day === 25) return "Рождество (европейское)";
-  if (month === 12 && day === 31) return "Канун Нового года";
-  if (month === 1 && day === 1) return "Новый год";
-  if (month === 1 && day === 7) return "Рождество (православное)";
-  if (month === 2 && day === 14) return "День святого Валентина";
-  if (month === 3 && day === 8) return "Международный женский день";
-  if (month === 4 && day === 23) return "День национального суверенитета Турции";
-  if (month === 5 && day === 1) return "День труда";
-  if (month === 5 && day === 19) return "День молодёжи Турции";
-  if (month === 8 && day === 30) return "День победы Турции";
-  if (month === 10 && day === 29) return "День Республики Турции";
-  
-  return null;
 }
 
 export default function Generator({ embedded }: { embedded?: boolean }) {
@@ -93,8 +76,22 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
     queryKey: ["/api/news-items"],
   });
 
-  const totalSlots = settings?.dailyDialogsCount || 12;
-  const holiday = getHolidayInfo(selectedDate);
+  const { data: voices } = useQuery<Voice[]>({
+    queryKey: ["/api/voices"],
+  });
+
+  const { data: resolvedSlots } = useQuery<ResolvedSlots>({
+    queryKey: ["/api/resolve-slots", selectedDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/resolve-slots?date=${selectedDate}`);
+      if (!res.ok) throw new Error("Failed to resolve slots");
+      return res.json();
+    },
+    enabled: !!selectedDate,
+  });
+
+  const totalSlots = resolvedSlots?.slots?.length || settings?.dailyDialogsCount || 12;
+  const holidayNames = resolvedSlots?.holidays?.map(h => h.nameRu).join(", ") || null;
   
   const dialogsForDate = dialogs?.filter(d => d.scheduledDate === selectedDate) || [];
   const dialogsBySlot = new Map<number, Dialog>();
@@ -105,6 +102,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
   });
 
   const unusedNews = newsItems?.filter(n => !n.isUsed).slice(0, 5) || [];
+  const activeVoices = voices?.filter(v => v.isActive) || [];
 
   const firecrawlSearchMutation = useMutation({
     mutationFn: async (topics: string[]) => {
@@ -294,9 +292,14 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                   </CardTitle>
                   <CardDescription>
                     {formatDate(selectedDate)}
-                    {holiday && (
+                    {holidayNames && (
                       <Badge variant="secondary" className="ml-2">
-                        {holiday}
+                        {holidayNames}
+                      </Badge>
+                    )}
+                    {resolvedSlots?.template && (
+                      <Badge variant="outline" className="ml-2">
+                        {resolvedSlots.template.name}
                       </Badge>
                     )}
                   </CardDescription>
@@ -439,8 +442,14 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                       const dialog = dialogsBySlot.get(slotNumber);
                       const isExpanded = expandedSlots.has(slotNumber);
                       const isEditing = editingSlot === slotNumber;
-                      const timeLabel = getSlotTimeLabel(slotNumber, totalSlots);
-                      const timeOfDay = getTimeOfDay(slotNumber, totalSlots);
+                      const slotInfo = resolvedSlots?.slots?.[i];
+                      const timeLabel = slotInfo?.time || `${Math.floor(7 + (i * 15 / totalSlots))}:00`;
+                      const timeOfDay = getTimeOfDayFromHour(slotInfo?.hour || Math.floor(7 + (i * 15 / totalSlots)));
+
+                      const slotVoiceNames = slotInfo?.voiceIds
+                        ?.map(id => activeVoices.find(v => v.id === id))
+                        .filter(Boolean)
+                        .map(v => v!.personaName || v!.name) || [];
 
                       return (
                         <Collapsible
@@ -465,6 +474,17 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                 <Badge variant="secondary">
                                   {timeOfDay}
                                 </Badge>
+                                {slotInfo?.shiftLabel && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {slotInfo.shiftLabel}
+                                  </Badge>
+                                )}
+                                {slotVoiceNames.length > 0 && (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Users className="h-3 w-3" />
+                                    {slotVoiceNames.join(", ")}
+                                  </span>
+                                )}
                               </div>
                               <div className="flex items-center gap-2">
                                 {dialog ? (
