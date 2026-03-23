@@ -224,6 +224,7 @@ export const programTypes = pgTable("program_types", {
   autoGenerate: boolean("auto_generate").default(false),
   weeklyCount: integer("weekly_count").default(7),
   autoVoice: boolean("auto_voice").default(true),
+  autoIsolate: boolean("auto_isolate").default(false),
   autoUpload: boolean("auto_upload").default(true),
   uploadFolder: text("upload_folder"),
   scheduleDays: integer("schedule_days").array(),

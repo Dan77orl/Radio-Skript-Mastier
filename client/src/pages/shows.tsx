@@ -661,6 +661,7 @@ export default function ShowsPage() {
         autoGenerate: settingsType.autoGenerate || false,
         weeklyCount: settingsType.weeklyCount || 7,
         autoVoice: settingsType.autoVoice !== false,
+        autoIsolate: settingsType.autoIsolate || false,
         autoUpload: settingsType.autoUpload !== false,
         uploadFolder: settingsType.uploadFolder || null,
         scheduleDays: settingsType.scheduleDays || [],
@@ -1570,7 +1571,7 @@ export default function ShowsPage() {
                 </div>
                 {settingsType.autoGenerate && (
                   <div className="space-y-3 mt-2">
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="space-y-1">
                         <span className="text-xs text-muted-foreground">Выпусков в неделю</span>
                         <Input
@@ -1591,6 +1592,17 @@ export default function ShowsPage() {
                           data-testid="button-toggle-auto-voice"
                         >
                           {settingsType.autoVoice !== false ? "Авто-озвучка" : "Без озвучки"}
+                        </Button>
+                      </div>
+                      <div className="space-y-1 flex flex-col justify-end">
+                        <Button
+                          size="sm"
+                          variant={settingsType.autoIsolate ? "default" : "outline"}
+                          onClick={() => setSettingsType(prev => prev ? { ...prev, autoIsolate: !prev.autoIsolate } : null)}
+                          className="w-full"
+                          data-testid="button-toggle-auto-isolate"
+                        >
+                          {settingsType.autoIsolate ? "Голосоизолятор" : "Без шумодава"}
                         </Button>
                       </div>
                       <div className="space-y-1 flex flex-col justify-end">

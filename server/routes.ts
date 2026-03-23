@@ -3598,6 +3598,22 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
             }
           }
 
+          if (programType.autoIsolate && audioOk && program.audioUrl) {
+            try {
+              const isolateRes = await fetch(`http://localhost:${process.env.PORT || 5000}/api/programs/${program.id}/voice-isolate`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+              });
+              if (isolateRes.ok) {
+                const isolateData = await isolateRes.json();
+                program.audioUrl = isolateData.audioUrl;
+                console.log(`Auto-pipeline: voice isolation done for ${program.id}`);
+              }
+            } catch (isolateErr: any) {
+              console.error(`Auto-pipeline isolate error for ${program.id}:`, isolateErr.message);
+            }
+          }
+
           if (programType.autoUpload !== false && program.audioUrl) {
             try {
               const settings = await storage.getSettings();
