@@ -3531,7 +3531,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
                 const normalizedUrl = program.audioUrl.startsWith("/") ? program.audioUrl.slice(1) : program.audioUrl;
                 const audioPath = path.join(process.cwd(), "public", normalizedUrl);
                 const fileData = await fs.readFile(audioPath);
-                const yandexFolder = `/radio/${programType.slug}`;
+                const yandexFolder = programType.uploadFolder || `/radio/${programType.slug}`;
 
                 await fetch(`https://cloud-api.yandex.net/v1/disk/resources?path=${encodeURIComponent(yandexFolder)}`, {
                   method: "PUT",

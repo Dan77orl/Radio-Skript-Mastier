@@ -643,6 +643,7 @@ export default function ShowsPage() {
         weeklyCount: settingsType.weeklyCount || 7,
         autoVoice: settingsType.autoVoice !== false,
         autoUpload: settingsType.autoUpload !== false,
+        uploadFolder: settingsType.uploadFolder || null,
         fileNameTemplate: settingsType.fileNameTemplate || "",
         useFirecrawl: settingsType.useFirecrawl || false,
         firecrawlTopics: settingsType.firecrawlTopics || [],
@@ -1569,6 +1570,20 @@ export default function ShowsPage() {
                         </Button>
                       </div>
                     </div>
+                    {settingsType.autoUpload !== false && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Папка на облачном диске</Label>
+                        <Input
+                          placeholder={`/radio/${settingsType.slug || 'program'}`}
+                          value={settingsType.uploadFolder || ""}
+                          onChange={(e) => setSettingsType(prev => prev ? { ...prev, uploadFolder: e.target.value || null } : null)}
+                          data-testid="input-upload-folder"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Путь на Яндекс Диске. По умолчанию: /radio/{settingsType.slug || 'program'}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
