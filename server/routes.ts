@@ -2471,22 +2471,39 @@ ${instructions || "Создай альтернативный вариант с �
 [${assignedVoices[1]?.personaName || assignedVoices[1]?.name}]: [announcer] ЗАГОЛОВОК`;
       }
 
-      const latestRef = existingPrograms
+      const scriptsWithFormat = existingPrograms
         .filter(p => p.scriptText && p.scriptText.includes("]:"))
-        .sort((a, b) => (b.id > a.id ? 1 : -1))
-        .slice(0, 1)[0];
+        .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+
+      const latestRef = scriptsWithFormat[0];
 
       if (latestRef?.scriptText) {
-        prompt += `\n\nОБРАЗЕЦ — предыдущий выпуск. Следуй ТОЧНО такому же формату, стилю назначения спикеров и распределению реплик:\n---\n${latestRef.scriptText.substring(0, 5000)}\n---\nСоздай НОВЫЙ выпуск на другую тему, но в таком же формате.`;
+        prompt += `\n\nОБРАЗЕЦ ФОРМАТА (копируй ТОЛЬКО формат и стиль, НЕ тему и НЕ содержание):\n---\n${latestRef.scriptText.substring(0, 3000)}\n---\nСоздай выпуск на СОВЕРШЕННО ДРУГУЮ тему, сохраняя только формат реплик и стиль.`;
       }
 
-      prompt += `\n\nСТРОГИЕ ЗАПРЕТЫ:
-- НЕ упоминай Институт Солка, Salk Institute — НИКОГДА
+      const existingTitles = existingPrograms
+        .filter(p => p.title)
+        .map(p => p.title)
+        .slice(0, 50);
+      const existingTopics = existingPrograms
+        .filter(p => p.scriptText)
+        .map(p => {
+          const firstLine = p.scriptText!.split("\n").find(l => l.length > 30) || "";
+          return firstLine.substring(0, 100);
+        })
+        .filter(t => t.length > 0)
+        .slice(0, 20);
+
+      if (existingTitles.length > 0) {
+        prompt += `\n\nУЖЕ СОЗДАННЫЕ ВЫПУСКИ (НЕ повторяй эти темы!):\n${existingTitles.join("\n")}`;
+      }
+
+      prompt += `\n\nСТРОГИЕ ПРАВИЛА:
+- Выбери НОВУЮ тему из области психологии, которой НЕТ в списке выше
 - НЕ выдумывай названия институтов, университетов и исследований
-- НЕ копируй источники и названия организаций из образца выше
-- Если есть данные из Firecrawl — используй ТОЛЬКО их как источник фактов
-- Если нет данных из Firecrawl — давай практические советы без выдуманных ссылок на институты
-- Каждый выпуск должен быть на НОВУЮ тему, не повторяй темы предыдущих выпусков`;
+- Если есть данные из интернета — используй ТОЛЬКО их как источник фактов
+- Если нет данных — давай практические советы без выдуманных ссылок на исследования
+- НЕ повторяй тему дыхания, медитации или потокового состояния, если они уже были`;
 
       const ctx = await buildStationContext();
       const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
