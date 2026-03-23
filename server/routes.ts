@@ -106,6 +106,14 @@ async function getAnthropicClient(): Promise<Anthropic | null> {
   return new Anthropic({ apiKey: settings.anthropicApiKey });
 }
 
+function resolveStationCountry(stationLocation: string | null | undefined): string {
+  if (!stationLocation) return "TR";
+  const loc = stationLocation.toLowerCase();
+  if (loc.includes("турц") || loc.includes("turkey") || loc.includes("alanya") || loc.includes("аланья")) return "TR";
+  if (loc.includes("росс") || loc.includes("russia") || loc.includes("москв") || loc.includes("moscow")) return "RU";
+  return "TR";
+}
+
 interface StationContext {
   stationName: string;
   stationDescription: string;
@@ -3834,12 +3842,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
         resolvedCountry = country.toUpperCase();
       } else {
         const stSettings = await storage.getSettings();
-        const loc = stSettings?.stationLocation?.toLowerCase() || "";
-        if (loc.includes("турц") || loc.includes("turkey") || loc.includes("alanya") || loc.includes("аланья")) {
-          resolvedCountry = "TR";
-        } else if (loc) {
-          resolvedCountry = "RU";
-        }
+        resolvedCountry = resolveStationCountry(stSettings?.stationLocation);
       }
 
       const filterByCountry = (holidays: ReturnType<typeof getHolidaysForDate>) => {
@@ -4013,8 +4016,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       const settings = await storage.getSettings();
 
       const allHolidays = getHolidaysForDate(date);
-      const stationLoc = settings?.stationLocation?.toLowerCase() || "";
-      const stationCountry = stationLoc.includes("турц") || stationLoc.includes("turkey") || stationLoc.includes("alanya") || stationLoc.includes("аланья") ? "TR" : "RU";
+      const stationCountry = resolveStationCountry(settings?.stationLocation);
       const holidays = allHolidays.filter(h => h.country === stationCountry || h.country === "BOTH");
 
       if (!template) {
