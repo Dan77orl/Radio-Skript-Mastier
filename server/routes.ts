@@ -2006,10 +2006,6 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.post("/api/voices", async (req, res) => {
     try {
-      const count = await storage.getVoicesCount();
-      if (count >= 4) {
-        return res.status(400).json({ error: "Maximum 4 voices allowed" });
-      }
       const parsed = insertVoiceSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.message });
