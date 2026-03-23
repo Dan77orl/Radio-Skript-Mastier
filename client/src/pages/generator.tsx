@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Wand2, Loader2, Calendar, Clock, User, CheckCircle, Edit3, Send, RefreshCw, ChevronDown, ChevronUp, Play, FileText, Save } from "lucide-react";
+import { Wand2, Loader2, Calendar, Clock, User, CheckCircle, Edit3, Send, RefreshCw, ChevronDown, ChevronUp, Play, FileText, Save, Search, Globe, X, Trash2, Plus } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { VoiceInput } from "@/components/voice-input";
@@ -70,6 +70,10 @@ export default function Generator() {
   const [editPrompt, setEditPrompt] = useState<string>("");
   const [dailyPromptValue, setDailyPromptValue] = useState<string>("");
   const [isDailyPromptDirty, setIsDailyPromptDirty] = useState(false);
+  const [firecrawlTopics, setFirecrawlTopics] = useState<string[]>(["погода Аланья сегодня", "новости Турция"]);
+  const [newTopic, setNewTopic] = useState("");
+  const [firecrawlContent, setFirecrawlContent] = useState<string>("");
+  const [isFirecrawlOpen, setIsFirecrawlOpen] = useState(false);
 
   const { data: settings } = useQuery<Settings>({
     queryKey: ["/api/settings"],
@@ -102,8 +106,36 @@ export default function Generator() {
 
   const unusedNews = newsItems?.filter(n => !n.isUsed).slice(0, 5) || [];
 
+  const firecrawlSearchMutation = useMutation({
+    mutationFn: async (topics: string[]) => {
+      const results: string[] = [];
+      for (const topic of topics) {
+        const response = await apiRequest("POST", "/api/firecrawl/search", { query: topic, limit: 3 });
+        const data = await response.json() as { results: string[] };
+        if (data.results?.length) {
+          results.push(`--- ${topic} ---\n${data.results.join("\n\n")}`);
+        }
+      }
+      return results.join("\n\n");
+    },
+    onSuccess: (content) => {
+      setFirecrawlContent(content);
+      toast({
+        title: "Контент найден",
+        description: "Информация из интернета загружена и будет использована при генерации",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка поиска",
+        description: error.message || "Не удалось найти контент",
+        variant: "destructive",
+      });
+    },
+  });
+
   const generateAllSlotsMutation = useMutation({
-    mutationFn: async (data: { date: string; totalSlots: number }) => {
+    mutationFn: async (data: { date: string; totalSlots: number; firecrawlContent?: string }) => {
       const response = await apiRequest("POST", "/api/generate-day-dialogs", data);
       return response.json() as Promise<{ dialogs: Dialog[]; generatedCount: number }>;
     },
@@ -214,11 +246,26 @@ export default function Generator() {
   };
 
   const onGenerateAllSlots = () => {
-    generateAllSlotsMutation.mutate({ date: selectedDate, totalSlots });
+    generateAllSlotsMutation.mutate({ 
+      date: selectedDate, 
+      totalSlots,
+      firecrawlContent: firecrawlContent || undefined 
+    });
   };
 
   const onSendToAutomation = () => {
     sendToAutomationMutation.mutate({ date: selectedDate });
+  };
+
+  const addTopic = () => {
+    if (newTopic.trim() && !firecrawlTopics.includes(newTopic.trim())) {
+      setFirecrawlTopics([...firecrawlTopics, newTopic.trim()]);
+      setNewTopic("");
+    }
+  };
+
+  const removeTopic = (topic: string) => {
+    setFirecrawlTopics(firecrawlTopics.filter(t => t !== topic));
   };
 
   const readyDialogsCount = dialogsForDate.filter(d => d.maleText && d.femaleText).length;
@@ -229,7 +276,7 @@ export default function Generator() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Генератор диалогов</h1>
-          <p className="text-muted-foreground">Автоматическая генерация текстов на весь день</p>
+          <p className="text-muted-foreground">Автоматическая генерация подводок на весь день</p>
         </div>
       </div>
 
@@ -292,6 +339,19 @@ export default function Generator() {
                   </Button>
                 )}
               </div>
+
+              {firecrawlContent && (
+                <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/30 p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Globe className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-700 dark:text-green-400">Контент из интернета подключён</span>
+                    <Badge variant="secondary" className="text-xs">{firecrawlContent.split('\n').filter(l => l.startsWith('---')).length} тем</Badge>
+                  </div>
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    Будет использован при генерации диалогов для точности фактов
+                  </p>
+                </div>
+              )}
 
               {generateAllSlotsMutation.isPending && (
                 <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
@@ -543,11 +603,11 @@ export default function Generator() {
 
         <div className="space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-3">
               <CardTitle>Статистика дня</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="text-center p-3 rounded-lg bg-muted">
                   <p className="text-2xl font-bold">{dialogsForDate.length}</p>
                   <p className="text-xs text-muted-foreground">Создано</p>
@@ -565,12 +625,117 @@ export default function Generator() {
                   <p className="text-xs text-muted-foreground">Осталось</p>
                 </div>
               </div>
+              {dialogsForDate.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Прогресс</span>
+                    <span>{Math.round((dialogsForDate.length / totalSlots) * 100)}%</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-green-500 rounded-full transition-all" 
+                      style={{ width: `${(dialogsForDate.length / totalSlots) * 100}%` }} 
+                    />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Globe className="h-5 w-5" />
+                  Firecrawl
+                </CardTitle>
+                <Button
+                  size="sm"
+                  variant={firecrawlContent ? "default" : "outline"}
+                  className={firecrawlContent ? "bg-green-600 hover:bg-green-700" : ""}
+                  onClick={() => firecrawlSearchMutation.mutate(firecrawlTopics)}
+                  disabled={firecrawlSearchMutation.isPending || firecrawlTopics.length === 0}
+                  data-testid="button-firecrawl-search"
+                >
+                  {firecrawlSearchMutation.isPending ? (
+                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Search className="mr-1 h-3.5 w-3.5" />
+                  )}
+                  {firecrawlContent ? "Обновить" : "Найти"}
+                </Button>
+              </div>
+              <CardDescription>
+                Поиск актуальной информации для подводок
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-1.5">
+                {firecrawlTopics.map(topic => (
+                  <Badge key={topic} variant="secondary" className="gap-1 pr-1">
+                    {topic}
+                    <button
+                      onClick={() => removeTopic(topic)}
+                      className="ml-0.5 hover:text-destructive rounded-full"
+                      data-testid={`remove-topic-${topic}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                <Input
+                  value={newTopic}
+                  onChange={(e) => setNewTopic(e.target.value)}
+                  placeholder="Добавить тему..."
+                  className="h-8 text-xs"
+                  onKeyDown={(e) => e.key === "Enter" && addTopic()}
+                  data-testid="input-new-topic"
+                />
+                <Button size="sm" variant="ghost" className="h-8 px-2" onClick={addTopic}>
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+
+              {firecrawlContent && (
+                <Collapsible open={isFirecrawlOpen} onOpenChange={setIsFirecrawlOpen}>
+                  <CollapsibleTrigger asChild>
+                    <button className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 hover:underline w-full">
+                      <CheckCircle className="h-3 w-3" />
+                      Контент загружен
+                      {isFirecrawlOpen ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="mt-2 rounded-lg border bg-muted/50 p-2 max-h-[200px] overflow-y-auto">
+                      <pre className="text-xs whitespace-pre-wrap text-muted-foreground">{firecrawlContent.substring(0, 1000)}{firecrawlContent.length > 1000 ? "..." : ""}</pre>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="mt-1 h-6 text-xs text-destructive"
+                      onClick={() => setFirecrawlContent("")}
+                    >
+                      <Trash2 className="mr-1 h-3 w-3" />
+                      Очистить
+                    </Button>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
+              {firecrawlSearchMutation.isPending && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Ищем информацию...
+                </div>
+              )}
             </CardContent>
           </Card>
 
           {unusedNews.length > 0 && (
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle>Свежие новости</CardTitle>
                 <CardDescription>Будут использованы в генерации</CardDescription>
               </CardHeader>
@@ -595,7 +760,7 @@ export default function Generator() {
           )}
 
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-3">
               <CardTitle>Настройки промптов</CardTitle>
               <CardDescription>Большой дневной промпт и слотовые промпты настраиваются в разделе "Настройки"</CardDescription>
             </CardHeader>

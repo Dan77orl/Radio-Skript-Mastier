@@ -676,7 +676,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
   app.post("/api/generate-day-dialogs", async (req, res) => {
     try {
-      const { date, totalSlots } = req.body;
+      const { date, totalSlots, firecrawlContent } = req.body;
       
       if (!date || !totalSlots) {
         return res.status(400).json({ error: "Date and totalSlots are required" });
@@ -739,6 +739,8 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
         const slotPrompt = slotPrompts[slotNumber - 1] || "";
         
+        const firecrawlSection = firecrawlContent ? `\nАКТУАЛЬНАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА (используй в диалогах как факты):\n${firecrawlContent}\n` : "";
+        
         const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}". 
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 Ведущие: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
@@ -749,7 +751,7 @@ ${holiday ? `- Праздник: ${holiday}` : ""}
 - Время слота: ${timeLabel} (${timeOfDay})
 - Слот номер: ${slotNumber} из ${totalSlots}
 ${newsContext}
-
+${firecrawlSection}
 ${dailyPrompt ? `ОБЩИЕ ИНСТРУКЦИИ НА ДЕНЬ:\n${dailyPrompt}\n` : ""}
 ${slotPrompt ? `ИНСТРУКЦИИ ДЛЯ ЭТОГО СЛОТА:\n${slotPrompt}\n` : ""}
 ${learnings ? `НАКОПЛЕННЫЙ ОПЫТ:\n${learnings}\n` : ""}
