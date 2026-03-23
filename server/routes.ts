@@ -2418,7 +2418,7 @@ ${instructions || "Создай альтернативный вариант с �
         }
       }
 
-      prompt += `\n\nДата: ${dateStr}, выпуск #${nextSlot} из ${dailyCount}`;
+      prompt += `\n\nДата: ${dateStr}, выпуск #${nextSlot} из ${programType.dailyCount || 1}`;
 
       if (programType.useFirecrawl && programType.firecrawlTopics?.length) {
         try {
