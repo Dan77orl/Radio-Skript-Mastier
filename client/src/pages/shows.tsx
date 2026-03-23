@@ -567,7 +567,9 @@ export default function ShowsPage() {
   };
 
   const getAssignedVoicesForType = (typeId: string) => {
-    return voices?.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(typeId)) || [];
+    const assigned = voices?.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(typeId)) || [];
+    if (assigned.length > 0) return assigned;
+    return voices?.filter(v => v.isActive) || [];
   };
 
   const openSettingsDialog = (type: ProgramType) => {
