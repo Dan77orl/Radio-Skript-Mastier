@@ -218,6 +218,11 @@ export default function ShowsPage() {
 
   const { data: programs, isLoading: isLoadingPrograms } = useQuery<Program[]>({
     queryKey: ["/api/programs", activeTab],
+    queryFn: async () => {
+      const res = await fetch(`/api/programs?typeId=${activeTab}`, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
     enabled: !!activeTab,
   });
 
