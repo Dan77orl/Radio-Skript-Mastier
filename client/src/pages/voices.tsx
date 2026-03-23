@@ -93,6 +93,17 @@ export default function VoicesPage() {
     retry: false,
   });
 
+  const selectVoice = (voice: ElevenLabsVoice) => {
+    setSelectedElevenLabsVoice(voice);
+    setPersonaName(voice.name);
+    const gender = voice.labels?.gender;
+    if (gender === "female") {
+      setPersonaGender("female");
+    } else if (gender === "male") {
+      setPersonaGender("male");
+    }
+  };
+
   const handleSearchInput = (value: string) => {
     setVoiceSearch(value);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -402,7 +413,7 @@ export default function VoicesPage() {
                                   ? "border-primary bg-primary/5"
                                   : ""
                               }`}
-                              onClick={() => setSelectedElevenLabsVoice(voice)}
+                              onClick={() => selectVoice(voice)}
                               data-testid={`voice-option-${voice.voice_id}`}
                             >
                               <div className="flex-1 min-w-0">
@@ -496,7 +507,7 @@ export default function VoicesPage() {
                                   ? "border-primary bg-primary/5"
                                   : ""
                               }`}
-                              onClick={() => setSelectedElevenLabsVoice(voice)}
+                              onClick={() => selectVoice(voice)}
                               data-testid={`voice-search-option-${voice.voice_id}`}
                             >
                               <div className="flex-1 min-w-0">
