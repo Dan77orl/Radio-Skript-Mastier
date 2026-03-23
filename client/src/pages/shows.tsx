@@ -663,6 +663,8 @@ export default function ShowsPage() {
         autoVoice: settingsType.autoVoice !== false,
         autoUpload: settingsType.autoUpload !== false,
         uploadFolder: settingsType.uploadFolder || null,
+        scheduleDays: settingsType.scheduleDays || [],
+        scheduleTime: settingsType.scheduleTime || "09:00",
         fileNameTemplate: settingsType.fileNameTemplate || "",
         useFirecrawl: settingsType.useFirecrawl || false,
         firecrawlTopics: settingsType.firecrawlTopics || [],
@@ -1603,6 +1605,58 @@ export default function ShowsPage() {
                         </Button>
                       </div>
                     </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium">Расписание</Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { day: 1, label: "Пн" },
+                          { day: 2, label: "Вт" },
+                          { day: 3, label: "Ср" },
+                          { day: 4, label: "Чт" },
+                          { day: 5, label: "Пт" },
+                          { day: 6, label: "Сб" },
+                          { day: 0, label: "Вс" },
+                        ].map(({ day, label }) => {
+                          const days = settingsType.scheduleDays || [];
+                          const isSelected = days.includes(day);
+                          return (
+                            <Button
+                              key={day}
+                              size="sm"
+                              variant={isSelected ? "default" : "outline"}
+                              className="h-8 w-10 p-0 text-xs"
+                              onClick={() => {
+                                const newDays = isSelected
+                                  ? days.filter((d: number) => d !== day)
+                                  : [...days, day].sort((a: number, b: number) => a - b);
+                                setSettingsType(prev => prev ? { ...prev, scheduleDays: newDays } : null);
+                              }}
+                              data-testid={`button-schedule-day-${day}`}
+                            >
+                              {label}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs whitespace-nowrap">Время запуска</Label>
+                        <Input
+                          type="time"
+                          className="w-28 h-8 text-sm"
+                          value={settingsType.scheduleTime || "09:00"}
+                          onChange={(e) => setSettingsType(prev => prev ? { ...prev, scheduleTime: e.target.value } : null)}
+                          data-testid="input-schedule-time"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {(!settingsType.scheduleDays || settingsType.scheduleDays.length === 0)
+                          ? "Дни не выбраны — генерация каждый день"
+                          : `Генерация: ${(settingsType.scheduleDays || []).map((d: number) => ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"][d]).join(", ")} в ${settingsType.scheduleTime || "09:00"}`
+                        }
+                      </p>
+                    </div>
+
                     {settingsType.autoUpload !== false && (
                       <div className="space-y-1">
                         <Label className="text-xs">Папка на облачном диске</Label>

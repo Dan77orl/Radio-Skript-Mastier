@@ -2442,6 +2442,18 @@ ${instructions || "Создай альтернативный вариант с �
       const durationRemSec = durationSec % 60;
       const durationStr = durationRemSec > 0 ? `${durationMin}:${String(durationRemSec).padStart(2, "0")}` : `${durationMin}:00`;
       prompt += `\n\nДата: ${dateStr}, выпуск #${nextSlot} из ${programType.dailyCount || 1}`;
+
+      const month = today.getMonth();
+      const seasonMap: Record<string, string> = {
+        winter: "Зима (декабрь-февраль). В Аланье мягкая зима, +12-18°C, дождливые дни. Период апельсинов и мандаринов, горнолыжный сезон рядом.",
+        spring: "Весна (март-май). В Аланье потепление +18-28°C, цветение, начало пляжного сезона. Рамадан, Навруз, пасхальные каникулы.",
+        summer: "Лето (июнь-август). В Аланье жарко +30-40°C, пик пляжного сезона, фрукты, летние фестивали. Закаты, ночная жизнь.",
+        autumn: "Осень (сентябрь-ноябрь). В Аланье бархатный сезон +22-30°C, гранаты, конец пляжного сезона, День Республики."
+      };
+      const season = month <= 1 || month === 11 ? "winter" : month <= 4 ? "spring" : month <= 7 ? "summer" : "autumn";
+      prompt += `\nСезон: ${seasonMap[season]}`;
+      prompt += `\nУчитывай текущий сезон и погоду при создании контента — темы, настроение и советы должны соответствовать времени года.`;
+
       prompt += `\nЦелевой хронометраж: ~${durationStr} минут. Рассчитывай объём текста под эту длительность.`;
 
       if (programType.useFirecrawl && programType.firecrawlTopics?.length) {
@@ -3644,7 +3656,24 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       const types = await storage.getProgramTypes();
       const autoTypes = types.filter(t => t.isActive && t.autoGenerate);
 
+      const now = new Date();
+      const currentDay = now.getDay();
+      const currentHour = now.getHours();
+
       for (const pType of autoTypes) {
+        if (pType.scheduleDays && pType.scheduleDays.length > 0) {
+          if (!pType.scheduleDays.includes(currentDay)) {
+            continue;
+          }
+        }
+
+        if (pType.scheduleTime) {
+          const [schedHour] = pType.scheduleTime.split(":").map(Number);
+          if (currentHour !== schedHour) {
+            continue;
+          }
+        }
+
         const weeklyCount = pType.weeklyCount || 7;
         const dailyCount = pType.dailyCount || 1;
         const today = new Date();

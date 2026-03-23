@@ -226,6 +226,8 @@ export const programTypes = pgTable("program_types", {
   autoVoice: boolean("auto_voice").default(true),
   autoUpload: boolean("auto_upload").default(true),
   uploadFolder: text("upload_folder"),
+  scheduleDays: integer("schedule_days").array(),
+  scheduleTime: text("schedule_time"),
   fileNameTemplate: text("file_name_template"),
   useFirecrawl: boolean("use_firecrawl").default(false),
   firecrawlTopics: text("firecrawl_topics").array(),
