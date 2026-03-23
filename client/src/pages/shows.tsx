@@ -457,6 +457,9 @@ export default function ShowsPage() {
     return !!matches && matches.length >= 2;
   };
 
+  const EMOTION_TAGS = ["energetic", "fast", "slow", "surprised", "thoughtful", "happy", "sad", "exclaims", "announcer", "serious", "calm", "excited", "warm", "dramatic", "whisper", "loud", "gentle", "playful", "confident"];
+  const tagPattern = new RegExp(`^\\s*\\[(${EMOTION_TAGS.join("|")})\\]`, "i");
+
   const parseScriptToBlocks = (scriptText: string): { text: string; speaker: string }[] => {
     if (isMultiSpeaker(scriptText)) {
       const blocks: { text: string; speaker: string }[] = [];
@@ -480,8 +483,30 @@ export default function ShowsPage() {
       return blocks;
     }
 
-    const paragraphs = scriptText.split(/\n\s*\n/).filter(p => p.trim());
-    return paragraphs.map(p => ({ text: p.trim(), speaker: "" }));
+    const blocks: { text: string; speaker: string }[] = [];
+    let currentText = "";
+    const lines = scriptText.split("\n");
+
+    for (const line of lines) {
+      if (tagPattern.test(line)) {
+        if (currentText.trim()) {
+          blocks.push({ text: currentText.trim(), speaker: "" });
+        }
+        currentText = line + "\n";
+      } else if (line.trim() === "") {
+        currentText += "\n";
+      } else {
+        currentText += line + "\n";
+      }
+    }
+    if (currentText.trim()) {
+      blocks.push({ text: currentText.trim(), speaker: "" });
+    }
+
+    if (blocks.length === 0) {
+      return [{ text: scriptText.trim(), speaker: "" }];
+    }
+    return blocks;
   };
 
   const blocksToScript = (blocks: { text: string; speaker: string }[]): string => {
