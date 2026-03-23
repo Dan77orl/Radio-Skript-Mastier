@@ -55,6 +55,8 @@ import {
   PackagePlus,
   CheckCircle2,
   XCircle,
+  Eye,
+  Users,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { ProgramType, Program, Settings as AppSettings, Voice } from "@shared/schema";
@@ -196,6 +198,7 @@ export default function ShowsPage() {
   const [batchCount, setBatchCount] = useState(10);
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchResult, setBatchResult] = useState<{ created: number; total: number; errors: string[] } | null>(null);
+  const [viewScriptProgram, setViewScriptProgram] = useState<Program | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: appSettings } = useQuery<AppSettings>({
@@ -378,6 +381,73 @@ export default function ShowsPage() {
     };
     const config = variants[status] || variants.pending;
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const speakerColors = [
+    "text-violet-600 dark:text-violet-400",
+    "text-emerald-600 dark:text-emerald-400",
+    "text-blue-600 dark:text-blue-400",
+    "text-orange-600 dark:text-orange-400",
+    "text-pink-600 dark:text-pink-400",
+  ];
+
+  const emotionTagPattern = /\[(energetic|fast|slow|surprised|thoughtful|happy|sad|exclaims|announcer|serious|calm|excited|warm|dramatic|whisper|loud|gentle|playful|confident|nervous|angry|romantic|mysterious|urgent|casual|formal|ironic|sarcastic)\]/gi;
+
+  const renderTextWithEmotionTags = (text: string) => {
+    const parts: Array<{ type: "text" | "tag"; value: string }> = [];
+    let lastIdx = 0;
+    let m;
+    const regex = new RegExp(emotionTagPattern.source, "gi");
+    while ((m = regex.exec(text)) !== null) {
+      if (m.index > lastIdx) {
+        parts.push({ type: "text", value: text.slice(lastIdx, m.index) });
+      }
+      parts.push({ type: "tag", value: m[0] });
+      lastIdx = regex.lastIndex;
+    }
+    if (lastIdx < text.length) {
+      parts.push({ type: "text", value: text.slice(lastIdx) });
+    }
+    return parts.map((p, j) =>
+      p.type === "tag" ? (
+        <span key={j} className="inline-block px-1 rounded text-xs bg-violet-100 dark:bg-violet-900 text-violet-700 dark:text-violet-300 mx-0.5">{p.value}</span>
+      ) : (
+        <span key={j}>{p.value}</span>
+      )
+    );
+  };
+
+  const renderMultiSpeakerScript = (scriptText: string) => {
+    const lines = scriptText.split("\n");
+    const speakerMap = new Map<string, number>();
+    let speakerIdx = 0;
+
+    return lines.map((line, i) => {
+      const match = line.match(/^\s*\[([^\]]+)\]:\s*(.*)/);
+      if (match) {
+        const speaker = match[1];
+        const content = match[2];
+        if (!speakerMap.has(speaker)) {
+          speakerMap.set(speaker, speakerIdx++);
+        }
+        const colorIdx = speakerMap.get(speaker)! % speakerColors.length;
+        return (
+          <div key={i} className="py-1.5 border-b border-border/30 last:border-0">
+            <span className={`font-semibold ${speakerColors[colorIdx]}`}>[{speaker}]:</span>{" "}
+            {renderTextWithEmotionTags(content)}
+          </div>
+        );
+      }
+      if (line.trim()) {
+        return <div key={i} className="py-0.5 text-muted-foreground">{line}</div>;
+      }
+      return null;
+    });
+  };
+
+  const isMultiSpeaker = (text: string) => {
+    const matches = text.match(/^\[([^\]]+)\]:/gm);
+    return !!matches && matches.length >= 2;
   };
 
   const openSettingsDialog = (type: ProgramType) => {
@@ -754,9 +824,22 @@ export default function ShowsPage() {
                               )}
                             </div>
                             {program.scriptText && (
-                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                                {program.scriptText.substring(0, 200)}...
-                              </p>
+                              <div className="mt-1">
+                                {isMultiSpeaker(program.scriptText) ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <Users className="h-3.5 w-3.5 text-violet-500" />
+                                    <span className="text-xs text-violet-600 dark:text-violet-400 font-medium">Мульти-спикер</span>
+                                    <span className="text-xs text-muted-foreground">•</span>
+                                    <span className="text-xs text-muted-foreground truncate max-w-xs">
+                                      {program.scriptText.match(/^\[([^\]]+)\]:/gm)?.map(m => m.replace(/[\[\]:]/g, "")).filter((v, i, a) => a.indexOf(v) === i).join(", ")}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-muted-foreground line-clamp-2">
+                                    {program.scriptText.substring(0, 200)}...
+                                  </p>
+                                )}
+                              </div>
                             )}
                             {program.scheduledDate && (
                               <p className="text-xs text-muted-foreground mt-1">
@@ -777,6 +860,16 @@ export default function ShowsPage() {
                                 ) : (
                                   "Сгенерировать скрипт"
                                 )}
+                              </Button>
+                            )}
+                            {program.scriptText && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setViewScriptProgram(program)}
+                                data-testid={`button-view-script-${program.id}`}
+                              >
+                                <Eye className="h-4 w-4" />
                               </Button>
                             )}
                             {program.status === "script_ready" && (
@@ -1206,6 +1299,32 @@ export default function ShowsPage() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewScriptProgram} onOpenChange={(open) => !open && setViewScriptProgram(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {viewScriptProgram?.scriptText && isMultiSpeaker(viewScriptProgram.scriptText) && (
+                <Users className="h-5 w-5 text-violet-500" />
+              )}
+              {viewScriptProgram?.title}
+            </DialogTitle>
+            <DialogDescription>
+              {viewScriptProgram?.scheduledDate && `Дата: ${viewScriptProgram.scheduledDate}`}
+              {viewScriptProgram?.slotNumber && ` • Слот #${viewScriptProgram.slotNumber}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-2">
+            {viewScriptProgram?.scriptText && isMultiSpeaker(viewScriptProgram.scriptText) ? (
+              <div className="space-y-0">{renderMultiSpeakerScript(viewScriptProgram.scriptText)}</div>
+            ) : (
+              <pre className="whitespace-pre-wrap text-sm font-sans leading-relaxed">
+                {viewScriptProgram?.scriptText}
+              </pre>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

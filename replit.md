@@ -55,6 +55,13 @@ Preferred communication style: Simple, everyday language.
 - Includes batch processing utilities with rate limiting and retries
 - Image generation capabilities available through gpt-image-1 model
 - **Batch Program Generation**: Accepts a URL (ChatGPT share link, web page) + voice/text instructions to auto-generate 5-50 programs in batch. Uses cheerio for HTML content extraction. Programs distributed across days based on dailyCount settings.
+- **Multi-Speaker Script Support**: When a program type has 2+ assigned voices, scripts are generated in multi-speaker format:
+  - Format: `[SpeakerName]: [emotion_tag] text...` with one speaker per line
+  - Emotion tags: `[energetic]`, `[fast]`, `[surprised]`, `[thoughtful]`, `[happy]`, `[announcer]`, etc.
+  - Tags are stripped before TTS synthesis; they serve as editorial/visual markers
+  - Audio generation: parses script into segments, matches speaker names to voices via `personaName`, synthesizes each segment separately, concatenates into one MP3 file
+  - Frontend renders multi-speaker scripts with color-coded speaker names and styled emotion tags
+  - Supports fuzzy speaker-to-voice matching (partial name match as fallback)
 
 ## External Dependencies
 

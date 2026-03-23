@@ -138,6 +138,47 @@ async function buildStationContext(): Promise<StationContext> {
   return { stationName, stationDescription, malePersona, femalePersona, personaList };
 }
 
+interface ScriptSegment {
+  speaker: string;
+  text: string;
+}
+
+function parseMultiSpeakerScript(scriptText: string): ScriptSegment[] {
+  const segments: ScriptSegment[] = [];
+  const lines = scriptText.split("\n");
+  let currentSpeaker = "";
+  let currentText = "";
+  
+  for (const line of lines) {
+    const speakerMatch = line.match(/^\s*\[([^\]]+)\]:\s*(.*)/);
+    if (speakerMatch) {
+      if (currentSpeaker && currentText.trim()) {
+        segments.push({ speaker: currentSpeaker, text: currentText.trim() });
+      }
+      currentSpeaker = speakerMatch[1];
+      currentText = speakerMatch[2];
+    } else if (currentSpeaker) {
+      currentText += " " + line;
+    }
+  }
+  
+  if (currentSpeaker && currentText.trim()) {
+    segments.push({ speaker: currentSpeaker, text: currentText.trim() });
+  }
+  
+  return segments;
+}
+
+function stripEmotionTags(text: string): string {
+  return text.replace(/\[(energetic|fast|slow|surprised|thoughtful|happy|sad|exclaims|announcer|serious|calm|excited|warm|dramatic|whisper|loud|gentle|playful|confident|nervous|angry|romantic|mysterious|urgent|casual|formal|ironic|sarcastic)\]/gi, "").replace(/\s{2,}/g, " ").trim();
+}
+
+function isMultiSpeakerScript(scriptText: string): boolean {
+  const speakerPattern = /^\[([^\]]+)\]:/m;
+  const matches = scriptText.match(new RegExp(speakerPattern.source, "gm"));
+  return !!matches && matches.length >= 2;
+}
+
 interface WeatherData {
   temperature: number;
   windspeed: number;
@@ -2358,12 +2399,29 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const ctx = await buildStationContext();
       const anthropic = await getAnthropicClient();
 
+      const voicesList = await storage.getVoices();
+      const assignedVoices = programType.assignedVoiceIds?.length
+        ? voicesList.filter(v => programType.assignedVoiceIds!.includes(v.id))
+        : [];
+      const isMultiSpeaker = assignedVoices.length >= 2;
+
       let prompt = `Создай ${totalCount} ГОТОВЫХ сценариев для радиопередачи "${programType.name}" на радио "${ctx.stationName}".
 
 Базовый промпт передачи:
 ${programType.defaultPrompt}
 
 `;
+
+      if (isMultiSpeaker) {
+        const speakerList = assignedVoices.map(v => v.personaName || v.name).join(", ");
+        prompt += `\nФОРМАТ: мульти-спикерный скрипт. Спикеры: ${speakerList}
+Каждая реплика начинается с [Имя]: и содержит теги эмоций.
+Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
+Пример:
+[${assignedVoices[0]?.personaName || assignedVoices[0]?.name}]: [energetic] [fast] Текст...
+[${assignedVoices[1]?.personaName || assignedVoices[1]?.name}]: [announcer] ЗАГОЛОВОК
+\n`;
+      }
 
       if (referenceContent) {
         prompt += `\nЭТАЛОНЫЙ КОНТЕНТ — изучи стиль, формат, тон. Создай новые выпуски ТОЧНО В ТАКОМ ЖЕ стиле:\n${referenceContent.substring(0, 30000)}\n`;
@@ -2387,10 +2445,10 @@ ${programType.defaultPrompt}
       prompt += `
 Ответь ТОЛЬКО JSON массивом из ${totalCount} объектов. Каждый объект:
 - "title": уникальное короткое название выпуска
-- "script": ПОЛНЫЙ ГОТОВЫЙ сценарий выпуска (текст для озвучки, с репликами ведущих)
+- "script": ПОЛНЫЙ ГОТОВЫЙ сценарий выпуска (текст для озвучки${isMultiSpeaker ? ", в мульти-спикерном формате [Имя]: [теги] текст" : ", с репликами ведущих"})
 
 Формат: [{"title":"...","script":"..."},...]
-Все ${totalCount} выпусков должны быть разными. Стиль и формат — как в эталоне.
+Все ${totalCount} выпусков должны быть разными.${referenceContent ? " Стиль и формат — как в эталоне." : ""}
 Ответь ТОЛЬКО JSON массивом, без пояснений.`;
 
       const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
@@ -2496,17 +2554,44 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       let scriptText: string;
 
       const ctx = await buildStationContext();
-      const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
+      const voicesList = await storage.getVoices();
+      const assignedVoices = programType.assignedVoiceIds?.length
+        ? voicesList.filter(v => programType.assignedVoiceIds!.includes(v.id))
+        : [];
+      const isMultiSpeaker = assignedVoices.length >= 2;
+
+      let systemPrompt: string;
+      if (isMultiSpeaker) {
+        const speakerList = assignedVoices.map(v => `${v.personaName || v.name}`).join(", ");
+        systemPrompt = `Ты - сценарист для радио "${ctx.stationName}".
+${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
+
+ФОРМАТ СКРИПТА — мульти-спикерный с тегами эмоций:
+Спикеры: ${speakerList}
+
+Каждая реплика начинается с [Имя]: и может содержать теги эмоций в квадратных скобках.
+Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
+
+Пример формата:
+[${assignedVoices[0]?.personaName || assignedVoices[0]?.name}]: [energetic] [fast] Привет! Текст первого спикера...
+[${assignedVoices[1]?.personaName || assignedVoices[1]?.name}]: [announcer] ЗАГОЛОВОК РУБРИКИ
+[${assignedVoices[0]?.personaName || assignedVoices[0]?.name}]: [surprised] Интересный факт! [thoughtful] Пояснение...
+
+Создавай контент на русском языке. Используй теги для придания выразительности.
+Обязательно чередуй спикеров, создавая динамичную передачу.`;
+      } else {
+        systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 Активные ведущие: ${ctx.personaList}.
 Создавай контент на русском языке в стиле радиостанции.`;
+      }
 
       const anthropic = await getAnthropicClient();
       
       if (anthropic) {
         const message = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 1024,
+          max_tokens: 2048,
           system: systemPrompt,
           messages: [{ role: "user", content: prompt }],
         });
@@ -2554,48 +2639,131 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       }
 
       const voicesList = await storage.getVoices();
-      const activeVoice = voicesList.find(v => v.isActive);
-      
-      if (!activeVoice) {
-        return res.status(400).json({ error: "No active voice configured" });
-      }
+      const programType = await storage.getProgramType(program.programTypeId);
 
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${activeVoice.elevenLabsVoiceId}`, {
-        method: "POST",
-        headers: {
-          "xi-api-key": settings.elevenLabsApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: program.scriptText,
-          model_id: "eleven_v3",
-          output_format: "mp3_44100_192",
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
+      const generateVoiceSegment = async (text: string, voiceId: string): Promise<Buffer> => {
+        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+          method: "POST",
+          headers: {
+            "xi-api-key": settings.elevenLabsApiKey!,
+            "Content-Type": "application/json",
           },
-        }),
-      });
+          body: JSON.stringify({
+            text,
+            model_id: "eleven_v3",
+            output_format: "mp3_44100_192",
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75,
+            },
+          }),
+        });
 
-      if (!response.ok) {
-        const error = await response.text();
-        console.error("ElevenLabs error:", error);
-        return res.status(500).json({ error: "Failed to generate audio" });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        return Buffer.from(arrayBuffer);
+      };
+
+      const audioDir = path.join(process.cwd(), "public", "audio");
+      await fs.mkdir(audioDir, { recursive: true });
+      const timestamp = Date.now();
+
+      if (isMultiSpeakerScript(program.scriptText)) {
+        const segments = parseMultiSpeakerScript(program.scriptText);
+        if (segments.length === 0) {
+          return res.status(400).json({ error: "Не удалось распарсить мульти-спикерный скрипт" });
+        }
+
+        const assignedVoices = programType?.assignedVoiceIds?.length
+          ? voicesList.filter(v => programType.assignedVoiceIds!.includes(v.id))
+          : voicesList.filter(v => v.isActive);
+
+        const speakerVoiceMap = new Map<string, string>();
+        for (const voice of assignedVoices) {
+          const speakerName = voice.personaName || voice.name;
+          speakerVoiceMap.set(speakerName.toLowerCase(), voice.elevenLabsVoiceId);
+        }
+
+        const audioBuffers: Buffer[] = [];
+        let segmentErrors: string[] = [];
+
+        for (let i = 0; i < segments.length; i++) {
+          const segment = segments[i];
+          const cleanText = stripEmotionTags(segment.text);
+          if (!cleanText) continue;
+
+          let voiceId = speakerVoiceMap.get(segment.speaker.toLowerCase());
+          if (!voiceId) {
+            for (const [name, vid] of speakerVoiceMap.entries()) {
+              if (segment.speaker.toLowerCase().includes(name) || name.includes(segment.speaker.toLowerCase())) {
+                voiceId = vid;
+                break;
+              }
+            }
+          }
+          if (!voiceId) {
+            voiceId = assignedVoices[0]?.elevenLabsVoiceId;
+          }
+          if (!voiceId) {
+            segmentErrors.push(`Сегмент ${i + 1}: голос не найден для "${segment.speaker}"`);
+            continue;
+          }
+
+          try {
+            console.log(`Synthesizing segment ${i + 1}/${segments.length}: [${segment.speaker}] (${cleanText.length} chars)`);
+            const buffer = await generateVoiceSegment(cleanText, voiceId);
+            audioBuffers.push(buffer);
+          } catch (err) {
+            console.error(`Segment ${i + 1} synthesis error:`, err);
+            segmentErrors.push(`Сегмент ${i + 1} (${segment.speaker}): ошибка синтеза`);
+          }
+        }
+
+        if (audioBuffers.length === 0) {
+          return res.status(500).json({ error: "Не удалось озвучить ни один сегмент", details: segmentErrors });
+        }
+
+        const combined = Buffer.concat(audioBuffers);
+        const filename = `program_${timestamp}.mp3`;
+        await fs.writeFile(path.join(audioDir, filename), combined);
+
+        const totalExpected = segments.filter(s => stripEmotionTags(s.text).length > 0).length;
+        const hasErrors = segmentErrors.length > 0;
+        const status = hasErrors ? (audioBuffers.length < totalExpected ? "error" : "ready") : "ready";
+
+        const updated = await storage.updateProgram(program.id, {
+          audioUrl: `/audio/${filename}`,
+          status,
+        });
+
+        res.json({ ...updated, segmentCount: audioBuffers.length, totalSegments: totalExpected, errors: segmentErrors });
+      } else {
+        const activeVoice = programType?.assignedVoiceIds?.length
+          ? voicesList.find(v => programType.assignedVoiceIds!.includes(v.id))
+          : voicesList.find(v => v.isActive);
+
+        if (!activeVoice) {
+          return res.status(400).json({ error: "No active voice configured" });
+        }
+
+        const buffer = await generateVoiceSegment(program.scriptText, activeVoice.elevenLabsVoiceId);
+        const filename = `program_${timestamp}.mp3`;
+        await fs.writeFile(path.join(audioDir, filename), buffer);
+
+        const updated = await storage.updateProgram(program.id, {
+          audioUrl: `/audio/${filename}`,
+          status: "ready",
+        });
+
+        res.json(updated);
       }
-
-      const audioBuffer = await response.arrayBuffer();
-      const base64Audio = Buffer.from(audioBuffer).toString("base64");
-      const audioUrl = `data:audio/mpeg;base64,${base64Audio}`;
-
-      const updated = await storage.updateProgram(program.id, {
-        audioUrl,
-        status: "ready",
-      });
-
-      res.json(updated);
     } catch (error) {
       console.error("Error generating program audio:", error);
-      res.status(500).json({ error: "Failed to generate program audio" });
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate program audio" });
     }
   });
 
