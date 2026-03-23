@@ -22,14 +22,9 @@ const menuItems = [
     icon: LayoutDashboard,
   },
   {
-    title: "Генератор диалогов",
-    url: "/generator",
+    title: "Подводки",
+    url: "/podvodki",
     icon: Mic,
-  },
-  {
-    title: "Расписание",
-    url: "/schedule",
-    icon: Calendar,
   },
   {
     title: "Передачи",

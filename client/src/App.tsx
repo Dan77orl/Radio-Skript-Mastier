@@ -10,6 +10,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import Dashboard from "@/pages/dashboard";
 import Generator from "@/pages/generator";
 import Schedule from "@/pages/schedule";
+import Podvodki from "@/pages/podvodki";
 import NewsSources from "@/pages/news-sources";
 import AdsPage from "@/pages/ads";
 import VoicesPage from "@/pages/voices";
@@ -22,6 +23,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/podvodki" component={Podvodki} />
       <Route path="/generator" component={Generator} />
       <Route path="/schedule" component={Schedule} />
       <Route path="/news-sources" component={NewsSources} />

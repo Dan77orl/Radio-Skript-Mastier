@@ -62,7 +62,7 @@ function getHolidayInfo(dateString: string): string | null {
   return null;
 }
 
-export default function Generator() {
+export default function Generator({ embedded }: { embedded?: boolean }) {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [expandedSlots, setExpandedSlots] = useState<Set<number>>(new Set());
@@ -272,13 +272,15 @@ export default function Generator() {
   const hasAnyDialogs = dialogsForDate.length > 0;
 
   return (
-    <div className="flex-1 space-y-6 p-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Генератор диалогов</h1>
-          <p className="text-muted-foreground">Автоматическая генерация подводок на весь день</p>
+    <div className={`flex-1 space-y-6 ${embedded ? "" : "p-6"}`}>
+      {!embedded && (
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Генератор диалогов</h1>
+            <p className="text-muted-foreground">Автоматическая генерация подводок на весь день</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">

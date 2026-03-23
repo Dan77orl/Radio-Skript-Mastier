@@ -139,10 +139,10 @@ export default function Dashboard() {
               Передачи
             </Button>
           </Link>
-          <Link href="/schedule">
-            <Button variant="outline" data-testid="button-go-schedule">
-              <Calendar className="mr-2 h-4 w-4" />
-              Расписание
+          <Link href="/podvodki">
+            <Button variant="outline" data-testid="button-go-podvodki">
+              <Mic className="mr-2 h-4 w-4" />
+              Подводки
             </Button>
           </Link>
         </div>

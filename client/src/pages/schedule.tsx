@@ -35,7 +35,7 @@ function getStatusInfo(status: string) {
   }
 }
 
-export default function Schedule() {
+export default function Schedule({ embedded }: { embedded?: boolean }) {
   const { toast } = useToast();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -163,12 +163,14 @@ export default function Schedule() {
   const dayNames = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
   return (
-    <div className="flex-1 space-y-6 p-6">
+    <div className={`flex-1 space-y-6 ${embedded ? "" : "p-6"}`}>
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Расписание</h1>
-          <p className="text-muted-foreground">Подводки по дням недели</p>
-        </div>
+        {!embedded && (
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Расписание</h1>
+            <p className="text-muted-foreground">Подводки по дням недели</p>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={() => navigateWeek(-1)} data-testid="button-prev-week">
             <ChevronLeft className="h-4 w-4" />
