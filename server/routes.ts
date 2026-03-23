@@ -2094,6 +2094,106 @@ ${instructions || "Создай альтернативный вариант с �
     }
   });
 
+  app.post("/api/elevenlabs/voices/add-shared", async (req, res) => {
+    try {
+      const settings = await storage.getSettings();
+      if (!settings?.elevenLabsApiKey) {
+        return res.status(400).json({ error: "ElevenLabs API key not configured" });
+      }
+
+      const { public_owner_id, voice_id, name } = req.body;
+      if (!public_owner_id || !voice_id || !name) {
+        return res.status(400).json({ error: "Missing required fields: public_owner_id, voice_id, name" });
+      }
+
+      const response = await fetch("https://api.elevenlabs.io/v1/voices/add", {
+        method: "POST",
+        headers: {
+          "xi-api-key": settings.elevenLabsApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          public_user_id: public_owner_id,
+          voice_id: voice_id,
+          new_name: name,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("ElevenLabs add shared voice error:", errorText);
+        return res.status(response.status).json({ error: "Failed to add shared voice to account" });
+      }
+
+      const data = await response.json();
+      res.json({ voice_id: data.voice_id || voice_id });
+    } catch (error) {
+      console.error("Error adding shared voice:", error);
+      res.status(500).json({ error: "Failed to add shared voice" });
+    }
+  });
+
+  app.get("/api/elevenlabs/voices/search", async (req, res) => {
+    try {
+      const settings = await storage.getSettings();
+      if (!settings?.elevenLabsApiKey) {
+        return res.status(400).json({ error: "ElevenLabs API key not configured" });
+      }
+
+      const query = (req.query.q as string) || "";
+      const gender = req.query.gender as string | undefined;
+      const page = parseInt(req.query.page as string) || 0;
+      const pageSize = 20;
+
+      const params = new URLSearchParams({
+        page_size: String(pageSize),
+        page: String(page),
+      });
+      if (query) params.append("search", query);
+      if (gender && gender !== "all") params.append("gender", gender);
+
+      const response = await fetch(`https://api.elevenlabs.io/v1/shared-voices?${params.toString()}`, {
+        headers: {
+          "xi-api-key": settings.elevenLabsApiKey,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error("ElevenLabs search error:", error);
+        return res.status(response.status).json({ error: "Failed to search voices" });
+      }
+
+      const data = await response.json();
+      const voicesList = data.voices?.map((v: any) => ({
+        voice_id: v.voice_id || v.public_owner_id,
+        public_owner_id: v.public_owner_id,
+        name: v.name,
+        category: v.category || "shared",
+        labels: {
+          gender: v.gender,
+          accent: v.accent,
+          age: v.age,
+          language: v.language,
+          use_case: v.use_case,
+        },
+        preview_url: v.preview_url,
+        description: v.description || v.name,
+        rate: v.rate,
+        cloned_by_count: v.cloned_by_count,
+      })) || [];
+
+      res.json({
+        voices: voicesList,
+        has_more: data.has_more || false,
+        total_count: data.total_count || voicesList.length,
+      });
+    } catch (error) {
+      console.error("Error searching ElevenLabs voices:", error);
+      res.status(500).json({ error: "Failed to search voices" });
+    }
+  });
+
   // Program Types routes
   app.get("/api/program-types", async (req, res) => {
     try {

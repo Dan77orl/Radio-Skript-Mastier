@@ -35,7 +35,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Play, Pause, Plus, Trash2, Volume2, User, Users, Mic, Edit2 } from "lucide-react";
+import { Play, Pause, Plus, Trash2, Volume2, User, Users, Mic, Edit2, Search, Loader2, Globe } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VoiceInput } from "@/components/voice-input";
 import type { Voice, ProgramType } from "@shared/schema";
 
@@ -58,6 +59,11 @@ export default function VoicesPage() {
   const [personaGender, setPersonaGender] = useState("male");
   const [selectedProgramTypes, setSelectedProgramTypes] = useState<string[]>([]);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const [voiceSearch, setVoiceSearch] = useState("");
+  const [voiceSearchQuery, setVoiceSearchQuery] = useState("");
+  const [voiceTab, setVoiceTab] = useState<"my" | "search">("my");
+  const [searchGender, setSearchGender] = useState("all");
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: voices, isLoading } = useQuery<Voice[]>({
@@ -72,6 +78,28 @@ export default function VoicesPage() {
     queryKey: ["/api/elevenlabs/voices"],
     retry: false,
   });
+
+  const { data: searchData, isLoading: isSearching, isError: isSearchError } = useQuery<{ voices: ElevenLabsVoice[]; has_more: boolean; total_count: number }>({
+    queryKey: ["/api/elevenlabs/voices/search", voiceSearchQuery, searchGender],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (voiceSearchQuery) params.append("q", voiceSearchQuery);
+      if (searchGender !== "all") params.append("gender", searchGender);
+      const res = await fetch(`/api/elevenlabs/voices/search?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    enabled: voiceTab === "search",
+    retry: false,
+  });
+
+  const handleSearchInput = (value: string) => {
+    setVoiceSearch(value);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      setVoiceSearchQuery(value);
+    }, 500);
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: { name: string; elevenLabsVoiceId: string; gender: string; previewUrl: string; description: string; assignedProgramTypeIds?: string[] }) => {
@@ -169,7 +197,7 @@ export default function VoicesPage() {
     };
   };
 
-  const handleAddVoice = () => {
+  const handleAddVoice = async () => {
     if (!selectedElevenLabsVoice || !personaName.trim()) {
       toast({
         title: "Заполните все поля",
@@ -179,9 +207,31 @@ export default function VoicesPage() {
       return;
     }
 
+    let voiceId = selectedElevenLabsVoice.voice_id;
+    const isSharedVoice = voiceTab === "search" && (selectedElevenLabsVoice as any).public_owner_id;
+
+    if (isSharedVoice) {
+      try {
+        const res = await apiRequest("POST", "/api/elevenlabs/voices/add-shared", {
+          public_owner_id: (selectedElevenLabsVoice as any).public_owner_id,
+          voice_id: selectedElevenLabsVoice.voice_id,
+          name: selectedElevenLabsVoice.name,
+        });
+        const data = await res.json();
+        voiceId = data.voice_id;
+      } catch (err) {
+        toast({
+          title: "Ошибка",
+          description: "Не удалось добавить голос из библиотеки в ваш аккаунт",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     createMutation.mutate({
       name: personaName.trim(),
-      elevenLabsVoiceId: selectedElevenLabsVoice.voice_id,
+      elevenLabsVoiceId: voiceId,
       gender: personaGender,
       previewUrl: selectedElevenLabsVoice.preview_url,
       description: selectedElevenLabsVoice.name,
@@ -234,7 +284,7 @@ export default function VoicesPage() {
             <Users className="mr-1 h-3 w-3" />
             {voicesCount} / 4 персон
           </Badge>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (open) { setVoiceTab("my"); setVoiceSearch(""); setVoiceSearchQuery(""); setSearchGender("all"); } setIsAddDialogOpen(open); }}>
             <DialogTrigger asChild>
               <Button disabled={!canAddMore} data-testid="button-add-voice">
                 <Plus className="mr-2 h-4 w-4" />
@@ -320,87 +370,188 @@ export default function VoicesPage() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Голос ElevenLabs</label>
-                  {isLoadingElevenLabs ? (
-                    <div className="space-y-2">
-                      {Array.from({ length: 5 }, (_, i) => (
-                        <Skeleton key={i} className="h-16 w-full" />
-                      ))}
-                    </div>
-                  ) : isElevenLabsError ? (
-                    <div className="text-center py-8 border rounded-lg bg-destructive/5">
-                      <Volume2 className="h-12 w-12 mx-auto mb-3 text-destructive/50" />
-                      <p className="text-sm text-destructive mb-2">Не удалось загрузить голоса</p>
-                      <p className="text-xs text-muted-foreground">
-                        Проверьте API ключ ElevenLabs в настройках
-                      </p>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="mt-3"
-                        onClick={() => window.location.href = "/settings"}
-                      >
-                        Перейти в настройки
-                      </Button>
-                    </div>
-                  ) : elevenLabsData?.voices && elevenLabsData.voices.length > 0 ? (
-                    <div className="grid gap-2 max-h-[300px] overflow-y-auto">
-                      {elevenLabsData.voices.map((voice) => (
-                        <div
-                          key={voice.voice_id}
-                          className={`flex items-center justify-between gap-3 p-3 rounded-lg border cursor-pointer hover-elevate ${
-                            selectedElevenLabsVoice?.voice_id === voice.voice_id
-                              ? "border-primary bg-primary/5"
-                              : ""
-                          }`}
-                          onClick={() => setSelectedElevenLabsVoice(voice)}
-                          data-testid={`voice-option-${voice.voice_id}`}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium">{voice.name}</span>
-                              {voice.labels?.gender && (
-                                <Badge variant="secondary" className="text-xs">
-                                  {voice.labels.gender === "male" ? "М" : "Ж"}
-                                </Badge>
-                              )}
-                              {voice.category && (
-                                <Badge variant="outline" className="text-xs">
-                                  {voice.category}
-                                </Badge>
+                  <Tabs value={voiceTab} onValueChange={(v) => setVoiceTab(v as "my" | "search")}>
+                    <TabsList className="w-full">
+                      <TabsTrigger value="my" className="flex-1" data-testid="tab-my-voices" onClick={() => setSelectedElevenLabsVoice(null)}>
+                        <Mic className="h-4 w-4 mr-1" /> Мои голоса
+                      </TabsTrigger>
+                      <TabsTrigger value="search" className="flex-1" data-testid="tab-search-voices" onClick={() => setSelectedElevenLabsVoice(null)}>
+                        <Globe className="h-4 w-4 mr-1" /> Поиск в библиотеке
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="my" className="mt-2">
+                      {isLoadingElevenLabs ? (
+                        <div className="space-y-2">
+                          {Array.from({ length: 3 }, (_, i) => (
+                            <Skeleton key={i} className="h-16 w-full" />
+                          ))}
+                        </div>
+                      ) : isElevenLabsError ? (
+                        <div className="text-center py-6 border rounded-lg bg-destructive/5">
+                          <Volume2 className="h-10 w-10 mx-auto mb-2 text-destructive/50" />
+                          <p className="text-sm text-destructive mb-1">Не удалось загрузить голоса</p>
+                          <p className="text-xs text-muted-foreground">Проверьте API ключ в настройках</p>
+                        </div>
+                      ) : elevenLabsData?.voices && elevenLabsData.voices.length > 0 ? (
+                        <div className="grid gap-2 max-h-[300px] overflow-y-auto">
+                          {elevenLabsData.voices.map((voice) => (
+                            <div
+                              key={voice.voice_id}
+                              className={`flex items-center justify-between gap-3 p-3 rounded-lg border cursor-pointer hover-elevate ${
+                                selectedElevenLabsVoice?.voice_id === voice.voice_id
+                                  ? "border-primary bg-primary/5"
+                                  : ""
+                              }`}
+                              onClick={() => setSelectedElevenLabsVoice(voice)}
+                              data-testid={`voice-option-${voice.voice_id}`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-medium">{voice.name}</span>
+                                  {voice.labels?.gender && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {voice.labels.gender === "male" ? "М" : "Ж"}
+                                    </Badge>
+                                  )}
+                                  {voice.category && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {voice.category}
+                                    </Badge>
+                                  )}
+                                </div>
+                                {voice.labels?.accent && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Акцент: {voice.labels.accent}
+                                  </p>
+                                )}
+                              </div>
+                              {voice.preview_url && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    playPreview(voice.preview_url, voice.voice_id);
+                                  }}
+                                  data-testid={`button-preview-${voice.voice_id}`}
+                                >
+                                  {playingVoiceId === voice.voice_id ? (
+                                    <Pause className="h-4 w-4" />
+                                  ) : (
+                                    <Play className="h-4 w-4" />
+                                  )}
+                                </Button>
                               )}
                             </div>
-                            {voice.labels?.accent && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Акцент: {voice.labels.accent}
-                              </p>
-                            )}
-                          </div>
-                          {voice.preview_url && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                playPreview(voice.preview_url, voice.voice_id);
-                              }}
-                              data-testid={`button-preview-${voice.voice_id}`}
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-6 text-muted-foreground">
+                          <Volume2 className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">Добавьте API ключ ElevenLabs в настройках</p>
+                        </div>
+                      )}
+                    </TabsContent>
+                    <TabsContent value="search" className="mt-2 space-y-3">
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Поиск голосов..."
+                            value={voiceSearch}
+                            onChange={(e) => handleSearchInput(e.target.value)}
+                            className="pl-9"
+                            data-testid="input-voice-search"
+                          />
+                        </div>
+                        <Select value={searchGender} onValueChange={setSearchGender}>
+                          <SelectTrigger className="w-32" data-testid="select-search-gender">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Все</SelectItem>
+                            <SelectItem value="male">Мужские</SelectItem>
+                            <SelectItem value="female">Женские</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {isSearching ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                          <span className="ml-2 text-sm text-muted-foreground">Поиск...</span>
+                        </div>
+                      ) : isSearchError ? (
+                        <div className="text-center py-6 border rounded-lg bg-destructive/5">
+                          <Volume2 className="h-10 w-10 mx-auto mb-2 text-destructive/50" />
+                          <p className="text-sm text-destructive mb-1">Ошибка поиска голосов</p>
+                          <p className="text-xs text-muted-foreground">Проверьте API ключ ElevenLabs в настройках</p>
+                        </div>
+                      ) : searchData?.voices && searchData.voices.length > 0 ? (
+                        <div className="grid gap-2 max-h-[300px] overflow-y-auto">
+                          {searchData.voices.map((voice) => (
+                            <div
+                              key={voice.voice_id}
+                              className={`flex items-center justify-between gap-3 p-3 rounded-lg border cursor-pointer hover-elevate ${
+                                selectedElevenLabsVoice?.voice_id === voice.voice_id
+                                  ? "border-primary bg-primary/5"
+                                  : ""
+                              }`}
+                              onClick={() => setSelectedElevenLabsVoice(voice)}
+                              data-testid={`voice-search-option-${voice.voice_id}`}
                             >
-                              {playingVoiceId === voice.voice_id ? (
-                                <Pause className="h-4 w-4" />
-                              ) : (
-                                <Play className="h-4 w-4" />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-medium truncate">{voice.name}</span>
+                                  {voice.labels?.gender && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {voice.labels.gender === "male" ? "М" : "Ж"}
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="text-xs">
+                                    {voice.category}
+                                  </Badge>
+                                </div>
+                                <div className="flex gap-2 text-xs text-muted-foreground mt-1">
+                                  {voice.labels?.accent && <span>Акцент: {voice.labels.accent}</span>}
+                                  {voice.labels?.language && <span>• {voice.labels.language}</span>}
+                                  {voice.labels?.use_case && <span>• {voice.labels.use_case}</span>}
+                                </div>
+                              </div>
+                              {voice.preview_url && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    playPreview(voice.preview_url, voice.voice_id);
+                                  }}
+                                  data-testid={`button-search-preview-${voice.voice_id}`}
+                                >
+                                  {playingVoiceId === voice.voice_id ? (
+                                    <Pause className="h-4 w-4" />
+                                  ) : (
+                                    <Play className="h-4 w-4" />
+                                  )}
+                                </Button>
                               )}
-                            </Button>
+                            </div>
+                          ))}
+                          {searchData.has_more && (
+                            <p className="text-xs text-center text-muted-foreground py-2">
+                              Показано {searchData.voices.length} из {searchData.total_count}. Уточните поиск для более точных результатов.
+                            </p>
                           )}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Volume2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                      <p>Добавьте API ключ ElevenLabs в настройках</p>
-                    </div>
-                  )}
+                      ) : (
+                        <div className="text-center py-6 text-muted-foreground">
+                          <Search className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">
+                            {voiceSearchQuery ? "Голоса не найдены" : "Введите запрос для поиска"}
+                          </p>
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
                 </div>
               </div>
 
@@ -527,7 +678,7 @@ export default function VoicesPage() {
               <p className="text-muted-foreground text-center mb-4">
                 Добавьте до 4 персон с голосами для радио-диалогов
               </p>
-              <Button onClick={() => setIsAddDialogOpen(true)} disabled={!canAddMore}>
+              <Button onClick={() => { setVoiceTab("my"); setVoiceSearch(""); setVoiceSearchQuery(""); setSearchGender("all"); setIsAddDialogOpen(true); }} disabled={!canAddMore}>
                 <Plus className="mr-2 h-4 w-4" />
                 Добавить первую персону
               </Button>
