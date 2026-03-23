@@ -201,6 +201,7 @@ export default function ShowsPage() {
   const [viewScriptProgram, setViewScriptProgram] = useState<Program | null>(null);
   const [editingBlocks, setEditingBlocks] = useState<{ text: string; speaker: string }[] | null>(null);
   const [savingScript, setSavingScript] = useState(false);
+  const [generatingAudioId, setGeneratingAudioId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: appSettings } = useQuery<AppSettings>({
@@ -282,10 +283,12 @@ export default function ShowsPage() {
 
   const generateAudioMutation = useMutation({
     mutationFn: async (id: string) => {
+      setGeneratingAudioId(id);
       const response = await apiRequest("POST", `/api/programs/${id}/generate-audio`);
       return response.json();
     },
     onSuccess: (data) => {
+      setGeneratingAudioId(null);
       queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
       if (viewScriptProgram && data?.id === viewScriptProgram.id) {
         setViewScriptProgram({ ...viewScriptProgram, status: "ready", audioUrl: data.audioUrl });
@@ -293,6 +296,7 @@ export default function ShowsPage() {
       toast({ title: "Аудио сгенерировано" });
     },
     onError: (error: Error) => {
+      setGeneratingAudioId(null);
       toast({ title: "Ошибка", description: error.message, variant: "destructive" });
     },
   });
@@ -976,10 +980,10 @@ export default function ShowsPage() {
                               <Button
                                 size="sm"
                                 onClick={() => generateAudioMutation.mutate(program.id)}
-                                disabled={generateAudioMutation.isPending}
+                                disabled={generatingAudioId === program.id}
                                 data-testid={`button-generate-audio-${program.id}`}
                               >
-                                {generateAudioMutation.isPending ? (
+                                {generatingAudioId === program.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
                                   "Озвучить"
@@ -1475,10 +1479,10 @@ export default function ShowsPage() {
                     onClick={() => {
                       generateAudioMutation.mutate(viewScriptProgram.id);
                     }}
-                    disabled={generateAudioMutation.isPending}
+                    disabled={generatingAudioId === viewScriptProgram.id}
                     data-testid="button-generate-audio-viewer"
                   >
-                    {generateAudioMutation.isPending ? (
+                    {generatingAudioId === viewScriptProgram.id ? (
                       <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Озвучивается...</>
                     ) : (
                       <><Volume2 className="mr-2 h-4 w-4" /> Озвучить</>
