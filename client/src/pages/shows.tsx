@@ -58,7 +58,10 @@ import {
   Eye,
   Users,
   Download,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import type { ProgramType, Program, Settings as AppSettings, Voice } from "@shared/schema";
 
@@ -209,6 +212,8 @@ export default function ShowsPage() {
   const [audioQueue, setAudioQueue] = useState<string[]>([]);
   const [generatingAudioId, setGeneratingAudioId] = useState<string | null>(null);
   const audioQueueRef = useRef<string[]>([]);
+  const [selectedPrograms, setSelectedPrograms] = useState<Set<string>>(new Set());
+  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: appSettings } = useQuery<AppSettings>({
@@ -914,7 +919,7 @@ export default function ShowsPage() {
                       ) : (
                         <Zap className="mr-2 h-4 w-4" />
                       )}
-                      Создать
+                      Сценарий
                     </Button>
                     <Button
                       variant="outline"
@@ -926,8 +931,25 @@ export default function ShowsPage() {
                       data-testid="button-batch-create"
                     >
                       <PackagePlus className="mr-2 h-4 w-4" />
-                      Пакетная
+                      Пакет сценариев
                     </Button>
+                    {selectedPrograms.size > 0 && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          const toVoice = filteredPrograms
+                            .filter(p => selectedPrograms.has(p.id) && p.scriptText && (p.status === "script_ready" || p.audioUrl))
+                            .map(p => p.id);
+                          toVoice.forEach(id => enqueueAudio(id));
+                          setSelectedPrograms(new Set());
+                        }}
+                        data-testid="button-bulk-voice"
+                      >
+                        <Volume2 className="mr-2 h-4 w-4" />
+                        Озвучить ({selectedPrograms.size})
+                      </Button>
+                    )}
                     {type.autoGenerate && (
                       <Button
                         variant="secondary"
@@ -960,17 +982,75 @@ export default function ShowsPage() {
                     <Volume2 className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
                     <p className="text-muted-foreground">Нет передач этого типа</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Нажмите "Создать" для автоматической генерации
+                      Нажмите «Сценарий» для генерации
                     </p>
                   </CardContent>
                 </Card>
-              ) : (
-                <div className="space-y-3">
-                  {filteredPrograms.map((program) => (
+              ) : (() => {
+                const grouped = filteredPrograms.reduce<Record<string, Program[]>>((acc, p) => {
+                  const date = p.scheduledDate || "Без даты";
+                  if (!acc[date]) acc[date] = [];
+                  acc[date].push(p);
+                  return acc;
+                }, {});
+                const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+                return (
+                <div className="space-y-2">
+                  {sortedDates.map(date => {
+                    const datePrograms = grouped[date];
+                    const isCollapsed = collapsedDates.has(date);
+                    const allSelected = datePrograms.every(p => selectedPrograms.has(p.id));
+                    const someSelected = datePrograms.some(p => selectedPrograms.has(p.id));
+
+                    return (
+                      <div key={date}>
+                        <div
+                          className="flex items-center gap-2 py-2 px-1 cursor-pointer hover:bg-muted/50 rounded-md"
+                          onClick={() => setCollapsedDates(prev => {
+                            const next = new Set(prev);
+                            if (next.has(date)) next.delete(date); else next.add(date);
+                            return next;
+                          })}
+                          data-testid={`date-group-${date}`}
+                        >
+                          <Checkbox
+                            checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                            onCheckedChange={(checked) => {
+                              setSelectedPrograms(prev => {
+                                const next = new Set(prev);
+                                datePrograms.forEach(p => {
+                                  if (checked) next.add(p.id); else next.delete(p.id);
+                                });
+                                return next;
+                              });
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`checkbox-date-${date}`}
+                          />
+                          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          <span className="text-sm font-medium">{date}</span>
+                          <Badge variant="outline" className="text-xs">{datePrograms.length}</Badge>
+                        </div>
+                        {!isCollapsed && (
+                          <div className="space-y-2 ml-2">
+                            {datePrograms.map((program) => (
                     <Card key={program.id}>
                       <CardContent className="py-4">
                         <div className="flex items-center justify-between gap-4 flex-wrap">
-                          <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <Checkbox
+                              checked={selectedPrograms.has(program.id)}
+                              onCheckedChange={(checked) => {
+                                setSelectedPrograms(prev => {
+                                  const next = new Set(prev);
+                                  if (checked) next.add(program.id); else next.delete(program.id);
+                                  return next;
+                                });
+                              }}
+                              data-testid={`checkbox-program-${program.id}`}
+                            />
+                            <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="font-medium truncate" data-testid={`text-program-title-${program.id}`}>{program.title}</h3>
                               {getStatusBadge(program.status)}
@@ -998,11 +1078,7 @@ export default function ShowsPage() {
                                 )}
                               </div>
                             )}
-                            {program.scheduledDate && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {program.scheduledDate}
-                              </p>
-                            )}
+                          </div>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
                             {program.status === "pending" && (
@@ -1096,9 +1172,15 @@ export default function ShowsPage() {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
+                );
+              })()}
             </TabsContent>
           );
         })}
