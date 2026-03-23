@@ -201,6 +201,7 @@ export default function ShowsPage() {
   const [batchCount, setBatchCount] = useState(10);
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchResult, setBatchResult] = useState<{ created: number; total: number; errors: string[] } | null>(null);
+  const [batchProgress, setBatchProgress] = useState(0);
   const [viewScriptProgram, setViewScriptProgram] = useState<Program | null>(null);
   const [editingBlocks, setEditingBlocks] = useState<{ text: string; speaker: string }[] | null>(null);
   const [savingScript, setSavingScript] = useState(false);
@@ -625,42 +626,32 @@ export default function ShowsPage() {
     if (!activeTab) return;
     setBatchGenerating(true);
     setBatchResult(null);
+    setBatchProgress(0);
     try {
-      let referenceContent = "";
-      let referenceUrl = "";
+      const results: { created: number; total: number; errors: string[] } = { created: 0, total: batchCount, errors: [] };
 
-      if (batchMode === "url" && batchUrl.trim()) {
-        const urlResponse = await apiRequest("POST", "/api/fetch-url-content", { url: batchUrl.trim() });
-        const urlData = await urlResponse.json();
-        referenceContent = urlData.text;
-        referenceUrl = batchUrl.trim();
-        toast({ title: "Контент загружен", description: `${Math.round(urlData.length / 1000)}K символов` });
-      } else if (batchMode === "text" && batchText.trim()) {
-        referenceContent = batchText.trim();
+      for (let i = 0; i < batchCount; i++) {
+        setBatchProgress(i + 1);
+        try {
+          const response = await apiRequest("POST", `/api/programs/auto-create/${activeTab}`);
+          await response.json();
+          results.created++;
+        } catch (err: any) {
+          results.errors.push(`#${i + 1}: ${err.message || "Ошибка"}`);
+        }
       }
 
-      if (!referenceContent) {
-        toast({ title: "Нет контента", description: "Вставьте текст или укажите ссылку", variant: "destructive" });
-        setBatchGenerating(false);
-        return;
-      }
-
-      const response = await apiRequest("POST", `/api/programs/batch-create/${activeTab}`, {
-        count: batchCount,
-        referenceContent,
-        referenceUrl: referenceUrl || null,
-      });
-      const data = await response.json();
-      setBatchResult(data);
+      setBatchResult(results);
       queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
       toast({ 
         title: "Готово!", 
-        description: `Создано ${data.created} из ${data.total} передач`,
+        description: `Создано ${results.created} из ${results.total} передач`,
       });
     } catch (error) {
       toast({ title: "Ошибка", description: error instanceof Error ? error.message : "Ошибка генерации", variant: "destructive" });
     } finally {
       setBatchGenerating(false);
+      setBatchProgress(0);
     }
   };
 
@@ -913,7 +904,7 @@ export default function ShowsPage() {
                     <Button
                       size="sm"
                       onClick={() => autoCreateMutation.mutate(type.id)}
-                      disabled={autoCreateMutation.isPending || !typeCanCreate}
+                      disabled={autoCreateMutation.isPending}
                       data-testid="button-auto-create"
                     >
                       {autoCreateMutation.isPending ? (
@@ -921,9 +912,7 @@ export default function ShowsPage() {
                       ) : (
                         <Zap className="mr-2 h-4 w-4" />
                       )}
-                      {typeCanCreate 
-                        ? `Создать #${typeTodayCount + 1}`
-                        : "Все на сегодня готовы"}
+                      Создать
                     </Button>
                     <Button
                       variant="outline"
@@ -1472,7 +1461,7 @@ export default function ShowsPage() {
               Пакетная генерация: {currentType?.name}
             </DialogTitle>
             <DialogDescription>
-              Скопируйте текст из ChatGPT/Claude или вставьте ссылку на веб-страницу
+              Выберите количество и создайте несколько выпусков за один раз
             </DialogDescription>
           </DialogHeader>
 
@@ -1509,61 +1498,6 @@ export default function ShowsPage() {
             </div>
           ) : (
             <div className="space-y-5 py-4">
-              <div className="flex gap-1 mb-1">
-                <Button
-                  variant={batchMode === "text" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setBatchMode("text")}
-                  disabled={batchGenerating}
-                  data-testid="button-batch-mode-text"
-                >
-                  Вставить текст
-                </Button>
-                <Button
-                  variant={batchMode === "url" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setBatchMode("url")}
-                  disabled={batchGenerating}
-                  data-testid="button-batch-mode-url"
-                >
-                  Ссылка на страницу
-                </Button>
-              </div>
-
-              {batchMode === "text" ? (
-                <div className="space-y-2">
-                  <Label>Скопируйте текст из ChatGPT / Claude</Label>
-                  <Textarea
-                    placeholder="Скопируйте и вставьте сюда текст из чата, где вы генерировали передачи..."
-                    value={batchText}
-                    onChange={(e) => setBatchText(e.target.value)}
-                    rows={8}
-                    disabled={batchGenerating}
-                    data-testid="input-batch-text"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Откройте чат в ChatGPT или Claude, выделите весь текст (Ctrl+A), скопируйте (Ctrl+C) и вставьте сюда
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Link className="h-4 w-4" />
-                    Ссылка на веб-страницу
-                  </Label>
-                  <Input
-                    placeholder="https://example.com/article..."
-                    value={batchUrl}
-                    onChange={(e) => setBatchUrl(e.target.value)}
-                    disabled={batchGenerating}
-                    data-testid="input-batch-url"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Работает с обычными веб-страницами, статьями, блогами. Ссылки ChatGPT/Claude не поддерживаются — используйте вставку текста.
-                  </p>
-                </div>
-              )}
-
               <div className="space-y-2">
                 <Label>Сколько выпусков создать</Label>
                 <Select
@@ -1580,15 +1514,18 @@ export default function ShowsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Каждый выпуск создаётся по промпту типа передачи{currentType?.useFirecrawl ? " + свежие данные из Firecrawl" : ""}
+                </p>
               </div>
 
               {batchGenerating && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm">Генерирую выпуски... Это может занять несколько минут</span>
+                    <span className="text-sm">Создаю {batchProgress} из {batchCount}...</span>
                   </div>
-                  <Progress value={undefined} className="h-2" />
+                  <Progress value={(batchProgress / batchCount) * 100} className="h-2" />
                 </div>
               )}
 
@@ -1598,13 +1535,13 @@ export default function ShowsPage() {
                 </Button>
                 <Button
                   onClick={startBatchGeneration}
-                  disabled={batchGenerating || (batchMode === "url" ? !batchUrl.trim() : !batchText.trim())}
+                  disabled={batchGenerating}
                   data-testid="button-start-batch"
                 >
                   {batchGenerating ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Генерация...
+                      {batchProgress} / {batchCount}
                     </>
                   ) : (
                     <>

@@ -2400,19 +2400,10 @@ ${instructions || "Создай альтернативный вариант с �
 
       const today = new Date();
       const dateStr = today.toISOString().split("T")[0];
-      const dailyCount = programType.dailyCount || 1;
 
       const existingPrograms = await storage.getProgramsByType(programType.id);
       const todayPrograms = existingPrograms.filter(p => p.scheduledDate === dateStr);
       const nextSlot = todayPrograms.length + 1;
-
-      if (nextSlot > dailyCount) {
-        return res.status(400).json({ 
-          error: `Все ${dailyCount} выпуск(ов) на сегодня уже созданы`,
-          todayCount: todayPrograms.length,
-          dailyCount,
-        });
-      }
 
       const slotDesc = programType.slotDescriptions?.[nextSlot - 1] || "";
       let prompt = programType.defaultPrompt;
