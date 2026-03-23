@@ -40,3 +40,8 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_openai_ai_integrations:2.0.0", "javascript_database:1.0.0", "javascript_anthropic:1.0.0", "javascript_gemini_ai_integrations:2.0.0"]
+
+[userenv]
+
+[userenv.shared]
+FIRECRAWL_API_KEY = "fc-16ab984a25aa43efbff48ee903efe25d"

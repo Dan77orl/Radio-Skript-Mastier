@@ -2307,6 +2307,90 @@ ${instructions || "Создай альтернативный вариант с �
     }
   });
 
+  async function firecrawlSearch(query: string, limit: number = 5): Promise<string[]> {
+    const apiKey = process.env.FIRECRAWL_API_KEY;
+    if (!apiKey) return [];
+
+    try {
+      const response = await fetch("https://api.firecrawl.dev/v1/search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          query,
+          limit,
+          lang: "ru",
+          scrapeOptions: { formats: ["markdown"] },
+        }),
+      });
+
+      if (!response.ok) {
+        console.error(`Firecrawl search error: ${response.status}`);
+        return [];
+      }
+
+      const data = await response.json();
+      const results: string[] = [];
+
+      for (const item of (data.data || [])) {
+        const content = item.markdown || item.description || "";
+        if (content.trim()) {
+          results.push(content.substring(0, 2000));
+        }
+      }
+
+      return results;
+    } catch (err: any) {
+      console.error("Firecrawl search error:", err.message);
+      return [];
+    }
+  }
+
+  async function researchForProgram(topics: string[]): Promise<string> {
+    if (!topics || topics.length === 0) return "";
+
+    const allResults: string[] = [];
+    for (const topic of topics.slice(0, 3)) {
+      const results = await firecrawlSearch(topic, 3);
+      allResults.push(...results);
+    }
+
+    if (allResults.length === 0) return "";
+
+    return `\n\nАКТУАЛЬНЫЕ ДАННЫЕ ИЗ ИНТЕРНЕТА (используй как основу для фактов и новостей в передаче):\n${allResults.map((r, i) => `--- Источник ${i + 1} ---\n${r}`).join("\n\n")}\n\nИспользуй эти реальные данные для создания точного, актуального контента. Не выдумывай статистику — бери из источников выше.`;
+  }
+
+  app.post("/api/firecrawl/search", async (req, res) => {
+    try {
+      const { query, limit } = req.body;
+      if (!query) return res.status(400).json({ error: "Query required" });
+
+      const results = await firecrawlSearch(query, limit || 5);
+      res.json({ results, count: results.length });
+    } catch (error) {
+      console.error("Firecrawl search error:", error);
+      res.status(500).json({ error: "Search failed" });
+    }
+  });
+
+  app.post("/api/firecrawl/research/:typeId", async (req, res) => {
+    try {
+      const programType = await storage.getProgramType(req.params.typeId);
+      if (!programType) return res.status(404).json({ error: "Type not found" });
+
+      const topics = req.body.topics || programType.firecrawlTopics || [];
+      if (topics.length === 0) return res.status(400).json({ error: "No topics configured" });
+
+      const research = await researchForProgram(topics);
+      res.json({ research, topicsUsed: topics });
+    } catch (error) {
+      console.error("Firecrawl research error:", error);
+      res.status(500).json({ error: "Research failed" });
+    }
+  });
+
   app.post("/api/programs/auto-create/:typeId", async (req, res) => {
     try {
       const programType = await storage.getProgramType(req.params.typeId);
@@ -2344,6 +2428,17 @@ ${instructions || "Создай альтернативный вариант с �
       }
 
       prompt += `\n\nДата: ${dateStr}, выпуск #${nextSlot} из ${dailyCount}`;
+
+      if (programType.useFirecrawl && programType.firecrawlTopics?.length) {
+        try {
+          const research = await researchForProgram(programType.firecrawlTopics);
+          if (research) {
+            prompt += research;
+          }
+        } catch (err: any) {
+          console.error("Firecrawl research in auto-create failed:", err.message);
+        }
+      }
 
       const title = `${programType.name} ${dateStr} #${nextSlot}`;
 

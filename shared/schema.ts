@@ -225,6 +225,8 @@ export const programTypes = pgTable("program_types", {
   weeklyCount: integer("weekly_count").default(7),
   autoVoice: boolean("auto_voice").default(true),
   autoUpload: boolean("auto_upload").default(true),
+  useFirecrawl: boolean("use_firecrawl").default(false),
+  firecrawlTopics: text("firecrawl_topics").array(),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 

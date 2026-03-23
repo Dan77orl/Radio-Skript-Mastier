@@ -88,6 +88,14 @@ Preferred communication style: Simple, everyday language.
 - **Manual Trigger**: `POST /api/run-scheduler` — forces immediate scheduler run
 - **UI Controls**: Settings dialog shows auto-generation toggle with weekly count, auto-voice, and auto-upload options. "Пайплайн" button visible when auto-generate is enabled
 
+### Firecrawl Integration
+- **API Key**: Stored in `FIRECRAWL_API_KEY` environment variable
+- **Search Endpoint**: `POST /api/firecrawl/search` — searches web via Firecrawl API, returns markdown content
+- **Research Endpoint**: `POST /api/firecrawl/research/:typeId` — runs topic-based research for a program type
+- **Auto-Create Integration**: When `useFirecrawl=true` on a program type, auto-create fetches fresh web content based on `firecrawlTopics` array and injects it into the AI prompt as factual source material
+- **Schema Fields**: `useFirecrawl: boolean`, `firecrawlTopics: text[]` on `programTypes` table
+- **UI**: Settings dialog has Firecrawl section with topic management (add/remove badges), test search button, and toggle
+
 ### Build and Development
 - Vite plugins for Replit integration (cartographer, dev-banner, runtime-error-modal)
 - esbuild for production server bundling with specific dependency allowlist

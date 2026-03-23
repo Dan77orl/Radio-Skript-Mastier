@@ -191,6 +191,9 @@ export default function ShowsPage() {
   const [newTypeDailyCount, setNewTypeDailyCount] = useState(1);
   const [playingProgramId, setPlayingProgramId] = useState<string | null>(null);
   const [slotInputs, setSlotInputs] = useState<string[]>([]);
+  const [firecrawlTopicInput, setFirecrawlTopicInput] = useState("");
+  const [firecrawlTestResult, setFirecrawlTestResult] = useState<string | null>(null);
+  const [firecrawlTesting, setFirecrawlTesting] = useState(false);
   const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
   const [batchUrl, setBatchUrl] = useState("");
   const [batchText, setBatchText] = useState("");
@@ -589,6 +592,8 @@ export default function ShowsPage() {
   const openSettingsDialog = (type: ProgramType) => {
     setSettingsType({ ...type });
     setSlotInputs(type.slotDescriptions || []);
+    setFirecrawlTopicInput("");
+    setFirecrawlTestResult(null);
     setIsSettingsDialogOpen(true);
   };
 
@@ -610,6 +615,8 @@ export default function ShowsPage() {
         weeklyCount: settingsType.weeklyCount || 7,
         autoVoice: settingsType.autoVoice !== false,
         autoUpload: settingsType.autoUpload !== false,
+        useFirecrawl: settingsType.useFirecrawl || false,
+        firecrawlTopics: settingsType.firecrawlTopics || [],
       },
     });
   };
@@ -1257,6 +1264,106 @@ export default function ShowsPage() {
                   </div>
                 );
               })()}
+
+              <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
+                <Label className="text-base font-semibold">Firecrawl — поиск контента</Label>
+                <p className="text-xs text-muted-foreground">
+                  Автоматический поиск актуальной информации из интернета для подготовки передач
+                </p>
+                <div className="flex items-center gap-3">
+                  <Button
+                    size="sm"
+                    variant={settingsType.useFirecrawl ? "default" : "outline"}
+                    onClick={() => setSettingsType(prev => prev ? { ...prev, useFirecrawl: !prev.useFirecrawl } : null)}
+                    data-testid="button-toggle-firecrawl"
+                  >
+                    {settingsType.useFirecrawl ? "Включен" : "Выключен"}
+                  </Button>
+                </div>
+                {settingsType.useFirecrawl && (
+                  <div className="space-y-3 mt-2">
+                    <div className="space-y-2">
+                      <span className="text-xs text-muted-foreground">Темы для поиска (каждая тема — отдельный поисковый запрос)</span>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {(settingsType.firecrawlTopics || []).map((topic: string, idx: number) => (
+                          <Badge key={idx} variant="secondary" className="text-sm py-1 px-3 cursor-pointer" data-testid={`badge-topic-${idx}`}
+                            onClick={() => {
+                              setSettingsType(prev => {
+                                if (!prev) return null;
+                                const topics = [...(prev.firecrawlTopics || [])];
+                                topics.splice(idx, 1);
+                                return { ...prev, firecrawlTopics: topics };
+                              });
+                            }}
+                          >
+                            {topic} ✕
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Новая тема: психология стресс 2025..."
+                          value={firecrawlTopicInput}
+                          onChange={(e) => setFirecrawlTopicInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && firecrawlTopicInput.trim()) {
+                              setSettingsType(prev => prev ? {
+                                ...prev,
+                                firecrawlTopics: [...(prev.firecrawlTopics || []), firecrawlTopicInput.trim()],
+                              } : null);
+                              setFirecrawlTopicInput("");
+                            }
+                          }}
+                          data-testid="input-firecrawl-topic"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (firecrawlTopicInput.trim()) {
+                              setSettingsType(prev => prev ? {
+                                ...prev,
+                                firecrawlTopics: [...(prev.firecrawlTopics || []), firecrawlTopicInput.trim()],
+                              } : null);
+                              setFirecrawlTopicInput("");
+                            }
+                          }}
+                          data-testid="button-add-topic"
+                        >
+                          +
+                        </Button>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={firecrawlTesting || !(settingsType.firecrawlTopics?.length)}
+                      onClick={async () => {
+                        setFirecrawlTesting(true);
+                        setFirecrawlTestResult(null);
+                        try {
+                          const topic = settingsType.firecrawlTopics?.[0] || "";
+                          const res = await apiRequest("POST", "/api/firecrawl/search", { query: topic, limit: 2 });
+                          const data = await res.json();
+                          setFirecrawlTestResult(`Найдено ${data.count} результатов для "${topic}":\n${data.results?.map((r: string) => r.substring(0, 200)).join("\n---\n") || "Пусто"}`);
+                        } catch (err: any) {
+                          setFirecrawlTestResult(`Ошибка: ${err.message}`);
+                        }
+                        setFirecrawlTesting(false);
+                      }}
+                      data-testid="button-test-firecrawl"
+                    >
+                      {firecrawlTesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Тест поиска
+                    </Button>
+                    {firecrawlTestResult && (
+                      <pre className="text-xs bg-muted p-3 rounded max-h-40 overflow-y-auto whitespace-pre-wrap" data-testid="text-firecrawl-result">
+                        {firecrawlTestResult}
+                      </pre>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
                 <Label className="text-base font-semibold">Авто-генерация</Label>
