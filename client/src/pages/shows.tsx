@@ -285,8 +285,11 @@ export default function ShowsPage() {
       const response = await apiRequest("POST", `/api/programs/${id}/generate-audio`);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
+      if (viewScriptProgram && data?.id === viewScriptProgram.id) {
+        setViewScriptProgram({ ...viewScriptProgram, status: "ready", audioUrl: data.audioUrl });
+      }
       toast({ title: "Аудио сгенерировано" });
     },
     onError: (error: Error) => {
@@ -1460,14 +1463,29 @@ export default function ShowsPage() {
                   {viewScriptProgram?.scriptText}
                 </pre>
               )}
-              {viewScriptProgram?.programTypeId && getAssignedVoicesForType(viewScriptProgram.programTypeId).length >= 1 && (
-                <div className="mt-4 flex justify-end">
+              <div className="mt-4 flex justify-end gap-2">
+                {viewScriptProgram?.programTypeId && getAssignedVoicesForType(viewScriptProgram.programTypeId).length >= 1 && (
                   <Button variant="outline" onClick={startEditingScript} data-testid="button-assign-speakers">
                     <Users className="mr-2 h-4 w-4" />
                     {viewScriptProgram?.scriptText && isMultiSpeaker(viewScriptProgram.scriptText) ? "Переназначить дикторов" : "Назначить дикторов"}
                   </Button>
-                </div>
-              )}
+                )}
+                {viewScriptProgram && viewScriptProgram.status === "script_ready" && (
+                  <Button
+                    onClick={() => {
+                      generateAudioMutation.mutate(viewScriptProgram.id);
+                    }}
+                    disabled={generateAudioMutation.isPending}
+                    data-testid="button-generate-audio-viewer"
+                  >
+                    {generateAudioMutation.isPending ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Озвучивается...</>
+                    ) : (
+                      <><Volume2 className="mr-2 h-4 w-4" /> Озвучить</>
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>
