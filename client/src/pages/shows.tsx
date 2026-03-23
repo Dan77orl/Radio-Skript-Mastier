@@ -904,121 +904,127 @@ export default function ShowsPage() {
           return (
             <TabsContent key={type.id} value={type.id} className="space-y-4">
               <Card>
-                <CardHeader className="flex flex-row items-start justify-between gap-4">
-                  <div className="space-y-2 flex-1 min-w-0">
-                    <CardTitle className="flex items-center gap-2 flex-wrap">
-                      <Icon className="h-5 w-5" />
-                      {type.name}
-                    </CardTitle>
-                    <CardDescription>{type.description}</CardDescription>
-                    <div className="flex items-center gap-3 flex-wrap text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5" />
-                        {typeTodayCount}/{typeDaily} на сегодня
-                      </span>
-                      {type.sponsorName && (
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <CardTitle className="flex items-center gap-2">
+                        <Icon className="h-5 w-5" />
+                        {type.name}
+                      </CardTitle>
+                      <CardDescription>{type.description}</CardDescription>
+                      <div className="flex items-center gap-3 flex-wrap text-sm text-muted-foreground pt-1">
                         <span className="flex items-center gap-1">
-                          <Megaphone className="h-3.5 w-3.5" />
-                          Спонсор: {type.sponsorName}
+                          <Calendar className="h-3.5 w-3.5" />
+                          {typeTodayCount}/{typeDaily} на сегодня
                         </span>
-                      )}
-                      {currentSlotDesc && typeCanCreate && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3.5 w-3.5" />
-                          След.: {currentSlotDesc.length > 50 ? currentSlotDesc.substring(0, 50) + "..." : currentSlotDesc}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditingType(type);
-                        setIsEditPromptDialogOpen(true);
-                      }}
-                      data-testid="button-edit-prompt"
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      Промпт
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openSettingsDialog(type)}
-                      data-testid="button-type-settings"
-                    >
-                      <Settings className="mr-2 h-4 w-4" />
-                      Настройки
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5 bg-background">
-                      <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Вручную:</span>
-                      <Button
-                        size="sm"
-                        onClick={() => autoCreateMutation.mutate(type.id)}
-                        disabled={autoCreateMutation.isPending}
-                        data-testid="button-auto-create"
-                      >
-                        {autoCreateMutation.isPending ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Zap className="mr-2 h-4 w-4" />
+                        {type.sponsorName && (
+                          <span className="flex items-center gap-1">
+                            <Megaphone className="h-3.5 w-3.5" />
+                            Спонсор: {type.sponsorName}
+                          </span>
                         )}
-                        Сценарий
-                      </Button>
+                        {currentSlotDesc && typeCanCreate && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            След.: {currentSlotDesc.length > 50 ? currentSlotDesc.substring(0, 50) + "..." : currentSlotDesc}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          resetBatchDialog();
-                          setIsBatchDialogOpen(true);
+                          setEditingType(type);
+                          setIsEditPromptDialogOpen(true);
                         }}
-                        data-testid="button-batch-create"
+                        data-testid="button-edit-prompt"
                       >
-                        <PackagePlus className="mr-2 h-4 w-4" />
-                        Пакет
+                        <FileText className="mr-2 h-4 w-4" />
+                        Промпт
                       </Button>
-                      {selectedPrograms.size > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openSettingsDialog(type)}
+                        data-testid="button-type-settings"
+                      >
+                        <Settings className="mr-2 h-4 w-4" />
+                        Настройки
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t mt-3">
+                    <div className="flex items-center gap-2 rounded-lg border px-3 py-2 bg-muted/30">
+                      <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Вручную:</span>
+                      <div className="flex items-center gap-1.5">
                         <Button
                           size="sm"
-                          variant="secondary"
-                          onClick={() => {
-                            const toVoice = filteredPrograms
-                              .filter(p => selectedPrograms.has(p.id) && p.scriptText && (p.status === "script_ready" || p.audioUrl))
-                              .map(p => p.id);
-                            toVoice.forEach(id => enqueueAudio(id));
-                            setSelectedPrograms(new Set());
-                          }}
-                          data-testid="button-bulk-voice"
+                          onClick={() => autoCreateMutation.mutate(type.id)}
+                          disabled={autoCreateMutation.isPending}
+                          data-testid="button-auto-create"
                         >
-                          <Volume2 className="mr-2 h-4 w-4" />
-                          Озвучить ({selectedPrograms.size})
+                          {autoCreateMutation.isPending ? (
+                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Zap className="mr-1.5 h-4 w-4" />
+                          )}
+                          Сценарий
                         </Button>
-                      )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            resetBatchDialog();
+                            setIsBatchDialogOpen(true);
+                          }}
+                          data-testid="button-batch-create"
+                        >
+                          <PackagePlus className="mr-1.5 h-4 w-4" />
+                          Пакет
+                        </Button>
+                        {selectedPrograms.size > 0 && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              const toVoice = filteredPrograms
+                                .filter(p => selectedPrograms.has(p.id) && p.scriptText && (p.status === "script_ready" || p.audioUrl))
+                                .map(p => p.id);
+                              toVoice.forEach(id => enqueueAudio(id));
+                              setSelectedPrograms(new Set());
+                            }}
+                            data-testid="button-bulk-voice"
+                          >
+                            <Volume2 className="mr-1.5 h-4 w-4" />
+                            Озвучить ({selectedPrograms.size})
+                          </Button>
+                        )}
+                      </div>
                     </div>
+
                     {type.autoGenerate && (
-                      <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2.5 rounded-lg border px-3 py-2 bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                          <span className="text-xs font-medium text-green-700 dark:text-green-400 whitespace-nowrap">Авто:</span>
+                          <span className="text-xs font-medium text-green-700 dark:text-green-400">Авто:</span>
                         </div>
-                        <span className="text-xs text-green-600 dark:text-green-400">
+                        <span className="text-xs text-green-600 dark:text-green-400 leading-relaxed">
                           {type.scheduleDays && type.scheduleDays.length > 0
                             ? `${type.scheduleDays.map((d: number) => ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"][d]).join(", ")} в ${type.scheduleTime || "09:00"}`
                             : `Ежедневно в ${type.scheduleTime || "09:00"}`
                           }
-                          {" | "}{type.weeklyCount || 7}/нед
-                          {type.autoVoice !== false && " | озвучка"}
-                          {type.autoIsolate && " | шумодав"}
-                          {type.autoUpload !== false && " | выгрузка"}
+                          {" · "}{type.weeklyCount || 7}/нед
+                          {type.autoVoice !== false && " · озвучка"}
+                          {type.autoIsolate && " · шумодав"}
+                          {type.autoUpload !== false && " · выгрузка"}
                         </span>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-7 border-green-300 dark:border-green-700"
+                          className="h-7 shrink-0 border-green-300 dark:border-green-700 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900"
                           onClick={() => pipelineMutation.mutate({ typeId: type.id, count: Math.ceil((type.weeklyCount || 7) / 7) })}
                           disabled={pipelineMutation.isPending}
                           data-testid="button-run-pipeline"
