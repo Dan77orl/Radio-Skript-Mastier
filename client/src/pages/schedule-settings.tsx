@@ -19,7 +19,7 @@ import { Plus, Trash2, Clock, Users, Calendar, Settings2, Loader2, Edit3, Chevro
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Voice } from "@shared/schema";
+import type { Voice, InsertScheduleTemplate, InsertHostShift } from "@shared/schema";
 
 interface ScheduleTemplate {
   id: string;
@@ -92,7 +92,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
   });
 
   const createTemplateMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: InsertScheduleTemplate) => {
       const res = await apiRequest("POST", "/api/schedule-templates", data);
       return res.json();
     },
@@ -105,7 +105,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
   });
 
   const updateTemplateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: Partial<InsertScheduleTemplate> }) => {
       const res = await apiRequest("PATCH", `/api/schedule-templates/${id}`, data);
       return res.json();
     },
@@ -129,7 +129,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
   });
 
   const createShiftMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: InsertHostShift) => {
       const res = await apiRequest("POST", "/api/host-shifts", data);
       return res.json();
     },

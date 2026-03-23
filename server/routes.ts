@@ -1277,9 +1277,9 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         dailyCount = settings?.dailyDialogsCount || 12;
       }
 
-      const holidayInfo = getHolidayInfo(date);
-      const holidayContext = holidayInfo.length > 0
-        ? `\nСегодня праздник: ${holidayInfo.map(h => h.nameRu).join(", ")}. Учти это в диалогах.`
+      const holidayInfoStr = getHolidayInfo(date);
+      const holidayContext = holidayInfoStr
+        ? `\nСегодня праздник: ${holidayInfoStr}. Учти это в диалогах.`
         : "";
 
       const ctx = await buildStationContext();
@@ -3776,20 +3776,28 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
   app.get("/api/holidays", async (req, res) => {
     try {
-      const { year, month, date } = req.query;
+      const { year, month, date, country } = req.query;
+
+      const filterByCountry = (holidays: ReturnType<typeof getHolidaysForDate>) => {
+        if (!country || typeof country !== "string") return holidays;
+        const c = country.toUpperCase();
+        return holidays.filter(h => h.country === c || h.country === "BOTH");
+      };
+
       if (date && typeof date === "string") {
-        const holidays = getHolidaysForDate(date);
-        return res.json(holidays);
+        return res.json(filterByCountry(getHolidaysForDate(date)));
       }
       if (year) {
         const y = parseInt(year as string);
+        if (isNaN(y)) return res.status(400).json({ error: "Invalid year" });
         if (month) {
           const m = parseInt(month as string);
-          return res.json(getHolidaysForMonth(y, m));
+          if (isNaN(m) || m < 1 || m > 12) return res.status(400).json({ error: "Invalid month" });
+          return res.json(filterByCountry(getHolidaysForMonth(y, m)));
         }
-        return res.json(getHolidaysForYear(y));
+        return res.json(filterByCountry(getHolidaysForYear(y)));
       }
-      return res.json(getHolidaysForYear(new Date().getFullYear()));
+      return res.json(filterByCountry(getHolidaysForYear(new Date().getFullYear())));
     } catch (error) {
       res.status(500).json({ error: "Failed to get holidays" });
     }
@@ -3941,6 +3949,11 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       const template = await storage.getTemplateForWeekday(weekday);
       const settings = await storage.getSettings();
 
+      const allHolidays = getHolidaysForDate(date);
+      const stationLoc = settings?.stationLocation?.toLowerCase() || "";
+      const stationCountry = stationLoc.includes("турц") || stationLoc.includes("turkey") || stationLoc.includes("alanya") || stationLoc.includes("аланья") ? "TR" : "RU";
+      const holidays = allHolidays.filter(h => h.country === stationCountry || h.country === "BOTH");
+
       if (!template) {
         const totalSlots = settings?.dailyDialogsCount || 12;
         const slots = [];
@@ -3959,7 +3972,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
             voiceIds: null,
           });
         }
-        return res.json({ template: null, slots, holidays: getHolidaysForDate(date) });
+        return res.json({ template: null, slots, holidays });
       }
 
       const shifts = await storage.getHostShifts(template.id);
@@ -3983,7 +3996,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
         });
       }
 
-      return res.json({ template, slots, holidays: getHolidaysForDate(date) });
+      return res.json({ template, slots, holidays });
     } catch (error) {
       res.status(500).json({ error: "Failed to resolve slots" });
     }
