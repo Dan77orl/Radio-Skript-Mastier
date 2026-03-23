@@ -2418,7 +2418,12 @@ ${instructions || "Создай альтернативный вариант с �
         }
       }
 
+      const durationSec = programType.defaultDurationSeconds || 60;
+      const durationMin = Math.floor(durationSec / 60);
+      const durationRemSec = durationSec % 60;
+      const durationStr = durationRemSec > 0 ? `${durationMin}:${String(durationRemSec).padStart(2, "0")}` : `${durationMin}:00`;
       prompt += `\n\nДата: ${dateStr}, выпуск #${nextSlot} из ${programType.dailyCount || 1}`;
+      prompt += `\nЦелевой хронометраж: ~${durationStr} минут. Рассчитывай объём текста под эту длительность.`;
 
       if (programType.useFirecrawl && programType.firecrawlTopics?.length) {
         try {
