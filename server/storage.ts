@@ -136,6 +136,7 @@ export class DatabaseStorage implements IStorage {
           stationLogo: newSettings.stationLogo ?? existing.stationLogo,
           stationDescription: newSettings.stationDescription ?? existing.stationDescription,
           stationWebsite: newSettings.stationWebsite ?? existing.stationWebsite,
+          stationLocation: newSettings.stationLocation ?? existing.stationLocation,
           stationAttachments: newSettings.stationAttachments ?? existing.stationAttachments,
         })
         .where(eq(settings.id, existing.id))
