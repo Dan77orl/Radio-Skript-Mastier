@@ -567,7 +567,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
   app.post("/api/generate-audio", async (req, res) => {
     try {
-      const { maleText, femaleText, title, scheduledDate, slotNumber } = req.body;
+      const { maleText, femaleText, title, scheduledDate, slotNumber, dialogId } = req.body;
       
       if (!maleText || !femaleText) {
         return res.status(400).json({ error: "Both male and female texts are required" });
@@ -579,17 +579,35 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       }
 
       const voicesList = await storage.getVoices();
-      const maleVoice = voicesList.find(v => v.gender === "male" && v.isActive);
-      const femaleVoice = voicesList.find(v => v.gender === "female" && v.isActive);
+
+      let maleVoiceId: string | undefined;
+      let femaleVoiceId: string | undefined;
+
+      if (dialogId) {
+        const dialog = await storage.getDialog(dialogId);
+        if (dialog?.hostVoiceIds && dialog.hostVoiceIds.length > 0) {
+          for (const vid of dialog.hostVoiceIds) {
+            const voice = voicesList.find(v => v.id === vid);
+            if (voice?.gender === "male" && !maleVoiceId) maleVoiceId = voice.elevenLabsVoiceId;
+            if (voice?.gender === "female" && !femaleVoiceId) femaleVoiceId = voice.elevenLabsVoiceId;
+          }
+        }
+      }
+
+      if (!maleVoiceId) {
+        const maleVoice = voicesList.find(v => v.gender === "male" && v.isActive);
+        maleVoiceId = maleVoice?.elevenLabsVoiceId;
+      }
+      if (!femaleVoiceId) {
+        const femaleVoice = voicesList.find(v => v.gender === "female" && v.isActive);
+        femaleVoiceId = femaleVoice?.elevenLabsVoiceId;
+      }
       
-      if (!maleVoice || !femaleVoice) {
+      if (!maleVoiceId || !femaleVoiceId) {
         return res.status(400).json({ 
           error: "Необходимо добавить активные мужской и женский голоса в разделе 'Голоса'" 
         });
       }
-      
-      const maleVoiceId = maleVoice.elevenLabsVoiceId;
-      const femaleVoiceId = femaleVoice.elevenLabsVoiceId;
 
       const generateVoice = async (text: string, voiceId: string): Promise<Buffer> => {
         const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
@@ -3778,10 +3796,22 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
     try {
       const { year, month, date, country } = req.query;
 
+      let resolvedCountry: string | null = null;
+      if (country && typeof country === "string") {
+        resolvedCountry = country.toUpperCase();
+      } else {
+        const stSettings = await storage.getSettings();
+        const loc = stSettings?.stationLocation?.toLowerCase() || "";
+        if (loc.includes("турц") || loc.includes("turkey") || loc.includes("alanya") || loc.includes("аланья")) {
+          resolvedCountry = "TR";
+        } else if (loc) {
+          resolvedCountry = "RU";
+        }
+      }
+
       const filterByCountry = (holidays: ReturnType<typeof getHolidaysForDate>) => {
-        if (!country || typeof country !== "string") return holidays;
-        const c = country.toUpperCase();
-        return holidays.filter(h => h.country === c || h.country === "BOTH");
+        if (!resolvedCountry) return holidays;
+        return holidays.filter(h => h.country === resolvedCountry || h.country === "BOTH");
       };
 
       if (date && typeof date === "string") {
