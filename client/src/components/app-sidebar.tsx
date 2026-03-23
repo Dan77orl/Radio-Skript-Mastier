@@ -17,7 +17,7 @@ import type { Settings as SettingsType } from "@shared/schema";
 
 const menuItems = [
   {
-    title: "Панель управления",
+    title: "Дашборд",
     url: "/",
     icon: LayoutDashboard,
   },

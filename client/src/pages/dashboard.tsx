@@ -5,27 +5,33 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
-import { Mic, Calendar, CheckCircle, Clock, AlertCircle, Plus, PlayCircle, PauseCircle } from "lucide-react";
-import type { Dialog, Settings } from "@shared/schema";
+import {
+  Mic, Calendar, CheckCircle, Clock, AlertCircle, Plus, PlayCircle, PauseCircle,
+  Radio, Zap, Volume2, Upload, AudioLines, TrendingUp, Activity, Podcast,
+  ArrowRight, BarChart3, CircleDot
+} from "lucide-react";
+import type { Program, ProgramType, Settings } from "@shared/schema";
 
-function StatCard({ 
-  title, 
-  value, 
-  description, 
+function StatCard({
+  title,
+  value,
+  description,
   icon: Icon,
-  loading 
-}: { 
-  title: string; 
-  value: string | number; 
+  loading,
+  color = "text-muted-foreground"
+}: {
+  title: string;
+  value: string | number;
   description: string;
   icon: React.ElementType;
   loading?: boolean;
+  color?: string;
 }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+        <Icon className={`h-4 w-4 ${color}`} />
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -42,22 +48,28 @@ function StatCard({
 function getStatusBadge(status: string) {
   switch (status) {
     case "ready":
-      return <Badge variant="default" className="bg-green-600"><CheckCircle className="mr-1 h-3 w-3" />Готов</Badge>;
+      return <Badge variant="default" className="bg-green-600 text-xs"><CheckCircle className="mr-1 h-3 w-3" />Готов</Badge>;
+    case "script_ready":
+      return <Badge variant="secondary" className="text-xs"><CheckCircle className="mr-1 h-3 w-3" />Сценарий</Badge>;
     case "generating":
-      return <Badge variant="secondary"><Clock className="mr-1 h-3 w-3" />Генерация</Badge>;
+      return <Badge variant="secondary" className="text-xs"><Clock className="mr-1 h-3 w-3 animate-spin" />Генерация</Badge>;
     case "error":
-      return <Badge variant="destructive"><AlertCircle className="mr-1 h-3 w-3" />Ошибка</Badge>;
+      return <Badge variant="destructive" className="text-xs"><AlertCircle className="mr-1 h-3 w-3" />Ошибка</Badge>;
     default:
-      return <Badge variant="outline"><Clock className="mr-1 h-3 w-3" />Ожидание</Badge>;
+      return <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3" />Ожидание</Badge>;
   }
 }
 
 export default function Dashboard() {
-  const [playingDialogId, setPlayingDialogId] = useState<string | null>(null);
+  const [playingId, setPlayingId] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const { data: dialogs, isLoading: dialogsLoading } = useQuery<Dialog[]>({
-    queryKey: ["/api/dialogs"],
+  const { data: programs, isLoading: programsLoading } = useQuery<Program[]>({
+    queryKey: ["/api/programs"],
+  });
+
+  const { data: programTypes, isLoading: typesLoading } = useQuery<ProgramType[]>({
+    queryKey: ["/api/program-types"],
   });
 
   const { data: settings, isLoading: settingsLoading } = useQuery<Settings>({
@@ -73,120 +85,314 @@ export default function Dashboard() {
     };
   }, []);
 
-  const playAudio = (audioUrl: string, dialogId: string) => {
+  const playAudio = (audioUrl: string, id: number) => {
     if (audioRef.current) {
       audioRef.current.pause();
     }
-    if (playingDialogId === dialogId) {
-      setPlayingDialogId(null);
+    if (playingId === id) {
+      setPlayingId(null);
       return;
     }
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
     audio.play().catch((err) => console.error("Error playing audio:", err));
-    setPlayingDialogId(dialogId);
-    audio.onended = () => setPlayingDialogId(null);
+    setPlayingId(id);
+    audio.onended = () => setPlayingId(null);
   };
 
   const today = new Date().toISOString().split("T")[0];
-  const todayDialogs = dialogs?.filter(d => d.scheduledDate === today) || [];
-  const readyToday = todayDialogs.filter(d => d.status === "ready").length;
-  const pendingToday = todayDialogs.filter(d => d.status === "pending").length;
-  const totalToday = settings?.dailyDialogsCount || 12;
+  const todayPrograms = programs?.filter(p => p.scheduledDate === today) || [];
+  const todayReady = todayPrograms.filter(p => p.status === "ready").length;
+  const todayWithAudio = todayPrograms.filter(p => p.audioUrl).length;
+  const todayWithScript = todayPrograms.filter(p => p.scriptText).length;
+  const todayErrors = todayPrograms.filter(p => p.status === "error").length;
+  const totalDailyNorm = programTypes?.reduce((acc, t) => acc + (t.dailyCount || 1), 0) || 0;
 
-  const recentDialogs = dialogs?.slice(0, 5) || [];
+  const autoTypes = programTypes?.filter(t => t.autoGenerate) || [];
+
+  const recentPrograms = programs
+    ?.slice()
+    .sort((a, b) => {
+      const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return db - da;
+    })
+    .slice(0, 8) || [];
+
+  const typeMap = new Map(programTypes?.map(t => [t.id, t]) || []);
+
+  const isLoading = programsLoading || typesLoading || settingsLoading;
 
   return (
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Панель управления</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Дашборд</h1>
           <p className="text-muted-foreground">
-            Генератор подводок для радио {settings?.stationName || "Радио"}
+            {settings?.stationName || "Радио"} — {new Date().toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })}
           </p>
         </div>
-        <Link href="/generator">
-          <Button data-testid="button-new-dialog">
-            <Plus className="mr-2 h-4 w-4" />
-            Создать подводку
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/shows">
+            <Button variant="outline" data-testid="button-go-shows">
+              <Podcast className="mr-2 h-4 w-4" />
+              Передачи
+            </Button>
+          </Link>
+          <Link href="/schedule">
+            <Button variant="outline" data-testid="button-go-schedule">
+              <Calendar className="mr-2 h-4 w-4" />
+              Расписание
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Подводок сегодня"
-          value={`${readyToday}/${totalToday}`}
-          description="Готово к эфиру"
-          icon={Mic}
-          loading={dialogsLoading || settingsLoading}
+          title="Сегодня готово"
+          value={`${todayReady}/${totalDailyNorm}`}
+          description={`Со звуком: ${todayWithAudio}, сценарии: ${todayWithScript}`}
+          icon={Activity}
+          color="text-green-600"
+          loading={isLoading}
         />
         <StatCard
-          title="В очереди"
-          value={pendingToday}
-          description="Ожидают генерации"
-          icon={Clock}
-          loading={dialogsLoading}
+          title="Ошибки сегодня"
+          value={todayErrors}
+          description={todayErrors > 0 ? "Требуют внимания" : "Всё в порядке"}
+          icon={AlertCircle}
+          color={todayErrors > 0 ? "text-red-500" : "text-muted-foreground"}
+          loading={isLoading}
         />
         <StatCard
-          title="Всего создано"
-          value={dialogs?.length || 0}
-          description="За все время"
-          icon={Calendar}
-          loading={dialogsLoading}
+          title="Автогенерация"
+          value={`${autoTypes.length}/${programTypes?.length || 0}`}
+          description={autoTypes.length > 0 ? "Типов на автомате" : "Не настроена"}
+          icon={Zap}
+          color={autoTypes.length > 0 ? "text-yellow-500" : "text-muted-foreground"}
+          loading={isLoading}
         />
         <StatCard
-          title="Норма в день"
-          value={settings?.dailyDialogsCount || 12}
-          description="Подводок"
-          icon={CheckCircle}
-          loading={settingsLoading}
+          title="Всего программ"
+          value={programs?.length || 0}
+          description="За всё время"
+          icon={BarChart3}
+          loading={isLoading}
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Последние подводки</CardTitle>
-            <CardDescription>Недавно созданные диалоги</CardDescription>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Сегодня по передачам</CardTitle>
+                <CardDescription>Статус выпусков на {new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}</CardDescription>
+              </div>
+              <Link href="/shows">
+                <Button variant="ghost" size="sm">
+                  Все передачи
+                  <ArrowRight className="ml-1 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
           </CardHeader>
           <CardContent>
-            {dialogsLoading ? (
+            {isLoading ? (
               <div className="space-y-3">
-                {[1, 2, 3].map(i => (
-                  <Skeleton key={i} className="h-16 w-full" />
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full" />)}
+              </div>
+            ) : programTypes && programTypes.length > 0 ? (
+              <div className="space-y-2">
+                {programTypes.map(type => {
+                  const typePrograms = todayPrograms.filter(p => p.programTypeId === type.id);
+                  const dailyNorm = type.dailyCount || 1;
+                  const ready = typePrograms.filter(p => p.status === "ready").length;
+                  const withScript = typePrograms.filter(p => p.scriptText && p.status !== "ready").length;
+                  const errors = typePrograms.filter(p => p.status === "error").length;
+                  const hasAuto = type.autoGenerate;
+                  const pct = Math.min(100, Math.round((ready / dailyNorm) * 100));
+
+                  return (
+                    <div key={type.id} className="flex items-center gap-3 rounded-lg border p-3" data-testid={`dashboard-type-${type.id}`}>
+                      <div className="shrink-0 h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                        <Radio className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm truncate">{type.name}</span>
+                          {hasAuto && (
+                            <span className="flex items-center gap-1 text-xs text-green-600">
+                              <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                              авто
+                            </span>
+                          )}
+                          {errors > 0 && (
+                            <Badge variant="destructive" className="text-xs h-5">{errors} ош.</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-green-500' : pct > 0 ? 'bg-blue-500' : 'bg-muted-foreground/20'}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {ready}/{dailyNorm}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {ready > 0 && (
+                          <span className="flex items-center gap-0.5 text-xs text-green-600" title="Готово к эфиру">
+                            <Volume2 className="h-3.5 w-3.5" />{ready}
+                          </span>
+                        )}
+                        {withScript > 0 && (
+                          <span className="flex items-center gap-0.5 text-xs text-blue-600" title="Есть сценарий">
+                            <Mic className="h-3.5 w-3.5" />{withScript}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Podcast className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground">Типы передач не созданы</p>
+                <Link href="/shows">
+                  <Button variant="ghost" className="mt-2">Настроить</Button>
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle>Автогенерация</CardTitle>
+            <CardDescription>Типы на автомате</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : autoTypes.length > 0 ? (
+              <div className="space-y-2">
+                {autoTypes.map(type => (
+                  <div key={type.id} className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/30 p-3 space-y-1.5" data-testid={`auto-type-${type.id}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                      <span className="font-medium text-sm">{type.name}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {type.scheduleDays && type.scheduleDays.length > 0
+                          ? (type.scheduleDays as number[]).map(d => ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"][d]).join(", ")
+                          : "Ежедневно"
+                        } в {type.scheduleTime || "09:00"}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <TrendingUp className="h-3 w-3" />
+                        {type.weeklyCount || 7}/нед
+                      </div>
+                      <div className="flex gap-2 flex-wrap mt-1">
+                        {type.autoVoice !== false && (
+                          <span className="flex items-center gap-0.5 text-green-600 dark:text-green-400">
+                            <Volume2 className="h-3 w-3" />озвучка
+                          </span>
+                        )}
+                        {type.autoIsolate && (
+                          <span className="flex items-center gap-0.5 text-green-600 dark:text-green-400">
+                            <AudioLines className="h-3 w-3" />шумодав
+                          </span>
+                        )}
+                        {type.autoUpload !== false && (
+                          <span className="flex items-center gap-0.5 text-green-600 dark:text-green-400">
+                            <Upload className="h-3 w-3" />выгрузка
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
-            ) : recentDialogs.length > 0 ? (
-              <div className="space-y-3">
-                {recentDialogs.map(dialog => (
+            ) : (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <Zap className="h-10 w-10 text-muted-foreground/50 mb-3" />
+                <p className="text-sm text-muted-foreground">Автогенерация не настроена</p>
+                <p className="text-xs text-muted-foreground mt-1">Включите в настройках передачи</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Последние выпуски</CardTitle>
+              <CardDescription>Недавно созданные программы</CardDescription>
+            </div>
+            <Link href="/shows">
+              <Button variant="ghost" size="sm">
+                Все передачи
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-14 w-full" />)}
+            </div>
+          ) : recentPrograms.length > 0 ? (
+            <div className="space-y-2">
+              {recentPrograms.map(program => {
+                const pType = typeMap.get(program.programTypeId);
+                return (
                   <div
-                    key={dialog.id}
-                    className="flex items-center justify-between gap-4 rounded-lg border p-3"
-                    data-testid={`dialog-item-${dialog.id}`}
+                    key={program.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                    data-testid={`recent-program-${program.id}`}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
                         <Mic className="h-4 w-4" />
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{dialog.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {dialog.scheduledDate || "Без даты"}
-                          {dialog.duration && ` • ${Math.floor(dialog.duration / 60)}:${String(dialog.duration % 60).padStart(2, "0")}`}
-                        </p>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm truncate">{program.title || "Без названия"}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {pType && <span className="truncate">{pType.name}</span>}
+                          <span>{program.scheduledDate || "—"}</span>
+                          {program.slotNumber && <span>#{program.slotNumber}</span>}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {getStatusBadge(dialog.status)}
-                      {dialog.audioUrl && (
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          data-testid={`button-play-${dialog.id}`}
-                          onClick={() => playAudio(dialog.audioUrl!, dialog.id)}
+                      {program.audioUrl?.includes("_isolated") && (
+                        <span className="text-green-600" title="Шум убран">
+                          <AudioLines className="h-4 w-4" />
+                        </span>
+                      )}
+                      {getStatusBadge(program.status)}
+                      {program.audioUrl && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          data-testid={`button-play-${program.id}`}
+                          onClick={() => playAudio(program.audioUrl!, program.id)}
                         >
-                          {playingDialogId === dialog.id ? (
+                          {playingId === program.id ? (
                             <PauseCircle className="h-4 w-4" />
                           ) : (
                             <PlayCircle className="h-4 w-4" />
@@ -195,65 +401,20 @@ export default function Dashboard() {
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <Mic className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <p className="text-muted-foreground">Пока нет подводок</p>
-                <Link href="/generator">
-                  <Button variant="ghost" className="mt-2">Создать первую</Button>
-                </Link>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Сегодняшнее расписание</CardTitle>
-            <CardDescription>{new Date().toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {dialogsLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4].map(i => (
-                  <Skeleton key={i} className="h-10 w-full" />
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-2">
-                {Array.from({ length: totalToday }, (_, i) => {
-                  const slotDialog = todayDialogs.find(d => d.slotNumber === i + 1);
-                  return (
-                    <div
-                      key={i}
-                      className={`flex items-center justify-center rounded-lg border-2 border-dashed p-3 text-sm ${
-                        slotDialog?.status === "ready"
-                          ? "border-green-500 bg-green-500/10 text-green-700 dark:text-green-400"
-                          : slotDialog?.status === "generating"
-                          ? "border-yellow-500 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400"
-                          : "border-muted text-muted-foreground"
-                      }`}
-                      data-testid={`schedule-slot-${i + 1}`}
-                    >
-                      {slotDialog ? (
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                      ) : null}
-                      #{i + 1}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <div className="mt-4 flex justify-end">
-              <Link href="/schedule">
-                <Button variant="outline" size="sm">Открыть расписание</Button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Radio className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">Пока нет программ</p>
+              <Link href="/shows">
+                <Button variant="ghost" className="mt-2">Создать первую</Button>
               </Link>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
