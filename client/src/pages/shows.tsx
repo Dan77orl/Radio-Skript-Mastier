@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -201,7 +201,9 @@ export default function ShowsPage() {
   const [viewScriptProgram, setViewScriptProgram] = useState<Program | null>(null);
   const [editingBlocks, setEditingBlocks] = useState<{ text: string; speaker: string }[] | null>(null);
   const [savingScript, setSavingScript] = useState(false);
+  const [audioQueue, setAudioQueue] = useState<string[]>([]);
   const [generatingAudioId, setGeneratingAudioId] = useState<string | null>(null);
+  const audioQueueRef = useRef<string[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: appSettings } = useQuery<AppSettings>({
@@ -281,25 +283,42 @@ export default function ShowsPage() {
     },
   });
 
-  const generateAudioMutation = useMutation({
-    mutationFn: async (id: string) => {
-      setGeneratingAudioId(id);
-      const response = await apiRequest("POST", `/api/programs/${id}/generate-audio`);
-      return response.json();
-    },
-    onSuccess: (data) => {
-      setGeneratingAudioId(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
-      if (viewScriptProgram && data?.id === viewScriptProgram.id) {
-        setViewScriptProgram({ ...viewScriptProgram, status: "ready", audioUrl: data.audioUrl });
-      }
-      toast({ title: "Аудио сгенерировано" });
-    },
-    onError: (error: Error) => {
-      setGeneratingAudioId(null);
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
-    },
-  });
+  const isProcessingRef = useRef(false);
+
+  const enqueueAudio = useCallback((id: string) => {
+    if (audioQueueRef.current.includes(id) || generatingAudioId === id) return;
+    audioQueueRef.current = [...audioQueueRef.current, id];
+    setAudioQueue(prev => [...prev, id]);
+
+    if (!isProcessingRef.current) {
+      isProcessingRef.current = true;
+      const run = async () => {
+        while (audioQueueRef.current.length > 0) {
+          const nextId = audioQueueRef.current[0];
+          setGeneratingAudioId(nextId);
+          try {
+            const response = await apiRequest("POST", `/api/programs/${nextId}/generate-audio`);
+            const data = await response.json();
+            queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
+            setViewScriptProgram(prev => {
+              if (prev && data?.id === prev.id) {
+                return { ...prev, status: "ready", audioUrl: data.audioUrl };
+              }
+              return prev;
+            });
+            toast({ title: "Аудио сгенерировано", description: data?.title || "" });
+          } catch (error: any) {
+            toast({ title: "Ошибка озвучки", description: error.message, variant: "destructive" });
+          }
+          audioQueueRef.current = audioQueueRef.current.filter(qId => qId !== nextId);
+          setAudioQueue(prev => prev.filter(qId => qId !== nextId));
+        }
+        setGeneratingAudioId(null);
+        isProcessingRef.current = false;
+      };
+      run();
+    }
+  }, [activeTab]);
 
   const generateScriptMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -976,15 +995,20 @@ export default function ShowsPage() {
                                 <Eye className="h-4 w-4" />
                               </Button>
                             )}
-                            {program.status === "script_ready" && (
+                            {(program.status === "script_ready" || program.audioUrl) && (
                               <Button
                                 size="sm"
-                                onClick={() => generateAudioMutation.mutate(program.id)}
-                                disabled={generatingAudioId === program.id}
+                                variant={program.audioUrl ? "outline" : "default"}
+                                onClick={() => enqueueAudio(program.id)}
+                                disabled={generatingAudioId === program.id || audioQueue.includes(program.id)}
                                 data-testid={`button-generate-audio-${program.id}`}
                               >
                                 {generatingAudioId === program.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : audioQueue.includes(program.id) ? (
+                                  <>В очереди ({audioQueue.indexOf(program.id) + 1})</>
+                                ) : program.audioUrl ? (
+                                  "Переозвучить"
                                 ) : (
                                   "Озвучить"
                                 )}
@@ -1474,16 +1498,21 @@ export default function ShowsPage() {
                     {viewScriptProgram?.scriptText && isMultiSpeaker(viewScriptProgram.scriptText) ? "Переназначить дикторов" : "Назначить дикторов"}
                   </Button>
                 )}
-                {viewScriptProgram && viewScriptProgram.status === "script_ready" && (
+                {viewScriptProgram && (viewScriptProgram.status === "script_ready" || viewScriptProgram.audioUrl) && (
                   <Button
+                    variant={viewScriptProgram.audioUrl ? "outline" : "default"}
                     onClick={() => {
-                      generateAudioMutation.mutate(viewScriptProgram.id);
+                      enqueueAudio(viewScriptProgram.id);
                     }}
-                    disabled={generatingAudioId === viewScriptProgram.id}
+                    disabled={generatingAudioId === viewScriptProgram.id || audioQueue.includes(viewScriptProgram.id)}
                     data-testid="button-generate-audio-viewer"
                   >
                     {generatingAudioId === viewScriptProgram.id ? (
                       <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Озвучивается...</>
+                    ) : audioQueue.includes(viewScriptProgram.id) ? (
+                      <>В очереди ({audioQueue.indexOf(viewScriptProgram.id) + 1})</>
+                    ) : viewScriptProgram.audioUrl ? (
+                      <><Volume2 className="mr-2 h-4 w-4" /> Переозвучить</>
                     ) : (
                       <><Volume2 className="mr-2 h-4 w-4" /> Озвучить</>
                     )}
