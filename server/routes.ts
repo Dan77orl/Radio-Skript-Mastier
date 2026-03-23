@@ -1261,12 +1261,30 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       }
 
       const settings = await storage.getSettings();
-      const dailyCount = count || settings?.dailyDialogsCount || 12;
       const basePrompt = prompt || settings?.defaultPrompt || "";
+
+      const dateObj = new Date(date);
+      const jsDay = dateObj.getDay();
+      const weekday = jsDay === 0 ? 7 : jsDay;
+      const template = await storage.getTemplateForWeekday(weekday);
+
+      let dailyCount: number;
+      if (count) {
+        dailyCount = count;
+      } else if (template) {
+        dailyCount = (template.endHour - template.startHour) * template.slotsPerHour;
+      } else {
+        dailyCount = settings?.dailyDialogsCount || 12;
+      }
+
+      const holidayInfo = getHolidayInfo(date);
+      const holidayContext = holidayInfo.length > 0
+        ? `\nСегодня праздник: ${holidayInfo.map(h => h.nameRu).join(", ")}. Учти это в диалогах.`
+        : "";
 
       const ctx = await buildStationContext();
       const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}".
-${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
+${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}${holidayContext}
 Создай ${dailyCount} разных коротких диалогов между ведущими: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
 Каждый диалог должен быть на русском языке, дружелюбным и естественным.
 Длительность каждого диалога при чтении - 30-50 секунд.

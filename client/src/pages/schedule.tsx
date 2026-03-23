@@ -20,7 +20,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { VoiceInput } from "@/components/voice-input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Dialog, Settings } from "@shared/schema";
+import type { Dialog, Settings, ScheduleTemplate } from "@shared/schema";
 
 interface Holiday {
   date: string;
@@ -102,7 +102,24 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
     return holidays.filter(h => h.date === dateStr || h.date.endsWith(dateStr.slice(4)));
   };
 
-  const dailyCount = settings?.dailyDialogsCount || 12;
+  const { data: templates } = useQuery<ScheduleTemplate[]>({
+    queryKey: ["/api/schedule-templates"],
+  });
+
+  const defaultDailyCount = settings?.dailyDialogsCount || 12;
+
+  const getSlotCountForDate = (date: Date): number => {
+    if (!templates || templates.length === 0) return defaultDailyCount;
+    const jsDay = date.getDay();
+    const weekday = jsDay === 0 ? 7 : jsDay;
+    const template = templates.find(t => t.isActive && t.weekdays.includes(weekday));
+    if (!template) return defaultDailyCount;
+    return (template.endHour - template.startHour) * template.slotsPerHour;
+  };
+
+  const dailyCount = viewingDate
+    ? getSlotCountForDate(new Date(viewingDate))
+    : defaultDailyCount;
 
   const autoGenerateMutation = useMutation({
     mutationFn: async (data: { date: string; prompt?: string }) => {
@@ -210,7 +227,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="capitalize">{formatMonthYear()}</CardTitle>
-          <CardDescription>{dailyCount} подводок в день</CardDescription>
+          <CardDescription>{dailyCount} подводок на выбранный день</CardDescription>
         </CardHeader>
         <CardContent>
           {dialogsLoading || settingsLoading ? (
@@ -249,14 +266,17 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
                           </div>
                         ) : null;
                       })()}
-                      {dayDialogs.length > 0 && (
-                        <Badge variant={readyCount === dailyCount ? "default" : "secondary"} className="mt-1">
-                          {dayDialogs.length}/{dailyCount}
-                        </Badge>
-                      )}
+                      {(() => {
+                        const daySlotCount = getSlotCountForDate(day);
+                        return dayDialogs.length > 0 ? (
+                          <Badge variant={readyCount === daySlotCount ? "default" : "secondary"} className="mt-1">
+                            {dayDialogs.length}/{daySlotCount}
+                          </Badge>
+                        ) : null;
+                      })()}
                     </div>
                     <div className="space-y-1">
-                      {Array.from({ length: Math.min(dailyCount, 6) }, (_, slotIndex) => {
+                      {Array.from({ length: Math.min(getSlotCountForDate(day), 6) }, (_, slotIndex) => {
                         const slotDialog = dayDialogs.find(d => d.slotNumber === slotIndex + 1);
                         const statusInfo = slotDialog ? getStatusInfo(slotDialog.status) : getStatusInfo("pending");
                         const StatusIcon = statusInfo.icon;
@@ -271,9 +291,9 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
                           </div>
                         );
                       })}
-                      {dailyCount > 6 && (
+                      {getSlotCountForDate(day) > 6 && (
                         <div className="text-center text-xs text-muted-foreground">
-                          +{dailyCount - 6} слотов
+                          +{getSlotCountForDate(day) - 6} слотов
                         </div>
                       )}
                     </div>

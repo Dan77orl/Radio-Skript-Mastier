@@ -21,8 +21,19 @@ interface SlotInfo {
   shiftLabel?: string | null;
 }
 
+interface ResolvedTemplate {
+  id: string;
+  name: string;
+  weekdays: number[];
+  startHour: number;
+  endHour: number;
+  slotsPerHour: number;
+  voiceIds: string[] | null;
+  isActive: boolean;
+}
+
 interface ResolvedSlots {
-  template: any;
+  template: ResolvedTemplate | null;
   slots: SlotInfo[];
   holidays: Array<{ nameRu: string; isPublic: boolean; country: string }>;
 }
