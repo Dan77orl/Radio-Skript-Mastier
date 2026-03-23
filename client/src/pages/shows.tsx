@@ -60,6 +60,8 @@ import {
   Download,
   ChevronDown,
   ChevronRight,
+  Search,
+  Filter,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
@@ -214,6 +216,8 @@ export default function ShowsPage() {
   const audioQueueRef = useRef<string[]>([]);
   const [selectedPrograms, setSelectedPrograms] = useState<Set<string>>(new Set());
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
+  const [programFilter, setProgramFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: appSettings } = useQuery<AppSettings>({
@@ -241,9 +245,26 @@ export default function ShowsPage() {
     enabled: !!activeTab,
   });
 
-  const filteredPrograms = programs?.filter(p => p.programTypeId === activeTab) || [];
+  const allTypePrograms = programs?.filter(p => p.programTypeId === activeTab) || [];
+  const filteredPrograms = allTypePrograms.filter(p => {
+    if (statusFilter !== "all") {
+      if (statusFilter === "script_ready" && p.status !== "script_ready") return false;
+      if (statusFilter === "ready" && p.status !== "ready") return false;
+      if (statusFilter === "pending" && p.status !== "pending") return false;
+      if (statusFilter === "no_audio" && p.audioUrl) return false;
+      if (statusFilter === "has_audio" && !p.audioUrl) return false;
+    }
+    if (programFilter.trim()) {
+      const q = programFilter.toLowerCase();
+      const titleMatch = p.title?.toLowerCase().includes(q);
+      const scriptMatch = p.scriptText?.toLowerCase().includes(q);
+      const dateMatch = p.scheduledDate?.includes(q);
+      if (!titleMatch && !scriptMatch && !dateMatch) return false;
+    }
+    return true;
+  });
   const today = new Date().toISOString().split("T")[0];
-  const todayPrograms = filteredPrograms.filter(p => p.scheduledDate === today);
+  const todayPrograms = allTypePrograms.filter(p => p.scheduledDate === today);
 
   const createTypeMutation = useMutation({
     mutationFn: async (data: { name: string; slug: string; description: string; defaultPrompt: string; dailyCount?: number; slotDescriptions?: string[] }) => {
@@ -969,6 +990,44 @@ export default function ShowsPage() {
                   </div>
                 </CardHeader>
               </Card>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Поиск по названию, тексту, дате..."
+                    value={programFilter}
+                    onChange={(e) => setProgramFilter(e.target.value)}
+                    className="pl-9 h-9"
+                    data-testid="input-program-filter"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[180px] h-9" data-testid="select-status-filter">
+                    <Filter className="h-3.5 w-3.5 mr-1.5" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все статусы</SelectItem>
+                    <SelectItem value="pending">Без сценария</SelectItem>
+                    <SelectItem value="script_ready">Сценарий готов</SelectItem>
+                    <SelectItem value="no_audio">Без аудио</SelectItem>
+                    <SelectItem value="has_audio">С аудио</SelectItem>
+                    <SelectItem value="ready">Готово</SelectItem>
+                  </SelectContent>
+                </Select>
+                {(programFilter || statusFilter !== "all") && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setProgramFilter(""); setStatusFilter("all"); }}
+                    data-testid="button-clear-filter"
+                  >
+                    <XCircle className="h-4 w-4 mr-1" /> Сброс
+                  </Button>
+                )}
+                <span className="text-xs text-muted-foreground">{filteredPrograms.length} из {allTypePrograms.length}</span>
+              </div>
 
               {isLoadingPrograms ? (
                 <div className="space-y-3">
