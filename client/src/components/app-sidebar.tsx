@@ -32,11 +32,6 @@ const menuItems = [
     icon: Calendar,
   },
   {
-    title: "Источники новостей",
-    url: "/news-sources",
-    icon: Newspaper,
-  },
-  {
     title: "Передачи",
     url: "/shows",
     icon: Podcast,
