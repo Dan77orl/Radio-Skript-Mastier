@@ -1255,8 +1255,9 @@ export default function ShowsPage() {
                                 </a>
                                 <Button
                                   size="icon"
-                                  variant="outline"
-                                  title="Голосоизолятор — убрать шум"
+                                  variant={program.audioUrl?.includes("_isolated") ? "default" : "outline"}
+                                  className={program.audioUrl?.includes("_isolated") ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                                  title={program.audioUrl?.includes("_isolated") ? "Шум убран ✓" : "Голосоизолятор — убрать шум"}
                                   onClick={() => voiceIsolateMutation.mutate(program.id)}
                                   disabled={isolatingId === program.id}
                                   data-testid={`button-isolate-${program.id}`}
