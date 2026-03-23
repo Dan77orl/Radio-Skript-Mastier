@@ -112,6 +112,7 @@ interface StationContext {
   malePersona: string;
   femalePersona: string;
   personaList: string;
+  knowledgeBase: string;
 }
 
 async function buildStationContext(): Promise<StationContext> {
@@ -135,8 +136,13 @@ async function buildStationContext(): Promise<StationContext> {
   const personaList = activeVoices.length > 0 
     ? activeVoices.map(v => `${v.personaName || v.name} (${v.gender === "male" ? "мужчина" : "женщина"})`).join(", ")
     : "ведущий (мужчина), ведущая (женщина)";
+
+  let knowledgeBase = "";
+  if (settings?.stationAttachments && settings.stationAttachments.length > 0) {
+    knowledgeBase = settings.stationAttachments.join("\n\n");
+  }
   
-  return { stationName, stationDescription, malePersona, femalePersona, personaList };
+  return { stationName, stationDescription, malePersona, femalePersona, personaList, knowledgeBase };
 }
 
 interface ScriptSegment {
@@ -774,7 +780,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}". 
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 ${hostsLine}
-
+${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeBase}\n` : ""}
 КОНТЕКСТ ДНЯ:
 - Дата: ${dateFormatted}, ${weekday}
 ${holiday ? `- Праздник: ${holiday}` : ""}
@@ -1303,6 +1309,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const ctx = await buildStationContext();
       const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}".
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}${holidayContext}
+${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeBase}\n` : ""}
 Создай ${dailyCount} разных коротких диалогов между ведущими: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
 Каждый диалог должен быть на русском языке, дружелюбным и естественным.
 Длительность каждого диалога при чтении - 30-50 секунд.
