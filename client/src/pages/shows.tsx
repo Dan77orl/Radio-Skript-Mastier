@@ -57,6 +57,7 @@ import {
   XCircle,
   Eye,
   Users,
+  Download,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { ProgramType, Program, Settings as AppSettings, Voice } from "@shared/schema";
@@ -1048,18 +1049,25 @@ export default function ShowsPage() {
                               </Button>
                             )}
                             {program.audioUrl && (
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                onClick={() => playAudio(program.audioUrl!, program.id)}
-                                data-testid={`button-play-${program.id}`}
-                              >
-                                {playingProgramId === program.id ? (
-                                  <Pause className="h-4 w-4" />
-                                ) : (
-                                  <Play className="h-4 w-4" />
-                                )}
-                              </Button>
+                              <>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => playAudio(program.audioUrl!, program.id)}
+                                  data-testid={`button-play-${program.id}`}
+                                >
+                                  {playingProgramId === program.id ? (
+                                    <Pause className="h-4 w-4" />
+                                  ) : (
+                                    <Play className="h-4 w-4" />
+                                  )}
+                                </Button>
+                                <a href={program.audioUrl} download>
+                                  <Button size="icon" variant="outline" data-testid={`button-download-${program.id}`}>
+                                    <Download className="h-4 w-4" />
+                                  </Button>
+                                </a>
+                              </>
                             )}
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
