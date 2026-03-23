@@ -81,6 +81,13 @@ Preferred communication style: Simple, everyday language.
 - Default male voice ID: `onwK4e9ZLuTAKqWW03F9`
 - Default female voice ID: `EXAVITQu4vr4xnSDxMaL`
 
+### Automatic Weekly Pipeline
+- **Auto-generation Settings**: Per program type: `autoGenerate`, `weeklyCount`, `autoVoice`, `autoUpload` fields
+- **Pipeline Endpoint**: `POST /api/programs/:typeId/auto-pipeline` — creates scripts, generates audio, uploads to Yandex Disk in sequence
+- **Scheduler**: Runs on startup (30s delay) then hourly. Checks which types have `autoGenerate=true`, calculates daily needs from `weeklyCount`, auto-triggers pipeline for any shortfall
+- **Manual Trigger**: `POST /api/run-scheduler` — forces immediate scheduler run
+- **UI Controls**: Settings dialog shows auto-generation toggle with weekly count, auto-voice, and auto-upload options. "Пайплайн" button visible when auto-generate is enabled
+
 ### Build and Development
 - Vite plugins for Replit integration (cartographer, dev-banner, runtime-error-modal)
 - esbuild for production server bundling with specific dependency allowlist

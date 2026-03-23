@@ -221,6 +221,10 @@ export const programTypes = pgTable("program_types", {
   assignedVoiceIds: text("assigned_voice_ids").array(),
   isActive: boolean("is_active").default(true),
   sortOrder: integer("sort_order").default(0),
+  autoGenerate: boolean("auto_generate").default(false),
+  weeklyCount: integer("weekly_count").default(7),
+  autoVoice: boolean("auto_voice").default(true),
+  autoUpload: boolean("auto_upload").default(true),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 

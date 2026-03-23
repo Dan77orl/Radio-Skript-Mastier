@@ -283,6 +283,20 @@ export default function ShowsPage() {
     },
   });
 
+  const pipelineMutation = useMutation({
+    mutationFn: async ({ typeId, count }: { typeId: string; count: number }) => {
+      const response = await apiRequest("POST", `/api/programs/${typeId}/auto-pipeline`, { count });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
+      toast({ title: "Пайплайн завершён", description: `Создано ${data.succeeded} из ${data.total}` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка пайплайна", description: error.message, variant: "destructive" });
+    },
+  });
+
   const isProcessingRef = useRef(false);
 
   const enqueueAudio = useCallback((id: string) => {
@@ -592,6 +606,10 @@ export default function ShowsPage() {
         sponsorText: settingsType.sponsorText,
         assignedVoiceIds: voiceIdsFromAssignment,
         defaultDurationSeconds: settingsType.defaultDurationSeconds,
+        autoGenerate: settingsType.autoGenerate || false,
+        weeklyCount: settingsType.weeklyCount || 7,
+        autoVoice: settingsType.autoVoice !== false,
+        autoUpload: settingsType.autoUpload !== false,
       },
     });
   };
@@ -912,6 +930,22 @@ export default function ShowsPage() {
                       <PackagePlus className="mr-2 h-4 w-4" />
                       Пакетная
                     </Button>
+                    {type.autoGenerate && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => pipelineMutation.mutate({ typeId: type.id, count: Math.ceil((type.weeklyCount || 7) / 7) })}
+                        disabled={pipelineMutation.isPending}
+                        data-testid="button-run-pipeline"
+                      >
+                        {pipelineMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Zap className="mr-2 h-4 w-4" />
+                        )}
+                        Пайплайн
+                      </Button>
+                    )}
                   </div>
                 </CardHeader>
               </Card>
@@ -1223,6 +1257,62 @@ export default function ShowsPage() {
                   </div>
                 );
               })()}
+
+              <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
+                <Label className="text-base font-semibold">Авто-генерация</Label>
+                <p className="text-xs text-muted-foreground">
+                  Система будет автоматически создавать скрипты, озвучивать и выгружать в облако
+                </p>
+                <div className="flex items-center gap-3">
+                  <Button
+                    size="sm"
+                    variant={settingsType.autoGenerate ? "default" : "outline"}
+                    onClick={() => setSettingsType(prev => prev ? { ...prev, autoGenerate: !prev.autoGenerate } : null)}
+                    data-testid="button-toggle-auto-generate"
+                  >
+                    {settingsType.autoGenerate ? "Включена" : "Выключена"}
+                  </Button>
+                </div>
+                {settingsType.autoGenerate && (
+                  <div className="space-y-3 mt-2">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <span className="text-xs text-muted-foreground">Выпусков в неделю</span>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={50}
+                          value={settingsType.weeklyCount || 7}
+                          onChange={(e) => setSettingsType(prev => prev ? { ...prev, weeklyCount: Number(e.target.value) } : null)}
+                          data-testid="input-weekly-count"
+                        />
+                      </div>
+                      <div className="space-y-1 flex flex-col justify-end">
+                        <Button
+                          size="sm"
+                          variant={settingsType.autoVoice !== false ? "default" : "outline"}
+                          onClick={() => setSettingsType(prev => prev ? { ...prev, autoVoice: !(prev.autoVoice !== false) } : null)}
+                          className="w-full"
+                          data-testid="button-toggle-auto-voice"
+                        >
+                          {settingsType.autoVoice !== false ? "Авто-озвучка" : "Без озвучки"}
+                        </Button>
+                      </div>
+                      <div className="space-y-1 flex flex-col justify-end">
+                        <Button
+                          size="sm"
+                          variant={settingsType.autoUpload !== false ? "default" : "outline"}
+                          onClick={() => setSettingsType(prev => prev ? { ...prev, autoUpload: !(prev.autoUpload !== false) } : null)}
+                          className="w-full"
+                          data-testid="button-toggle-auto-upload"
+                        >
+                          {settingsType.autoUpload !== false ? "Авто-выгрузка" : "Без выгрузки"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <AlertDialog>
                 <AlertDialogTrigger asChild>

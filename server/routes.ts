@@ -3328,5 +3328,160 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
     }
   });
 
+  app.post("/api/programs/:typeId/auto-pipeline", async (req, res) => {
+    try {
+      const programType = await storage.getProgramType(req.params.typeId);
+      if (!programType) {
+        return res.status(404).json({ error: "Program type not found" });
+      }
+
+      const count = req.body.count || 1;
+      const results: any[] = [];
+
+      for (let i = 0; i < count; i++) {
+        try {
+          const createRes = await fetch(`http://localhost:${process.env.PORT || 5000}/api/programs/auto-create/${programType.id}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          });
+
+          if (!createRes.ok) {
+            const err = await createRes.json();
+            results.push({ step: "create", error: err.error || "Failed", index: i });
+            continue;
+          }
+
+          const program = await createRes.json();
+
+          let audioOk = true;
+          let uploadOk = true;
+
+          if (programType.autoVoice !== false) {
+            audioOk = false;
+            try {
+              const audioRes = await fetch(`http://localhost:${process.env.PORT || 5000}/api/programs/${program.id}/generate-audio`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+              });
+              if (audioRes.ok) {
+                const audioData = await audioRes.json();
+                program.audioUrl = audioData.audioUrl;
+                program.status = "ready";
+                audioOk = true;
+              }
+            } catch (audioErr: any) {
+              console.error(`Auto-pipeline audio error for ${program.id}:`, audioErr.message);
+            }
+          }
+
+          if (programType.autoUpload !== false && program.audioUrl) {
+            try {
+              const settings = await storage.getSettings();
+              if (settings?.yandexDiskToken) {
+                const normalizedUrl = program.audioUrl.startsWith("/") ? program.audioUrl.slice(1) : program.audioUrl;
+                const audioPath = path.join(process.cwd(), "public", normalizedUrl);
+                const fileData = await fs.readFile(audioPath);
+                const yandexFolder = `/radio/${programType.slug}`;
+
+                await fetch(`https://cloud-api.yandex.net/v1/disk/resources?path=${encodeURIComponent(yandexFolder)}`, {
+                  method: "PUT",
+                  headers: { Authorization: `OAuth ${settings.yandexDiskToken}` },
+                }).catch(() => {});
+
+                const fileName = program.audioUrl.split("/").pop();
+                const uploadUrlRes = await fetch(
+                  `https://cloud-api.yandex.net/v1/disk/resources/upload?path=${encodeURIComponent(`${yandexFolder}/${fileName}`)}&overwrite=true`,
+                  { headers: { Authorization: `OAuth ${settings.yandexDiskToken}` } }
+                );
+
+                if (uploadUrlRes.ok) {
+                  const { href } = await uploadUrlRes.json();
+                  await fetch(href, { method: "PUT", body: fileData });
+                  await storage.updateProgram(program.id, {
+                    uploadedToYandex: true,
+                    yandexPath: `${yandexFolder}/${fileName}`,
+                  });
+                  program.uploadedToYandex = true;
+                }
+              }
+            } catch (uploadErr: any) {
+              console.error(`Auto-pipeline upload error for ${program.id}:`, uploadErr.message);
+            }
+          }
+
+          const allStepsOk = audioOk && (programType.autoUpload === false || uploadOk);
+          results.push({ success: allStepsOk, program, audioOk, uploadOk });
+        } catch (err: any) {
+          results.push({ step: "pipeline", error: err.message, index: i });
+        }
+      }
+
+      res.json({
+        total: count,
+        succeeded: results.filter(r => r.success).length,
+        results,
+      });
+    } catch (error) {
+      console.error("Error in auto-pipeline:", error);
+      res.status(500).json({ error: "Auto-pipeline failed" });
+    }
+  });
+
+  const runAutoScheduler = async () => {
+    try {
+      const types = await storage.getProgramTypes();
+      const autoTypes = types.filter(t => t.isActive && t.autoGenerate);
+
+      for (const pType of autoTypes) {
+        const weeklyCount = pType.weeklyCount || 7;
+        const dailyCount = pType.dailyCount || 1;
+        const today = new Date();
+        const dateStr = today.toISOString().split("T")[0];
+
+        const dayOfWeek = today.getDay();
+        const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - mondayOffset);
+        const weekStartStr = weekStart.toISOString().split("T")[0];
+
+        const existingPrograms = await storage.getProgramsByType(pType.id);
+        const thisWeekPrograms = existingPrograms.filter(p => p.scheduledDate && p.scheduledDate >= weekStartStr && p.scheduledDate <= dateStr);
+        const todayPrograms = existingPrograms.filter(p => p.scheduledDate === dateStr);
+
+        const weeklyRemaining = weeklyCount - thisWeekPrograms.length;
+        if (weeklyRemaining <= 0) continue;
+
+        const neededToday = Math.min(dailyCount, weeklyRemaining) - todayPrograms.length;
+        const remaining = Math.max(0, neededToday);
+
+        if (remaining <= 0) continue;
+
+        console.log(`[scheduler] Auto-generating ${remaining} program(s) for "${pType.name}" (${dateStr})`);
+
+        try {
+          await fetch(`http://localhost:${process.env.PORT || 5000}/api/programs/${pType.id}/auto-pipeline`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ count: remaining }),
+          });
+        } catch (err: any) {
+          console.error(`[scheduler] Error for "${pType.name}":`, err.message);
+        }
+      }
+    } catch (err) {
+      console.error("[scheduler] Error running auto-scheduler:", err);
+    }
+  };
+
+  setTimeout(() => {
+    runAutoScheduler();
+    setInterval(runAutoScheduler, 60 * 60 * 1000);
+  }, 30000);
+
+  app.post("/api/run-scheduler", async (_req, res) => {
+    runAutoScheduler();
+    res.json({ status: "Scheduler triggered" });
+  });
+
   return httpServer;
 }
