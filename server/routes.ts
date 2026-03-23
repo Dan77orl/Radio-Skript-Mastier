@@ -169,6 +169,13 @@ function parseMultiSpeakerScript(scriptText: string): ScriptSegment[] {
   return segments;
 }
 
+function resolveAssignedVoices(voicesList: any[], programType: any): any[] {
+  if (programType.assignedVoiceIds?.length) {
+    return voicesList.filter(v => programType.assignedVoiceIds.includes(v.id));
+  }
+  return voicesList.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(programType.id));
+}
+
 function stripEmotionTags(text: string): string {
   return text.replace(/\[(energetic|fast|slow|surprised|thoughtful|happy|sad|exclaims|announcer|serious|calm|excited|warm|dramatic|whisper|loud|gentle|playful|confident|nervous|angry|romantic|mysterious|urgent|casual|formal|ironic|sarcastic)\]/gi, "").replace(/\s{2,}/g, " ").trim();
 }
@@ -2496,9 +2503,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const anthropic = await getAnthropicClient();
 
       const voicesList = await storage.getVoices();
-      const assignedVoices = programType.assignedVoiceIds?.length
-        ? voicesList.filter(v => programType.assignedVoiceIds!.includes(v.id))
-        : [];
+      const assignedVoices = resolveAssignedVoices(voicesList, programType);
       const isMultiSpeaker = assignedVoices.length >= 2;
 
       let prompt = `Создай ${totalCount} ГОТОВЫХ сценариев для радиопередачи "${programType.name}" на радио "${ctx.stationName}".
@@ -2651,9 +2656,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
       const ctx = await buildStationContext();
       const voicesList = await storage.getVoices();
-      const assignedVoices = programType.assignedVoiceIds?.length
-        ? voicesList.filter(v => programType.assignedVoiceIds!.includes(v.id))
-        : [];
+      const assignedVoices = resolveAssignedVoices(voicesList, programType);
       const isMultiSpeaker = assignedVoices.length >= 2;
 
       let systemPrompt: string;
@@ -2774,9 +2777,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
           return res.status(400).json({ error: "Не удалось распарсить мульти-спикерный скрипт" });
         }
 
-        const assignedVoices = programType?.assignedVoiceIds?.length
-          ? voicesList.filter(v => programType.assignedVoiceIds!.includes(v.id))
-          : voicesList.filter(v => v.isActive);
+        const assignedVoices = resolveAssignedVoices(voicesList, programType);
 
         const speakerVoiceMap = new Map<string, string>();
         for (const voice of assignedVoices) {
@@ -2838,9 +2839,8 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
         res.json({ ...updated, segmentCount: audioBuffers.length, totalSegments: totalExpected, errors: segmentErrors });
       } else {
-        const activeVoice = programType?.assignedVoiceIds?.length
-          ? voicesList.find(v => programType.assignedVoiceIds!.includes(v.id))
-          : voicesList.find(v => v.isActive);
+        const resolved = resolveAssignedVoices(voicesList, programType);
+        const activeVoice = resolved.length > 0 ? resolved[0] : voicesList.find(v => v.isActive);
 
         if (!activeVoice) {
           return res.status(400).json({ error: "No active voice configured" });
