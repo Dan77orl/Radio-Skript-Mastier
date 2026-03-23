@@ -1410,7 +1410,7 @@ export default function ShowsPage() {
                   <div className="space-y-1">
                     <span className="text-xs text-muted-foreground">Текст спонсора</span>
                     <Input
-                      placeholder="Спонсор прогноза погоды..."
+                      placeholder={`Спонсор передачи "${settingsType.name}"...`}
                       value={settingsType.sponsorText || ""}
                       onChange={(e) => setSettingsType(prev => prev ? { ...prev, sponsorText: e.target.value } : null)}
                       data-testid="input-sponsor-text"
@@ -1428,7 +1428,7 @@ export default function ShowsPage() {
                   data-testid="input-file-name-template"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Переменные: <code>{"{название}"}</code> — имя передачи, <code>{"{дата}"}</code> — дата выпуска, <code>{"{номер}"}</code> — номер слота. Пример: <code>ПсихОфф_{"{дата}"}_{"{номер}"}</code> → <code>ПсихОфф_2026-03-24_1.mp3</code>
+                  Переменные: <code>{"{название}"}</code> — имя передачи, <code>{"{дата}"}</code> — дата выпуска, <code>{"{номер}"}</code> — номер слота. Пример: <code>{settingsType.name}_{"{дата}"}_{"{номер}"}</code> → <code>{settingsType.name}_2026-03-24_1.mp3</code>
                 </p>
               </div>
 
