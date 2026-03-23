@@ -930,7 +930,7 @@ export default function ShowsPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -952,63 +952,85 @@ export default function ShowsPage() {
                       <Settings className="mr-2 h-4 w-4" />
                       Настройки
                     </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => autoCreateMutation.mutate(type.id)}
-                      disabled={autoCreateMutation.isPending}
-                      data-testid="button-auto-create"
-                    >
-                      {autoCreateMutation.isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Zap className="mr-2 h-4 w-4" />
-                      )}
-                      Сценарий
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        resetBatchDialog();
-                        setIsBatchDialogOpen(true);
-                      }}
-                      data-testid="button-batch-create"
-                    >
-                      <PackagePlus className="mr-2 h-4 w-4" />
-                      Пакет сценариев
-                    </Button>
-                    {selectedPrograms.size > 0 && (
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5 bg-background">
+                      <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Вручную:</span>
                       <Button
                         size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          const toVoice = filteredPrograms
-                            .filter(p => selectedPrograms.has(p.id) && p.scriptText && (p.status === "script_ready" || p.audioUrl))
-                            .map(p => p.id);
-                          toVoice.forEach(id => enqueueAudio(id));
-                          setSelectedPrograms(new Set());
-                        }}
-                        data-testid="button-bulk-voice"
+                        onClick={() => autoCreateMutation.mutate(type.id)}
+                        disabled={autoCreateMutation.isPending}
+                        data-testid="button-auto-create"
                       >
-                        <Volume2 className="mr-2 h-4 w-4" />
-                        Озвучить ({selectedPrograms.size})
-                      </Button>
-                    )}
-                    {type.autoGenerate && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => pipelineMutation.mutate({ typeId: type.id, count: Math.ceil((type.weeklyCount || 7) / 7) })}
-                        disabled={pipelineMutation.isPending}
-                        data-testid="button-run-pipeline"
-                      >
-                        {pipelineMutation.isPending ? (
+                        {autoCreateMutation.isPending ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         ) : (
                           <Zap className="mr-2 h-4 w-4" />
                         )}
-                        Авто-цикл
+                        Сценарий
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          resetBatchDialog();
+                          setIsBatchDialogOpen(true);
+                        }}
+                        data-testid="button-batch-create"
+                      >
+                        <PackagePlus className="mr-2 h-4 w-4" />
+                        Пакет
+                      </Button>
+                      {selectedPrograms.size > 0 && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            const toVoice = filteredPrograms
+                              .filter(p => selectedPrograms.has(p.id) && p.scriptText && (p.status === "script_ready" || p.audioUrl))
+                              .map(p => p.id);
+                            toVoice.forEach(id => enqueueAudio(id));
+                            setSelectedPrograms(new Set());
+                          }}
+                          data-testid="button-bulk-voice"
+                        >
+                          <Volume2 className="mr-2 h-4 w-4" />
+                          Озвучить ({selectedPrograms.size})
+                        </Button>
+                      )}
+                    </div>
+                    {type.autoGenerate && (
+                      <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                          <span className="text-xs font-medium text-green-700 dark:text-green-400 whitespace-nowrap">Авто:</span>
+                        </div>
+                        <span className="text-xs text-green-600 dark:text-green-400">
+                          {type.scheduleDays && type.scheduleDays.length > 0
+                            ? `${type.scheduleDays.map((d: number) => ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"][d]).join(", ")} в ${type.scheduleTime || "09:00"}`
+                            : `Ежедневно в ${type.scheduleTime || "09:00"}`
+                          }
+                          {" | "}{type.weeklyCount || 7}/нед
+                          {type.autoVoice !== false && " | озвучка"}
+                          {type.autoIsolate && " | шумодав"}
+                          {type.autoUpload !== false && " | выгрузка"}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 border-green-300 dark:border-green-700"
+                          onClick={() => pipelineMutation.mutate({ typeId: type.id, count: Math.ceil((type.weeklyCount || 7) / 7) })}
+                          disabled={pipelineMutation.isPending}
+                          data-testid="button-run-pipeline"
+                        >
+                          {pipelineMutation.isPending ? (
+                            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Zap className="mr-1 h-3.5 w-3.5" />
+                          )}
+                          Запустить
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </CardHeader>
