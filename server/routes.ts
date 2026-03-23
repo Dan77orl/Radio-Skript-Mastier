@@ -917,11 +917,22 @@ ${hour >= 18 ? "Вечерний слот: расслабленный тон, и
       }
 
       const ctx = await buildStationContext();
+
+      let maleHost = ctx.malePersona;
+      let femaleHost = ctx.femalePersona;
+      if (dialog.hostVoiceIds && dialog.hostVoiceIds.length > 0) {
+        const voicesList = await storage.getVoices();
+        for (const vid of dialog.hostVoiceIds) {
+          const voice = voicesList.find(v => v.id === vid);
+          if (voice?.gender === "male") maleHost = voice.personaName || voice.name;
+          if (voice?.gender === "female") femaleHost = voice.personaName || voice.name;
+        }
+      }
       
       const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}". 
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
-Ведущие: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
-
+Ведущие: ${maleHost} (мужчина) и ${femaleHost} (женщина).
+${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeBase}\n` : ""}
 Текущий диалог:
 Мужской текст: ${dialog.maleText || ""}
 Женский текст: ${dialog.femaleText || ""}
@@ -931,8 +942,8 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
 ВАЖНО: Ответ в формате JSON:
 {
-  "maleText": "новый текст для ${ctx.malePersona}",
-  "femaleText": "новый текст для ${ctx.femalePersona}"
+  "maleText": "новый текст для ${maleHost}",
+  "femaleText": "новый текст для ${femaleHost}"
 }`;
 
       const anthropic = await getAnthropicClient();
@@ -1015,10 +1026,10 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       }
 
       const voicesList = await storage.getVoices();
-      const maleVoice = voicesList.find(v => v.gender === "male" && v.isActive);
-      const femaleVoice = voicesList.find(v => v.gender === "female" && v.isActive);
+      const defaultMaleVoice = voicesList.find(v => v.gender === "male" && v.isActive);
+      const defaultFemaleVoice = voicesList.find(v => v.gender === "female" && v.isActive);
       
-      if (!maleVoice || !femaleVoice) {
+      if (!defaultMaleVoice || !defaultFemaleVoice) {
         return res.status(400).json({ 
           error: "Необходимо добавить активные мужской и женский голоса в разделе 'Голоса'" 
         });
@@ -1057,14 +1068,29 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         return Buffer.from(arrayBuffer);
       };
 
+      const resolveVoicesForDialog = (dialog: typeof dialogsForDate[0]) => {
+        let maleVoiceId = defaultMaleVoice.elevenLabsVoiceId;
+        let femaleVoiceId = defaultFemaleVoice.elevenLabsVoiceId;
+
+        if (dialog.hostVoiceIds && dialog.hostVoiceIds.length > 0) {
+          for (const vid of dialog.hostVoiceIds) {
+            const voice = voicesList.find(v => v.id === vid);
+            if (voice?.gender === "male") maleVoiceId = voice.elevenLabsVoiceId;
+            if (voice?.gender === "female") femaleVoiceId = voice.elevenLabsVoiceId;
+          }
+        }
+        return { maleVoiceId, femaleVoiceId };
+      };
+
       (async () => {
         for (const dialog of dialogsForDate) {
           try {
             console.log(`Generating audio for dialog ${dialog.id}...`);
+            const { maleVoiceId, femaleVoiceId } = resolveVoicesForDialog(dialog);
             
             const [maleAudio, femaleAudio] = await Promise.all([
-              generateVoiceAudio(dialog.maleText!, maleVoice.elevenLabsVoiceId),
-              generateVoiceAudio(dialog.femaleText!, femaleVoice.elevenLabsVoiceId),
+              generateVoiceAudio(dialog.maleText!, maleVoiceId),
+              generateVoiceAudio(dialog.femaleText!, femaleVoiceId),
             ]);
 
             const audioDir = path.join(process.cwd(), "public", "audio");
