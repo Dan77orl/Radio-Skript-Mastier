@@ -281,7 +281,6 @@ export default function VoicesPage() {
   };
 
   const voicesCount = voices?.length || 0;
-  const canAddMore = voicesCount < 4;
 
   return (
     <div className="flex-1 space-y-6 p-6">
@@ -293,11 +292,11 @@ export default function VoicesPage() {
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-sm">
             <Users className="mr-1 h-3 w-3" />
-            {voicesCount} / 4 персон
+            {voicesCount} персон
           </Badge>
           <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (open) { setVoiceTab("my"); setVoiceSearch(""); setVoiceSearchQuery(""); setSearchGender("all"); } setIsAddDialogOpen(open); }}>
             <DialogTrigger asChild>
-              <Button disabled={!canAddMore} data-testid="button-add-voice">
+              <Button data-testid="button-add-voice">
                 <Plus className="mr-2 h-4 w-4" />
                 Добавить персону
               </Button>
@@ -687,9 +686,9 @@ export default function VoicesPage() {
               <Users className="h-16 w-16 text-muted-foreground/50 mb-4" />
               <h3 className="text-lg font-medium mb-2">Нет персон</h3>
               <p className="text-muted-foreground text-center mb-4">
-                Добавьте до 4 персон с голосами для радио-диалогов
+                Добавьте персоны с голосами для радио-диалогов
               </p>
-              <Button onClick={() => { setVoiceTab("my"); setVoiceSearch(""); setVoiceSearchQuery(""); setSearchGender("all"); setIsAddDialogOpen(true); }} disabled={!canAddMore}>
+              <Button onClick={() => { setVoiceTab("my"); setVoiceSearch(""); setVoiceSearchQuery(""); setSearchGender("all"); setIsAddDialogOpen(true); }}>
                 <Plus className="mr-2 h-4 w-4" />
                 Добавить первую персону
               </Button>
@@ -697,16 +696,6 @@ export default function VoicesPage() {
           </Card>
         )}
       </div>
-
-      {!canAddMore && voices && voices.length >= 4 && (
-        <Card>
-          <CardContent className="py-4">
-            <p className="text-sm text-muted-foreground text-center">
-              Достигнут лимит в 4 персоны. Удалите существующую персону, чтобы добавить новую.
-            </p>
-          </CardContent>
-        </Card>
-      )}
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
