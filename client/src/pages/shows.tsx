@@ -1006,7 +1006,7 @@ export default function ShowsPage() {
                         ) : (
                           <Zap className="mr-2 h-4 w-4" />
                         )}
-                        Пайплайн
+                        Авто-цикл
                       </Button>
                     )}
                   </div>
