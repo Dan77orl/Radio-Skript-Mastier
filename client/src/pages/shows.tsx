@@ -1500,20 +1500,15 @@ export default function ShowsPage() {
             <div className="space-y-5 py-4">
               <div className="space-y-2">
                 <Label>Сколько выпусков создать</Label>
-                <Select
-                  value={String(batchCount)}
-                  onValueChange={(v) => setBatchCount(Number(v))}
+                <Input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={batchCount}
+                  onChange={(e) => setBatchCount(Math.min(30, Math.max(1, Number(e.target.value) || 1)))}
                   disabled={batchGenerating}
-                >
-                  <SelectTrigger data-testid="select-batch-count">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[5, 10, 15, 20, 25, 30, 40, 50].map(n => (
-                      <SelectItem key={n} value={String(n)}>{n}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  data-testid="input-batch-count"
+                />
                 <p className="text-xs text-muted-foreground">
                   Каждый выпуск создаётся по промпту типа передачи{currentType?.useFirecrawl ? " + свежие данные из Firecrawl" : ""}
                 </p>
