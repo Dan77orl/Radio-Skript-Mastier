@@ -2499,11 +2499,15 @@ ${instructions || "Создай альтернативный вариант с �
       }
 
       prompt += `\n\nСТРОГИЕ ПРАВИЛА:
-- Выбери НОВУЮ тему из области психологии, которой НЕТ в списке выше
+- Выбери НОВУЮ тему, которой НЕТ в списке выше
 - НЕ выдумывай названия институтов, университетов и исследований
 - Если есть данные из интернета — используй ТОЛЬКО их как источник фактов
 - Если нет данных — давай практические советы без выдуманных ссылок на исследования
-- НЕ повторяй тему дыхания, медитации или потокового состояния, если они уже были`;
+- НЕ повторяй темы, которые уже были в списке выше
+
+В САМОЙ ПЕРВОЙ СТРОКЕ ответа напиши ТЕМА: и краткое название темы выпуска (2-5 слов). Например:
+ТЕМА: Эффект плацебо в психологии
+После этого начинай сценарий.`;
 
       const ctx = await buildStationContext();
       const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
@@ -2539,9 +2543,20 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         return res.status(500).json({ error: "Не удалось сгенерировать скрипт. Слот не занят, попробуйте снова." });
       }
 
+      let extractedTopic = "";
+      const topicMatch = scriptText.match(/^ТЕМА:\s*(.+)/m);
+      if (topicMatch) {
+        extractedTopic = topicMatch[1].trim();
+        scriptText = scriptText.replace(/^ТЕМА:\s*.+\n*/m, "").trim();
+      }
+
+      const finalTitle = extractedTopic 
+        ? `${programType.name}: ${extractedTopic}`
+        : title;
+
       const program = await storage.createProgram({
         programTypeId: programType.id,
-        title,
+        title: finalTitle,
         prompt,
         scheduledDate: dateStr,
         slotNumber: nextSlot,
