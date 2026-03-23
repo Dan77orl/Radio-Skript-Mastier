@@ -3045,6 +3045,68 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
     }
   });
 
+  app.post("/api/programs/:id/voice-isolate", async (req, res) => {
+    try {
+      const program = await storage.getProgram(req.params.id);
+      if (!program) {
+        return res.status(404).json({ error: "Program not found" });
+      }
+      if (!program.audioUrl) {
+        return res.status(400).json({ error: "No audio file to process" });
+      }
+
+      const settings = await storage.getSettings();
+      if (!settings?.elevenLabsApiKey) {
+        return res.status(400).json({ error: "ElevenLabs API key not configured" });
+      }
+
+      const normalizedUrl = program.audioUrl.startsWith("/") ? program.audioUrl.slice(1) : program.audioUrl;
+      const audioPath = path.join(process.cwd(), "public", normalizedUrl);
+      const audioData = await fs.readFile(audioPath);
+
+      const FormData = (await import("form-data")).default;
+      const formData = new FormData();
+      formData.append("audio", audioData, {
+        filename: path.basename(audioPath),
+        contentType: "audio/mpeg",
+      });
+
+      console.log(`Voice isolating audio for program ${program.id}...`);
+      const response = await fetch("https://api.elevenlabs.io/v1/audio-isolation", {
+        method: "POST",
+        headers: {
+          "xi-api-key": settings.elevenLabsApiKey!,
+          ...formData.getHeaders(),
+        },
+        body: formData.getBuffer(),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`ElevenLabs Voice Isolator error: ${response.status} - ${errorText}`);
+      }
+
+      const resultBuffer = Buffer.from(await response.arrayBuffer());
+      const audioDir = path.join(process.cwd(), "public", "audio");
+      await fs.mkdir(audioDir, { recursive: true });
+
+      const originalFilename = path.basename(audioPath, path.extname(audioPath));
+      const isolatedFilename = `${originalFilename}_isolated.mp3`;
+      const isolatedPath = path.join(audioDir, isolatedFilename);
+      await fs.writeFile(isolatedPath, resultBuffer);
+
+      const updated = await storage.updateProgram(program.id, {
+        audioUrl: `/audio/${isolatedFilename}`,
+      });
+
+      console.log(`Voice isolation complete for program ${program.id}: /audio/${isolatedFilename}`);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error in voice isolation:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Voice isolation failed" });
+    }
+  });
+
   app.get("/api/automations", async (req, res) => {
     try {
       const automationsList = await storage.getAutomations();

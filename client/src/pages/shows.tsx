@@ -62,6 +62,7 @@ import {
   ChevronRight,
   Search,
   Filter,
+  AudioLines,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
@@ -218,6 +219,7 @@ export default function ShowsPage() {
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
   const [programFilter, setProgramFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isolatingId, setIsolatingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: appSettings } = useQuery<AppSettings>({
@@ -389,6 +391,23 @@ export default function ShowsPage() {
     },
     onError: (error: Error) => {
       toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const voiceIsolateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      setIsolatingId(id);
+      const response = await apiRequest("POST", `/api/programs/${id}/voice-isolate`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
+      toast({ title: "Голосоизолятор применён", description: "Шум удалён, аудио обновлено" });
+      setIsolatingId(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка голосоизолятора", description: error.message, variant: "destructive" });
+      setIsolatingId(null);
     },
   });
 
@@ -1203,6 +1222,20 @@ export default function ShowsPage() {
                                     <Download className="h-4 w-4" />
                                   </Button>
                                 </a>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  title="Голосоизолятор — убрать шум"
+                                  onClick={() => voiceIsolateMutation.mutate(program.id)}
+                                  disabled={isolatingId === program.id}
+                                  data-testid={`button-isolate-${program.id}`}
+                                >
+                                  {isolatingId === program.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <AudioLines className="h-4 w-4" />
+                                  )}
+                                </Button>
                               </>
                             )}
                             <AlertDialog>
