@@ -2347,6 +2347,29 @@ ${instructions || "Создай альтернативный вариант с �
 
       const title = `${programType.name} ${dateStr} #${nextSlot}`;
 
+      const voicesList = await storage.getVoices();
+      const assignedVoices = resolveAssignedVoices(voicesList, programType);
+      const isMultiSpeaker = assignedVoices.length >= 2;
+
+      if (isMultiSpeaker) {
+        const speakerList = assignedVoices.map((v: any) => v.personaName || v.name).join(", ");
+        prompt += `\n\nФОРМАТ: мульти-спикерный скрипт. Спикеры: ${speakerList}
+Каждая реплика начинается с [Имя]: и содержит теги эмоций.
+Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
+Пример:
+[${assignedVoices[0]?.personaName || assignedVoices[0]?.name}]: [energetic] [fast] Текст...
+[${assignedVoices[1]?.personaName || assignedVoices[1]?.name}]: [announcer] ЗАГОЛОВОК`;
+      }
+
+      const latestRef = existingPrograms
+        .filter(p => p.scriptText && p.scriptText.includes("]:"))
+        .sort((a, b) => (b.id > a.id ? 1 : -1))
+        .slice(0, 1)[0];
+
+      if (latestRef?.scriptText) {
+        prompt += `\n\nОБРАЗЕЦ — предыдущий выпуск. Следуй ТОЧНО такому же формату, стилю назначения спикеров и распределению реплик:\n---\n${latestRef.scriptText.substring(0, 5000)}\n---\nСоздай НОВЫЙ выпуск на другую тему, но в таком же формате.`;
+      }
+
       const ctx = await buildStationContext();
       const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
@@ -2522,6 +2545,15 @@ ${programType.defaultPrompt}
 [${assignedVoices[0]?.personaName || assignedVoices[0]?.name}]: [energetic] [fast] Текст...
 [${assignedVoices[1]?.personaName || assignedVoices[1]?.name}]: [announcer] ЗАГОЛОВОК
 \n`;
+      }
+
+      const latestRef = existingPrograms
+        .filter(p => p.scriptText && p.scriptText.includes("]:"))
+        .sort((a, b) => (b.id > a.id ? 1 : -1))
+        .slice(0, 1)[0];
+
+      if (latestRef?.scriptText) {
+        prompt += `\nОБРАЗЕЦ — последний выпуск с назначенными дикторами. Следуй ТОЧНО такому же формату и стилю:\n---\n${latestRef.scriptText.substring(0, 5000)}\n---\n`;
       }
 
       if (referenceContent) {

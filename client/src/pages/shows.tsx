@@ -199,6 +199,8 @@ export default function ShowsPage() {
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchResult, setBatchResult] = useState<{ created: number; total: number; errors: string[] } | null>(null);
   const [viewScriptProgram, setViewScriptProgram] = useState<Program | null>(null);
+  const [editingBlocks, setEditingBlocks] = useState<{ text: string; speaker: string }[] | null>(null);
+  const [savingScript, setSavingScript] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: appSettings } = useQuery<AppSettings>({
@@ -453,6 +455,68 @@ export default function ShowsPage() {
   const isMultiSpeaker = (text: string) => {
     const matches = text.match(/^\[([^\]]+)\]:/gm);
     return !!matches && matches.length >= 2;
+  };
+
+  const parseScriptToBlocks = (scriptText: string): { text: string; speaker: string }[] => {
+    if (isMultiSpeaker(scriptText)) {
+      const blocks: { text: string; speaker: string }[] = [];
+      let currentSpeaker = "";
+      let currentText = "";
+      for (const line of scriptText.split("\n")) {
+        const match = line.match(/^\s*\[([^\]]+)\]:\s*(.*)/);
+        if (match) {
+          if (currentText.trim()) {
+            blocks.push({ text: currentText.trim(), speaker: currentSpeaker });
+          }
+          currentSpeaker = match[1];
+          currentText = match[2] + "\n";
+        } else {
+          currentText += line + "\n";
+        }
+      }
+      if (currentText.trim()) {
+        blocks.push({ text: currentText.trim(), speaker: currentSpeaker });
+      }
+      return blocks;
+    }
+
+    const paragraphs = scriptText.split(/\n\s*\n/).filter(p => p.trim());
+    return paragraphs.map(p => ({ text: p.trim(), speaker: "" }));
+  };
+
+  const blocksToScript = (blocks: { text: string; speaker: string }[]): string => {
+    return blocks
+      .map(b => b.speaker ? `[${b.speaker}]: ${b.text}` : b.text)
+      .join("\n\n");
+  };
+
+  const startEditingScript = () => {
+    if (!viewScriptProgram?.scriptText) return;
+    const blocks = parseScriptToBlocks(viewScriptProgram.scriptText);
+    setEditingBlocks(blocks);
+  };
+
+  const saveEditedScript = async () => {
+    if (!viewScriptProgram || !editingBlocks) return;
+    setSavingScript(true);
+    try {
+      const newScript = blocksToScript(editingBlocks);
+      await apiRequest("PATCH", `/api/programs/${viewScriptProgram.id}`, {
+        scriptText: newScript,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/programs"] });
+      setViewScriptProgram({ ...viewScriptProgram, scriptText: newScript });
+      setEditingBlocks(null);
+      toast({ title: "Скрипт сохранён", description: "Назначение дикторов обновлено" });
+    } catch (err) {
+      toast({ title: "Ошибка", description: "Не удалось сохранить скрипт", variant: "destructive" });
+    } finally {
+      setSavingScript(false);
+    }
+  };
+
+  const getAssignedVoicesForType = (typeId: string) => {
+    return voices?.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(typeId)) || [];
   };
 
   const openSettingsDialog = (type: ProgramType) => {
@@ -1300,7 +1364,7 @@ export default function ShowsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!viewScriptProgram} onOpenChange={(open) => !open && setViewScriptProgram(null)}>
+      <Dialog open={!!viewScriptProgram} onOpenChange={(open) => { if (!open) { setViewScriptProgram(null); setEditingBlocks(null); } }}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1314,15 +1378,73 @@ export default function ShowsPage() {
               {viewScriptProgram?.slotNumber && ` • Слот #${viewScriptProgram.slotNumber}`}
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-2">
-            {viewScriptProgram?.scriptText && isMultiSpeaker(viewScriptProgram.scriptText) ? (
-              <div className="space-y-0">{renderMultiSpeakerScript(viewScriptProgram.scriptText)}</div>
-            ) : (
-              <pre className="whitespace-pre-wrap text-sm font-sans leading-relaxed">
-                {viewScriptProgram?.scriptText}
-              </pre>
-            )}
-          </div>
+
+          {editingBlocks ? (
+            <div className="mt-2 space-y-3">
+              <p className="text-sm text-muted-foreground">Назначьте диктора для каждого блока:</p>
+              {editingBlocks.map((block, idx) => {
+                const typeVoices = viewScriptProgram?.programTypeId
+                  ? getAssignedVoicesForType(viewScriptProgram.programTypeId)
+                  : [];
+                return (
+                  <div key={idx} className="border rounded-lg p-3 space-y-2">
+                    <Select
+                      value={block.speaker || "__none__"}
+                      onValueChange={(val) => {
+                        setEditingBlocks(prev => {
+                          if (!prev) return prev;
+                          const updated = [...prev];
+                          updated[idx] = { ...updated[idx], speaker: val === "__none__" ? "" : val };
+                          return updated;
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="w-full" data-testid={`select-speaker-${idx}`}>
+                        <SelectValue placeholder="Выберите диктора" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Без диктора</SelectItem>
+                        {typeVoices.map(v => (
+                          <SelectItem key={v.id} value={v.personaName || v.name}>
+                            {v.personaName || v.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <pre className="whitespace-pre-wrap text-sm font-sans leading-relaxed bg-muted/30 p-2 rounded">
+                      {renderTextWithEmotionTags(block.text)}
+                    </pre>
+                  </div>
+                );
+              })}
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setEditingBlocks(null)} data-testid="button-cancel-edit-script">
+                  Отмена
+                </Button>
+                <Button onClick={saveEditedScript} disabled={savingScript} data-testid="button-save-script">
+                  {savingScript ? "Сохранение..." : "Сохранить"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2">
+              {viewScriptProgram?.scriptText && isMultiSpeaker(viewScriptProgram.scriptText) ? (
+                <div className="space-y-0">{renderMultiSpeakerScript(viewScriptProgram.scriptText)}</div>
+              ) : (
+                <pre className="whitespace-pre-wrap text-sm font-sans leading-relaxed">
+                  {viewScriptProgram?.scriptText}
+                </pre>
+              )}
+              {viewScriptProgram?.programTypeId && getAssignedVoicesForType(viewScriptProgram.programTypeId).length >= 1 && (
+                <div className="mt-4 flex justify-end">
+                  <Button variant="outline" onClick={startEditingScript} data-testid="button-assign-speakers">
+                    <Users className="mr-2 h-4 w-4" />
+                    {viewScriptProgram?.scriptText && isMultiSpeaker(viewScriptProgram.scriptText) ? "Переназначить дикторов" : "Назначить дикторов"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
