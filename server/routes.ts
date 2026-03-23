@@ -176,6 +176,25 @@ function resolveAssignedVoices(voicesList: any[], programType: any): any[] {
   return voicesList.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(programType.id));
 }
 
+function resolveFileName(template: string | null | undefined, programType: any, program: any, timestamp: number): string {
+  if (!template || !template.trim()) {
+    return `program_${timestamp}.mp3`;
+  }
+  const date = program.scheduledDate || new Date().toISOString().split("T")[0];
+  const slot = program.slotNumber || 1;
+  const name = template
+    .replace(/\{название\}/gi, programType.name || "program")
+    .replace(/\{name\}/gi, programType.name || "program")
+    .replace(/\{дата\}/gi, date)
+    .replace(/\{date\}/gi, date)
+    .replace(/\{номер\}/gi, String(slot))
+    .replace(/\{number\}/gi, String(slot))
+    .replace(/\{id\}/gi, String(timestamp));
+  const sanitized = name.replace(/[<>:"|?*\/\\]/g, "_").trim();
+  if (!sanitized) return `program_${timestamp}.mp3`;
+  return sanitized.endsWith(".mp3") ? sanitized : `${sanitized}.mp3`;
+}
+
 function stripEmotionTags(text: string): string {
   return text.replace(/\[(energetic|fast|slow|surprised|thoughtful|happy|sad|exclaims|announcer|serious|calm|excited|warm|dramatic|whisper|loud|gentle|playful|confident|nervous|angry|romantic|mysterious|urgent|casual|formal|ironic|sarcastic)\]/gi, "").replace(/\s{2,}/g, " ").trim();
 }
@@ -2950,7 +2969,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         }
 
         const combined = Buffer.concat(audioBuffers);
-        const filename = `program_${timestamp}.mp3`;
+        const filename = resolveFileName(programType?.fileNameTemplate, programType, program, timestamp);
         await fs.writeFile(path.join(audioDir, filename), combined);
 
         const totalExpected = segments.filter(s => stripEmotionTags(s.text).length > 0).length;
@@ -2972,7 +2991,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         }
 
         const buffer = await generateVoiceSegment(program.scriptText, activeVoice.elevenLabsVoiceId);
-        const filename = `program_${timestamp}.mp3`;
+        const filename = resolveFileName(programType?.fileNameTemplate, programType, program, timestamp);
         await fs.writeFile(path.join(audioDir, filename), buffer);
 
         const updated = await storage.updateProgram(program.id, {

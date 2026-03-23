@@ -616,6 +616,7 @@ export default function ShowsPage() {
         weeklyCount: settingsType.weeklyCount || 7,
         autoVoice: settingsType.autoVoice !== false,
         autoUpload: settingsType.autoUpload !== false,
+        fileNameTemplate: settingsType.fileNameTemplate || "",
         useFirecrawl: settingsType.useFirecrawl || false,
         firecrawlTopics: settingsType.firecrawlTopics || [],
       },
@@ -1230,6 +1231,19 @@ export default function ShowsPage() {
                     />
                   </div>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Шаблон имени файла</Label>
+                <Input
+                  placeholder="Например: {название}_{дата}_{номер}"
+                  value={settingsType.fileNameTemplate || ""}
+                  onChange={(e) => setSettingsType(prev => prev ? { ...prev, fileNameTemplate: e.target.value } : null)}
+                  data-testid="input-file-name-template"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Переменные: <code>{"{название}"}</code> — имя передачи, <code>{"{дата}"}</code> — дата выпуска, <code>{"{номер}"}</code> — номер слота. Пример: <code>ПсихОфф_{"{дата}"}_{"{номер}"}</code> → <code>ПсихОфф_2026-03-24_1.mp3</code>
+                </p>
               </div>
 
               {voices && voices.length > 0 && (() => {
