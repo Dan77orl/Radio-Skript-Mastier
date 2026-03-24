@@ -3418,7 +3418,7 @@ ${existingList}
 
       prompt += `\nЦелевой хронометраж: ~${durationStr} минут. Рассчитывай объём текста под эту длительность.`;
 
-      if (programType.useFirecrawl && fcKeywords.length > 0) {
+      if (fcKeywords.length > 0) {
         try {
           const research = await researchForProgram(fcKeywords);
           if (research) {
@@ -3745,6 +3745,14 @@ ${expandedDefaultPrompt}
       }
 
       if (fcKeywords.length > 0) {
+        try {
+          const research = await researchForProgram(fcKeywords);
+          if (research) {
+            prompt += research;
+          }
+        } catch (err: any) {
+          console.error("Firecrawl research in batch-create failed:", err.message);
+        }
         prompt += `\nТематика передачи: ${fcKeywords.join(", ")}. Все выпуски должны быть в рамках этих тем.\n`;
       }
 
