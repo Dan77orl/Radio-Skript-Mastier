@@ -76,9 +76,9 @@ function AppContent() {
   const langSynced = useRef(false);
 
   useEffect(() => {
-    if (user?.language && !langSynced.current) {
+    if (user && !langSynced.current) {
       langSynced.current = true;
-      if (i18n.language !== user.language) {
+      if (user.language && i18n.language !== user.language) {
         i18n.changeLanguage(user.language);
       }
     }
