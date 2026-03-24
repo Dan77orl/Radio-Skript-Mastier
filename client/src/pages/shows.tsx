@@ -224,6 +224,8 @@ export default function ShowsPage() {
   const [viewScriptProgram, setViewScriptProgram] = useState<Program | null>(null);
   const [editingBlocks, setEditingBlocks] = useState<{ text: string; speaker: string }[] | null>(null);
   const [savingScript, setSavingScript] = useState(false);
+  const [generatingTypeIds, setGeneratingTypeIds] = useState<Set<string>>(new Set());
+  const [pipelineTypeIds, setPipelineTypeIds] = useState<Set<string>>(new Set());
   const [audioQueue, setAudioQueue] = useState<string[]>([]);
   const [generatingAudioId, setGeneratingAudioId] = useState<string | null>(null);
   const audioQueueRef = useRef<string[]>([]);
@@ -316,28 +318,34 @@ export default function ShowsPage() {
 
   const autoCreateMutation = useMutation({
     mutationFn: async (typeId: string) => {
+      setGeneratingTypeIds(prev => new Set(prev).add(typeId));
       const response = await apiRequest("POST", `/api/programs/auto-create/${typeId}`);
-      return response.json();
+      return { data: await response.json(), typeId };
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
+    onSuccess: ({ data, typeId }) => {
+      setGeneratingTypeIds(prev => { const next = new Set(prev); next.delete(typeId); return next; });
+      queryClient.invalidateQueries({ queryKey: ["/api/programs", typeId] });
       toast({ title: t("shows.programCreated"), description: data.title });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, typeId) => {
+      setGeneratingTypeIds(prev => { const next = new Set(prev); next.delete(typeId); return next; });
       toast({ title: t("shows.error"), description: error.message, variant: "destructive" });
     },
   });
 
   const pipelineMutation = useMutation({
     mutationFn: async ({ typeId, count }: { typeId: string; count: number }) => {
+      setPipelineTypeIds(prev => new Set(prev).add(typeId));
       const response = await apiRequest("POST", `/api/programs/${typeId}/auto-pipeline`, { count });
-      return response.json();
+      return { data: await response.json(), typeId };
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
+    onSuccess: ({ data, typeId }) => {
+      setPipelineTypeIds(prev => { const next = new Set(prev); next.delete(typeId); return next; });
+      queryClient.invalidateQueries({ queryKey: ["/api/programs", typeId] });
       toast({ title: t("shows.pipelineCompleted"), description: t("shows.pipelineResult", { succeeded: data.succeeded, total: data.total }) });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, { typeId }) => {
+      setPipelineTypeIds(prev => { const next = new Set(prev); next.delete(typeId); return next; });
       toast({ title: t("shows.pipelineErrorMsg"), description: error.message, variant: "destructive" });
     },
   });
@@ -984,10 +992,10 @@ export default function ShowsPage() {
                         <Button
                           size="sm"
                           onClick={() => autoCreateMutation.mutate(type.id)}
-                          disabled={autoCreateMutation.isPending}
+                          disabled={generatingTypeIds.has(type.id)}
                           data-testid="button-auto-create"
                         >
-                          {autoCreateMutation.isPending ? (
+                          {generatingTypeIds.has(type.id) ? (
                             <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                           ) : (
                             <Zap className="mr-1.5 h-4 w-4" />
@@ -1047,10 +1055,10 @@ export default function ShowsPage() {
                           size="sm"
                           className="h-7 shrink-0 border-green-300 dark:border-green-700 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900"
                           onClick={() => pipelineMutation.mutate({ typeId: type.id, count: Math.ceil((type.weeklyCount || 7) / 7) })}
-                          disabled={pipelineMutation.isPending}
+                          disabled={pipelineTypeIds.has(type.id)}
                           data-testid="button-run-pipeline"
                         >
-                          {pipelineMutation.isPending ? (
+                          {pipelineTypeIds.has(type.id) ? (
                             <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
                           ) : (
                             <Zap className="mr-1 h-3.5 w-3.5" />
