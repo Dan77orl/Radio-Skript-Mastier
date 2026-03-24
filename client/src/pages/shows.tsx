@@ -716,6 +716,7 @@ export default function ShowsPage() {
         scheduleDays: settingsType.scheduleDays || [],
         scheduleTime: settingsType.scheduleTime || "09:00",
         fileNameTemplate: settingsType.fileNameTemplate || "",
+        scriptTemplate: settingsType.scriptTemplate || "",
         useFirecrawl: settingsType.useFirecrawl || false,
         firecrawlTopics: settingsType.firecrawlTopics || [],
       },
@@ -1733,6 +1734,35 @@ export default function ShowsPage() {
                   </div>
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label>{t("shows.scriptTemplateLabel")}</Label>
+                <p className="text-xs text-muted-foreground">
+                  {t("shows.scriptTemplateDesc")}
+                </p>
+                <textarea
+                  className="w-full min-h-[120px] p-3 rounded-md border bg-background text-sm font-mono resize-y"
+                  placeholder={t("shows.scriptTemplatePlaceholder")}
+                  value={settingsType.scriptTemplate || ""}
+                  onChange={(e) => setSettingsType(prev => prev ? { ...prev, scriptTemplate: e.target.value } : null)}
+                  data-testid="textarea-script-template"
+                />
+                {!settingsType.scriptTemplate && voices && voices.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(settingsType.id)).length >= 2 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const assignedVoices = voices.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(settingsType.id));
+                      const names = assignedVoices.map(v => getCleanVoiceName(v));
+                      const template = `Открытие: [${names[0]}] — объявляет передачу, представляет ведущего\nОсновная часть: [${names.length > 1 ? names[1] : names[0]}] — ведёт весь выпуск\nЗакрытие: [${names[0]}] — прощается со слушателями`;
+                      setSettingsType(prev => prev ? { ...prev, scriptTemplate: template } : null);
+                    }}
+                    data-testid="button-generate-script-template"
+                  >
+                    {t("shows.scriptTemplateGenerate")}
+                  </Button>
+                )}
+              </div>
 
               <div className="space-y-3 border rounded-lg p-3 sm:p-4 bg-muted/20 min-w-0">
                 <Label className="text-base font-semibold">{t("shows.firecrawlTitle")}</Label>

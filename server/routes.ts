@@ -3548,6 +3548,12 @@ ${existingList}
 НЕ пиши текст без префикса [${speakerNames[0]}]:! Каждый блок должен начинаться с имени ведущего.`;
       }
 
+      if (programType.scriptTemplate) {
+        prompt += `\n\nСТРУКТУРА СЦЕНАРИЯ — СТРОГО СЛЕДУЙ ЭТОМУ ШАБЛОНУ:
+${programType.scriptTemplate}
+ВАЖНО: Распределяй текст между спикерами ТОЧНО по этой структуре. Каждый спикер выполняет ТОЛЬКО свою роль, указанную выше.`;
+      }
+
       {
         const scriptsWithFormat = existingPrograms
           .filter(p => p.scriptText && p.scriptText.includes("]:"))
@@ -3840,6 +3846,12 @@ ${expandedDefaultPrompt}
 \n`;
       }
 
+      if (programType.scriptTemplate) {
+        prompt += `\nСТРУКТУРА СЦЕНАРИЯ — СТРОГО СЛЕДУЙ ЭТОМУ ШАБЛОНУ:
+${programType.scriptTemplate}
+ВАЖНО: Распределяй текст между спикерами ТОЧНО по этой структуре. Каждый спикер выполняет ТОЛЬКО свою роль, указанную выше.\n`;
+      }
+
       {
         const latestRef = existingPrograms
           .filter(p => p.scriptText && p.scriptText.includes("]:"))
@@ -4077,6 +4089,12 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
 НЕ пиши текст без префикса [${singleSpeakerName}]:! Каждый блок должен начинаться с имени ведущего.
 Создавай контент на русском языке.`;
+      }
+
+      if (programType.scriptTemplate) {
+        systemPrompt += `\n\nСТРУКТУРА СЦЕНАРИЯ — СТРОГО СЛЕДУЙ ЭТОМУ ШАБЛОНУ:
+${programType.scriptTemplate}
+ВАЖНО: Распределяй текст между спикерами ТОЧНО по этой структуре. Каждый спикер выполняет ТОЛЬКО свою роль, указанную выше.`;
       }
 
       const genDurationSec = programType.defaultDurationSeconds || 60;

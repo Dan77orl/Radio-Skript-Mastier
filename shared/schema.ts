@@ -250,6 +250,7 @@ export const programTypes = pgTable("program_types", {
   scheduleDays: integer("schedule_days").array(),
   scheduleTime: text("schedule_time"),
   fileNameTemplate: text("file_name_template"),
+  scriptTemplate: text("script_template"),
   useFirecrawl: boolean("use_firecrawl").default(false),
   firecrawlTopics: text("firecrawl_topics").array(),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
