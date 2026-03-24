@@ -648,6 +648,7 @@
     "sponsor": "ผู้สนับสนุน: {{name}}",
     "next": "ถัดไป: {{desc}}",
     "multiSpeaker": "หลายเสียง",
+    "singleSpeaker": "Speaker",
     "statusPending": "รอดำเนินการ",
     "statusScriptReady": "สคริปต์พร้อม",
     "statusReady": "พร้อม",

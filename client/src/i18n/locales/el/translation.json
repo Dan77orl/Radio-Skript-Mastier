@@ -648,6 +648,7 @@
     "sponsor": "Χορηγός: {{name}}",
     "next": "Επόμενο: {{desc}}",
     "multiSpeaker": "Πολλαπλοί ομιλητές",
+    "singleSpeaker": "Speaker",
     "statusPending": "Εκκρεμεί",
     "statusScriptReady": "Το σενάριο είναι έτοιμο",
     "statusReady": "Έτοιμο",

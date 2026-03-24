@@ -648,6 +648,7 @@
     "sponsor": "Sponzor: {{name}}",
     "next": "Ďalšie: {{desc}}",
     "multiSpeaker": "Viacero hovorcov",
+    "singleSpeaker": "Speaker",
     "statusPending": "Čaká na spracovanie",
     "statusScriptReady": "Scenár pripravený",
     "statusReady": "Pripravené",

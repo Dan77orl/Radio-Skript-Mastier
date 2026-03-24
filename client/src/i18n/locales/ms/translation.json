@@ -648,6 +648,7 @@
     "sponsor": "Penaja: {{name}}",
     "next": "Seterusnya: {{desc}}",
     "multiSpeaker": "Multi-pembicara",
+    "singleSpeaker": "Speaker",
     "statusPending": "Menunggu",
     "statusScriptReady": "Skrip sedia",
     "statusReady": "Sedia",

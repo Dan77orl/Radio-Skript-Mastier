@@ -648,6 +648,7 @@
     "sponsor": "Спонзор: {{name}}",
     "next": "Следно: {{desc}}",
     "multiSpeaker": "Мулти-глас",
+    "singleSpeaker": "Speaker",
     "statusPending": "Во чекање",
     "statusScriptReady": "Сценариото е подготвено",
     "statusReady": "Подготвено",

@@ -648,6 +648,7 @@
     "sponsor": "Sponsor: {{name}}",
     "next": "Järgmine: {{desc}}",
     "multiSpeaker": "Mitme kõneleja",
+    "singleSpeaker": "Speaker",
     "statusPending": "Ootel",
     "statusScriptReady": "Stsenaarium valmis",
     "statusReady": "Valmis",

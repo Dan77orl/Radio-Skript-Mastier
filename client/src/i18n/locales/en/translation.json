@@ -662,6 +662,7 @@
     "sponsor": "Sponsor: {{name}}",
     "next": "Next: {{desc}}",
     "multiSpeaker": "Multi-speaker",
+    "singleSpeaker": "Speaker",
     "statusPending": "Pending",
     "statusScriptReady": "Script ready",
     "statusReady": "Ready",

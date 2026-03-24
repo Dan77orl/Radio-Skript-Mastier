@@ -648,6 +648,7 @@
     "sponsor": "Հովանավոր: {{name}}",
     "next": "Հաջորդ: {{desc}}",
     "multiSpeaker": "Բազմաձայն",
+    "singleSpeaker": "Speaker",
     "statusPending": "Սպասման մեջ",
     "statusScriptReady": "Սցենարը պատրաստ է",
     "statusReady": "Պատրաստ",

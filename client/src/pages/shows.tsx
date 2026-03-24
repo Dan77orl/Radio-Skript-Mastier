@@ -58,6 +58,7 @@ import {
   CheckCircle2,
   XCircle,
   Eye,
+  User,
   Users,
   Download,
   ChevronDown,
@@ -553,16 +554,23 @@ export default function ShowsPage() {
     });
   };
 
+  const hasFormattedSpeakers = (text: string) => {
+    const matches = text.match(/^\[([^\]]+)\]:/gm);
+    return !!matches && matches.length >= 1;
+  };
+
   const isMultiSpeaker = (text: string) => {
     const matches = text.match(/^\[([^\]]+)\]:/gm);
-    return !!matches && matches.length >= 2;
+    if (!matches || matches.length < 1) return false;
+    const uniqueSpeakers = new Set(matches.map(m => m.replace(/[\[\]:]/g, "")));
+    return uniqueSpeakers.size >= 2;
   };
 
   const EMOTION_TAGS = ["energetic", "fast", "slow", "surprised", "thoughtful", "happy", "sad", "exclaims", "announcer", "serious", "calm", "excited", "warm", "dramatic", "whisper", "loud", "gentle", "playful", "confident"];
   const tagPattern = new RegExp(`^\\s*\\[(${EMOTION_TAGS.join("|")})\\]`, "i");
 
   const parseScriptToBlocks = (scriptText: string): { text: string; speaker: string }[] => {
-    if (isMultiSpeaker(scriptText)) {
+    if (hasFormattedSpeakers(scriptText)) {
       const blocks: { text: string; speaker: string }[] = [];
       let currentSpeaker = "";
       let currentText = "";
@@ -1183,10 +1191,16 @@ export default function ShowsPage() {
                             </div>
                             {program.scriptText && (
                               <div className="mt-1">
-                                {isMultiSpeaker(program.scriptText) ? (
+                                {hasFormattedSpeakers(program.scriptText) ? (
                                   <div className="flex items-center gap-1.5">
-                                    <Users className="h-3.5 w-3.5 text-violet-500" />
-                                    <span className="text-xs text-violet-600 dark:text-violet-400 font-medium">{t("shows.multiSpeaker")}</span>
+                                    {isMultiSpeaker(program.scriptText) ? (
+                                      <Users className="h-3.5 w-3.5 text-violet-500" />
+                                    ) : (
+                                      <User className="h-3.5 w-3.5 text-violet-500" />
+                                    )}
+                                    <span className="text-xs text-violet-600 dark:text-violet-400 font-medium">
+                                      {isMultiSpeaker(program.scriptText) ? t("shows.multiSpeaker") : t("shows.singleSpeaker")}
+                                    </span>
                                     <span className="text-xs text-muted-foreground">•</span>
                                     <span className="text-xs text-muted-foreground truncate max-w-xs">
                                       {program.scriptText.match(/^\[([^\]]+)\]:/gm)?.map(m => m.replace(/[\[\]:]/g, "")).filter((v, i, a) => a.indexOf(v) === i).join(", ")}
@@ -2011,8 +2025,10 @@ export default function ShowsPage() {
         <DialogContent className="!w-[min(42rem,calc(100vw-2rem))] !max-w-none max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {viewScriptProgram?.scriptText && isMultiSpeaker(viewScriptProgram.scriptText) && (
-                <Users className="h-5 w-5 text-violet-500" />
+              {viewScriptProgram?.scriptText && hasFormattedSpeakers(viewScriptProgram.scriptText) && (
+                isMultiSpeaker(viewScriptProgram.scriptText) 
+                  ? <Users className="h-5 w-5 text-violet-500" />
+                  : <User className="h-5 w-5 text-violet-500" />
               )}
               {viewScriptProgram?.title}
             </DialogTitle>
@@ -2071,7 +2087,7 @@ export default function ShowsPage() {
             </div>
           ) : (
             <div className="mt-2">
-              {viewScriptProgram?.scriptText && isMultiSpeaker(viewScriptProgram.scriptText) ? (
+              {viewScriptProgram?.scriptText && hasFormattedSpeakers(viewScriptProgram.scriptText) ? (
                 <div className="space-y-0">{renderMultiSpeakerScript(viewScriptProgram.scriptText)}</div>
               ) : (
                 <pre className="whitespace-pre-wrap text-sm font-sans leading-relaxed">

@@ -648,6 +648,7 @@
     "sponsor": "Sponsori: {{name}}",
     "next": "Tjetra: {{desc}}",
     "multiSpeaker": "Multi-folës",
+    "singleSpeaker": "Speaker",
     "statusPending": "Në pritje",
     "statusScriptReady": "Skripta e gatshme",
     "statusReady": "Gati",

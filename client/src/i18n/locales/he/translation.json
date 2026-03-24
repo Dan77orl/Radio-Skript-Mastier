@@ -648,6 +648,7 @@
     "sponsor": "ספונסר: {{name}}",
     "next": "הבא: {{desc}}",
     "multiSpeaker": "ריבוי דוברים",
+    "singleSpeaker": "Speaker",
     "statusPending": "ממתין",
     "statusScriptReady": "התסריט מוכן",
     "statusReady": "מוכן",

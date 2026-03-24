@@ -648,6 +648,7 @@
     "sponsor": "후원자: {{name}}",
     "next": "다음: {{desc}}",
     "multiSpeaker": "다중 화자",
+    "singleSpeaker": "Speaker",
     "statusPending": "대기 중",
     "statusScriptReady": "스크립트 준비 완료",
     "statusReady": "준비 완료",

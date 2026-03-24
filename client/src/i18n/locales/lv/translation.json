@@ -648,6 +648,7 @@
     "sponsor": "Sponsors: {{name}}",
     "next": "Nākamais: {{desc}}",
     "multiSpeaker": "Vairāki runātāji",
+    "singleSpeaker": "Speaker",
     "statusPending": "Gaidīšanā",
     "statusScriptReady": "Scenārijs gatavs",
     "statusReady": "Gatavs",

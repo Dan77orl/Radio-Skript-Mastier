@@ -648,6 +648,7 @@
     "sponsor": "Спонсор: {{name}}",
     "next": "Следващо: {{desc}}",
     "multiSpeaker": "Много говорители",
+    "singleSpeaker": "Speaker",
     "statusPending": "В очакване",
     "statusScriptReady": "Сценарият е готов",
     "statusReady": "Готово",

@@ -648,6 +648,7 @@
     "sponsor": "Mfadhili: {{name}}",
     "next": "Ifuatayo: {{desc}}",
     "multiSpeaker": "Mzungumzaji wengi",
+    "singleSpeaker": "Speaker",
     "statusPending": "Inasubiri",
     "statusScriptReady": "Script tayari",
     "statusReady": "Tayari",

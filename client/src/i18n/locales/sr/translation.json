@@ -648,6 +648,7 @@
     "sponsor": "Sponzor: {{name}}",
     "next": "Sledeće: {{desc}}",
     "multiSpeaker": "Više govornika",
+    "singleSpeaker": "Speaker",
     "statusPending": "Na čekanju",
     "statusScriptReady": "Scenario spreman",
     "statusReady": "Spremno",

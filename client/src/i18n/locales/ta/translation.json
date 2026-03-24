@@ -648,6 +648,7 @@
     "sponsor": "பணியாளர்: {{name}}",
     "next": "அடுத்தது: {{desc}}",
     "multiSpeaker": "பல பேச்சாளர்கள்",
+    "singleSpeaker": "Speaker",
     "statusPending": "காத்திருக்கிறது",
     "statusScriptReady": "ஸ்கிரிப்ட் தயாராக உள்ளது",
     "statusReady": "தயாராக உள்ளது",

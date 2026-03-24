@@ -648,6 +648,7 @@
     "sponsor": "حامی: {{name}}",
     "next": "بعدی: {{desc}}",
     "multiSpeaker": "چندگویه",
+    "singleSpeaker": "Speaker",
     "statusPending": "در انتظار",
     "statusScriptReady": "سناریو آماده",
     "statusReady": "آماده",

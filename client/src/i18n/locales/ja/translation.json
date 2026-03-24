@@ -648,6 +648,7 @@
     "sponsor": "スポンサー: {{name}}",
     "next": "次: {{desc}}",
     "multiSpeaker": "複数話者",
+    "singleSpeaker": "Speaker",
     "statusPending": "保留中",
     "statusScriptReady": "スクリプト準備完了",
     "statusReady": "準備完了",

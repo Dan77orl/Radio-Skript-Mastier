@@ -648,6 +648,7 @@
     "sponsor": "Homiy: {{name}}",
     "next": "Keyingi: {{desc}}",
     "multiSpeaker": "Ko'p ovozli",
+    "singleSpeaker": "Speaker",
     "statusPending": "Kutish",
     "statusScriptReady": "Ssenariy tayyor",
     "statusReady": "Tayyor",

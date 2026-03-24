@@ -648,6 +648,7 @@
     "sponsor": "Sponsori: {{name}}",
     "next": "Seuraava: {{desc}}",
     "multiSpeaker": "Moniääninen",
+    "singleSpeaker": "Speaker",
     "statusPending": "Odottaa",
     "statusScriptReady": "Käsikirjoitus valmis",
     "statusReady": "Valmis",

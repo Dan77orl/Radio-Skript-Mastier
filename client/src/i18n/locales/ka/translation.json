@@ -648,6 +648,7 @@
     "sponsor": "სპონსორი: {{name}}",
     "next": "შემდეგი: {{desc}}",
     "multiSpeaker": "მრავალხმოვანი",
+    "singleSpeaker": "Speaker",
     "statusPending": "მოლოდინში",
     "statusScriptReady": "სკრიპტი მზადაა",
     "statusReady": "მზადაა",

@@ -648,6 +648,7 @@
     "sponsor": "Szponzor: {{name}}",
     "next": "Következő: {{desc}}",
     "multiSpeaker": "Több beszélő",
+    "singleSpeaker": "Speaker",
     "statusPending": "Függőben",
     "statusScriptReady": "Forgatókönyv kész",
     "statusReady": "Kész",

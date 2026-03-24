@@ -648,6 +648,7 @@
     "sponsor": "Sponzor: {{name}}",
     "next": "Další: {{desc}}",
     "multiSpeaker": "Více mluvčích",
+    "singleSpeaker": "Speaker",
     "statusPending": "Čekající",
     "statusScriptReady": "Scénář připraven",
     "statusReady": "Připraveno",

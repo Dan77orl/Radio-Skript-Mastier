@@ -648,6 +648,7 @@
     "sponsor": "Sponsor: {{name}}",
     "next": "Następny: {{desc}}",
     "multiSpeaker": "Wielogłosowy",
+    "singleSpeaker": "Speaker",
     "statusPending": "Oczekujące",
     "statusScriptReady": "Skrypt gotowy",
     "statusReady": "Gotowe",

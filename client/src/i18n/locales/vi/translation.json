@@ -648,6 +648,7 @@
     "sponsor": "Nhà tài trợ: {{name}}",
     "next": "Tiếp theo: {{desc}}",
     "multiSpeaker": "Nhiều người nói",
+    "singleSpeaker": "Speaker",
     "statusPending": "Đang chờ",
     "statusScriptReady": "Kịch bản đã sẵn sàng",
     "statusReady": "Sẵn sàng",

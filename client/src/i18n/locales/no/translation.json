@@ -648,6 +648,7 @@
     "sponsor": "Sponsor: {{name}}",
     "next": "Neste: {{desc}}",
     "multiSpeaker": "Flere talere",
+    "singleSpeaker": "Speaker",
     "statusPending": "Venter",
     "statusScriptReady": "Manus klart",
     "statusReady": "Klar",

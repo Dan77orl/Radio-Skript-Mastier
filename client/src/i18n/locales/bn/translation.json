@@ -648,6 +648,7 @@
     "sponsor": "স্পন্সর: {{name}}",
     "next": "পরবর্তী: {{desc}}",
     "multiSpeaker": "একাধিক বক্তা",
+    "singleSpeaker": "Speaker",
     "statusPending": "অপেক্ষমাণ",
     "statusScriptReady": "স্ক্রিপ্ট প্রস্তুত",
     "statusReady": "প্রস্তুত",

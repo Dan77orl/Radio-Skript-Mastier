@@ -680,6 +680,7 @@
     "sponsor": "Спонсор: {{name}}",
     "next": "След.: {{desc}}",
     "multiSpeaker": "Мульти-спикер",
+    "singleSpeaker": "Ведущий",
     "statusPending": "Ожидает",
     "statusScriptReady": "Скрипт готов",
     "statusReady": "Готово",

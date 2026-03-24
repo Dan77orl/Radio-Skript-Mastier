@@ -648,6 +648,7 @@
     "sponsor": "Sponsor: {{name}}",
     "next": "Selanjutnya: {{desc}}",
     "multiSpeaker": "Multi-pembicara",
+    "singleSpeaker": "Speaker",
     "statusPending": "Menunggu",
     "statusScriptReady": "Skrip siap",
     "statusReady": "Siap",

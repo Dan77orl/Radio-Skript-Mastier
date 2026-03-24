@@ -648,6 +648,7 @@
     "sponsor": "الراعي: {{name}}",
     "next": "التالي: {{desc}}",
     "multiSpeaker": "متعدد المتحدثين",
+    "singleSpeaker": "Speaker",
     "statusPending": "معلق",
     "statusScriptReady": "النص جاهز",
     "statusReady": "جاهز",

@@ -648,6 +648,7 @@
     "sponsor": "Rėmėjas: {{name}}  ",
     "next": "Kitas: {{desc}}  ",
     "multiSpeaker": "Daugiabalsis  ",
+    "singleSpeaker": "Speaker",
     "statusPending": "Laukiama  ",
     "statusScriptReady": "Scenarijus paruoštas  ",
     "statusReady": "Paruošta  ",

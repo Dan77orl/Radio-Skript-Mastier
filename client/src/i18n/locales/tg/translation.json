@@ -648,6 +648,7 @@
     "sponsor": "Масъулият: {{name}}",
     "next": "Пасандоз: {{desc}}",
     "multiSpeaker": "Мулти-садо",
+    "singleSpeaker": "Speaker",
     "statusPending": "Дар интизор",
     "statusScriptReady": "Сценарий омода",
     "statusReady": "Омода",

@@ -648,6 +648,7 @@
     "sponsor": "प्रायोजक: {{name}}",
     "next": "अगला: {{desc}}",
     "multiSpeaker": "बहु-स्वर",
+    "singleSpeaker": "Speaker",
     "statusPending": "लंबित",
     "statusScriptReady": "स्क्रिप्ट तैयार",
     "statusReady": "तैयार",

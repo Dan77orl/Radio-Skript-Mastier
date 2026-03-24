@@ -648,6 +648,7 @@
     "sponsor": "赞助商: {{name}}",
     "next": "下一个: {{desc}}",
     "multiSpeaker": "多语音",
+    "singleSpeaker": "Speaker",
     "statusPending": "待处理",
     "statusScriptReady": "脚本准备好",
     "statusReady": "准备好",

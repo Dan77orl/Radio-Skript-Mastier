@@ -648,6 +648,7 @@
     "sponsor": "Sponsor: {{name}}",
     "next": "Următor: {{desc}}",
     "multiSpeaker": "Multi-voci",
+    "singleSpeaker": "Speaker",
     "statusPending": "În așteptare",
     "statusScriptReady": "Script gata",
     "statusReady": "Gata",

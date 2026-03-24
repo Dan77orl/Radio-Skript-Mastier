@@ -648,6 +648,7 @@
     "sponsor": "Sponsor: {{name}}",
     "next": "Növbəti: {{desc}}",
     "multiSpeaker": "Çoxlu danışan",
+    "singleSpeaker": "Speaker",
     "statusPending": "Gözləmədə",
     "statusScriptReady": "Ssenari hazır",
     "statusReady": "Hazır",
