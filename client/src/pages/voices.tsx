@@ -177,7 +177,7 @@ export default function VoicesPage() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка",
+        title: t("common.error"),
         description: error.message,
         variant: "destructive",
       });
@@ -524,7 +524,7 @@ export default function VoicesPage() {
                                   </Badge>
                                 </div>
                                 <div className="flex gap-2 text-xs text-muted-foreground mt-1">
-                                  {voice.labels?.accent && <span>Акцент: {voice.labels.accent}</span>}
+                                  {voice.labels?.accent && <span>{t("voices.accent")}: {voice.labels.accent}</span>}
                                   {voice.labels?.language && <span>• {voice.labels.language}</span>}
                                   {voice.labels?.use_case && <span>• {voice.labels.use_case}</span>}
                                 </div>
@@ -550,7 +550,7 @@ export default function VoicesPage() {
                           ))}
                           {searchData.has_more && (
                             <p className="text-xs text-center text-muted-foreground py-2">
-                              Показано {searchData.voices.length} из {searchData.total_count}. Уточните поиск для более точных результатов.
+                              {t("voices.showingResults", { shown: searchData.voices.length, total: searchData.total_count })}
                             </p>
                           )}
                         </div>
@@ -558,7 +558,7 @@ export default function VoicesPage() {
                         <div className="text-center py-6 text-muted-foreground">
                           <Search className="h-10 w-10 mx-auto mb-2 opacity-50" />
                           <p className="text-sm">
-                            {voiceSearchQuery ? "Голоса не найдены" : "Введите запрос для поиска"}
+                            {voiceSearchQuery ? t("voices.notFound") : t("voices.enterQuery")}
                           </p>
                         </div>
                       )}

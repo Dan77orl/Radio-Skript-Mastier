@@ -66,7 +66,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
   const [editPrompt, setEditPrompt] = useState<string>("");
   const [dailyPromptValue, setDailyPromptValue] = useState<string>("");
   const [isDailyPromptDirty, setIsDailyPromptDirty] = useState(false);
-  const [firecrawlTopics, setFirecrawlTopics] = useState<string[]>(["погода Аланья сегодня", "новости Турция"]);
+  const [firecrawlTopics, setFirecrawlTopics] = useState<string[]>(["weather Alanya today", "news Turkey"]);
   const [newTopic, setNewTopic] = useState("");
   const [firecrawlContent, setFirecrawlContent] = useState<string>("");
   const [isFirecrawlOpen, setIsFirecrawlOpen] = useState(false);
@@ -159,8 +159,8 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось сгенерировать диалоги",
+        title: t("common.error"),
+        description: error.message || t("generator.generateError"),
         variant: "destructive",
       });
     },
@@ -182,8 +182,8 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось перегенерировать диалог",
+        title: t("common.error"),
+        description: error.message || t("generator.regenerateError"),
         variant: "destructive",
       });
     },
@@ -203,8 +203,8 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось отправить в автоматизацию",
+        title: t("common.error"),
+        description: error.message || t("generator.automationError"),
         variant: "destructive",
       });
     },
@@ -224,8 +224,8 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось сохранить промпт",
+        title: t("common.error"),
+        description: error.message || t("generator.savePromptError"),
         variant: "destructive",
       });
     },

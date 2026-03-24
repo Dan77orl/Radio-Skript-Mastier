@@ -187,7 +187,11 @@
     "usedInGeneration": "Will be used in generation",
     "promptSettings": "Prompt settings",
     "promptSettingsDescription": "Daily prompt and slot prompts are configured in Settings",
-    "goToSettings": "Go to settings"
+    "goToSettings": "Go to settings",
+    "generateError": "Failed to generate dialogs",
+    "regenerateError": "Failed to regenerate dialog",
+    "automationError": "Failed to send to automation",
+    "savePromptError": "Failed to save prompt"
   },
   "schedule": {
     "title": "Schedule",
@@ -368,7 +372,11 @@
     "deleteVoice": "Delete voice",
     "deleteVoiceConfirm": "Are you sure you want to delete this persona?",
     "noVoicesConfigured": "No personas configured",
-    "addFirstVoice": "Add your first persona"
+    "addFirstVoice": "Add your first persona",
+    "accent": "Accent",
+    "showingResults": "Showing {{shown}} of {{total}}. Refine your search for more precise results.",
+    "notFound": "No voices found",
+    "enterQuery": "Enter a search query"
   },
   "ads": {
     "title": "Ads",

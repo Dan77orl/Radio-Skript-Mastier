@@ -21,8 +21,8 @@ import type { NewsSource, NewsItem } from "@shared/schema";
 import { format } from "date-fns";
 
 const sourceFormSchema = z.object({
-  name: z.string().min(1, "Введите название"),
-  url: z.string().url("Введите корректный URL"),
+  name: z.string().min(1),
+  url: z.string().url(),
   type: z.string().default("rss"),
   language: z.string().default("ru"),
   description: z.string().optional(),

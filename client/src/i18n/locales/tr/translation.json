@@ -187,7 +187,11 @@
     "usedInGeneration": "Oluşturmada kullanılacak",
     "promptSettings": "İstem ayarları",
     "promptSettingsDescription": "Günlük istem ve slot istemleri Ayarlar bölümünde yapılandırılır",
-    "goToSettings": "Ayarlara git"
+    "goToSettings": "Ayarlara git",
+    "generateError": "Diyaloglar oluşturulamadı",
+    "regenerateError": "Diyalog yeniden oluşturulamadı",
+    "automationError": "Otomasyona gönderilemedi",
+    "savePromptError": "Prompt kaydedilemedi"
   },
   "schedule": {
     "title": "Program",
@@ -368,7 +372,11 @@
     "deleteVoice": "Sesi sil",
     "deleteVoiceConfirm": "Bu kişiyi silmek istediğinizden emin misiniz?",
     "noVoicesConfigured": "Kişi yapılandırılmamış",
-    "addFirstVoice": "İlk kişinizi ekleyin"
+    "addFirstVoice": "İlk kişinizi ekleyin",
+    "accent": "Aksan",
+    "showingResults": "{{total}} sonuçtan {{shown}} tanesi gösteriliyor. Daha kesin sonuçlar için aramanızı daraltın.",
+    "notFound": "Ses bulunamadı",
+    "enterQuery": "Aramak için bir sorgu girin"
   },
   "ads": {
     "title": "Reklamlar",

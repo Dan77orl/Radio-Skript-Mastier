@@ -30,7 +30,7 @@ declare global {
 }
 
 const automationFormSchema = z.object({
-  name: z.string().min(1, "Название обязательно"),
+  name: z.string().min(1),
   automationType: z.enum(["dialog", "program"]),
   programTypeId: z.string().optional(),
   voiceIds: z.array(z.string()).optional(),

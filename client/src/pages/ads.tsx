@@ -66,7 +66,7 @@ interface ExtractedFile {
 }
 
 const adFormSchema = z.object({
-  prompt: z.string().min(10, "Описание должно быть не менее 10 символов"),
+  prompt: z.string().min(10),
   clientName: z.string().optional(),
   websiteUrl: z.string().optional(),
   instagramUrl: z.string().optional(),
@@ -966,9 +966,9 @@ export default function AdsPage() {
   const [isPresetDialogOpen, setIsPresetDialogOpen] = useState(false);
 
   const presetFormSchema = z.object({
-    name: z.string().min(2, "Название должно быть не менее 2 символов"),
+    name: z.string().min(2),
     description: z.string().optional(),
-    miniPrompt: z.string().min(10, "Промпт должен быть не менее 10 символов"),
+    miniPrompt: z.string().min(10),
     contentType: z.string().default("single"),
     speakersCount: z.number().min(1).max(3).default(1),
     voiceIds: z.array(z.string()).optional(),
