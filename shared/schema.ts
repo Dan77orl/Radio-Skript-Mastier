@@ -33,6 +33,7 @@ export type User = typeof users.$inferSelect;
 
 export const settings = pgTable("settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),
   elevenLabsApiKey: text("eleven_labs_api_key"),
   anthropicApiKey: text("anthropic_api_key"),
   yandexDiskToken: text("yandex_disk_token"),

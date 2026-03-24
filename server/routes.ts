@@ -308,7 +308,7 @@ export async function registerRoutes(
   
   app.get("/api/settings", async (req, res) => {
     try {
-      const settings = await storage.getSettings();
+      const settings = await storage.getSettings(req.session.userId);
       res.json(settings || {});
     } catch (error) {
       console.error("Error getting settings:", error);
@@ -322,7 +322,7 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.message });
       }
-      const settings = await storage.saveSettings(parsed.data);
+      const settings = await storage.saveSettings(parsed.data, req.session.userId);
       res.json(settings);
     } catch (error) {
       console.error("Error saving settings:", error);

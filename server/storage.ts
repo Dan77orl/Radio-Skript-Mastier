@@ -8,8 +8,8 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
-  getSettings(): Promise<Settings | undefined>;
-  saveSettings(settings: InsertSettings): Promise<Settings>;
+  getSettings(userId?: string): Promise<Settings | undefined>;
+  saveSettings(settings: InsertSettings, userId?: string): Promise<Settings>;
   
   getDialogs(): Promise<Dialog[]>;
   getDialog(id: string): Promise<Dialog | undefined>;
@@ -107,11 +107,16 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getSettings(): Promise<Settings | undefined> {
+  async getSettings(userId?: string): Promise<Settings | undefined> {
+    if (userId) {
+      const [result] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+      if (result) return result;
+    }
     const [result] = await db.select().from(settings).limit(1);
     if (result) return result;
     
     const [defaultSettings] = await db.insert(settings).values({
+      userId: userId || null,
       elevenLabsApiKey: null,
       yandexDiskToken: null,
       maleVoiceId: "onwK4e9ZLuTAKqWW03F9",
@@ -126,11 +131,12 @@ export class DatabaseStorage implements IStorage {
     return defaultSettings;
   }
 
-  async saveSettings(newSettings: InsertSettings): Promise<Settings> {
-    const existing = await this.getSettings();
+  async saveSettings(newSettings: InsertSettings, userId?: string): Promise<Settings> {
+    const existing = await this.getSettings(userId);
     if (existing) {
       const [updated] = await db.update(settings)
         .set({
+          userId: userId || existing.userId,
           elevenLabsApiKey: newSettings.elevenLabsApiKey ?? existing.elevenLabsApiKey,
           yandexDiskToken: newSettings.yandexDiskToken ?? existing.yandexDiskToken,
           maleVoiceId: newSettings.maleVoiceId ?? existing.maleVoiceId,
@@ -149,7 +155,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return updated;
     }
-    const [created] = await db.insert(settings).values(newSettings).returning();
+    const [created] = await db.insert(settings).values({ ...newSettings, userId: userId || null }).returning();
     return created;
   }
 
