@@ -3303,13 +3303,12 @@ ${existingList}
 
       if (hasEpisodeContent || hasUrlContent) {
         prompt += `\n\nКРИТИЧЕСКИ ВАЖНО:
-- Текст выше — это ЭТАЛОННЫЕ ВЫПУСКИ передачи "${programType.name}". Создай НОВЫЙ выпуск ТОЧНО В ТАКОМ ЖЕ стиле и тематической области
+- Текст выше — это ЭТАЛОННЫЕ ВЫПУСКИ передачи "${programType.name}". Создай НОВЫЙ выпуск ТОЧНО В ТАКОМ ЖЕ стиле, формате и тематической области
 - Тематика: оставайся В ТОЙ ЖЕ ПРЕДМЕТНОЙ ОБЛАСТИ (${fcKeywords.length > 0 ? fcKeywords.join(", ") : "как в эталонах выше"})
 - Выбери НОВЫЙ конкретный аспект/угол внутри этой предметной области
 - Ведущий(ая): ${speakerNames.join(", ")}. Используй ТОЧНО ${speakerNames.length === 1 ? "это имя" : "эти имена"} ведущих
 - Сохраняй структуру: приветствие, основная часть, заключение — как в эталонах
-- Используй ОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА, описанный ниже (с [Имя]: и тегами эмоций)
-- НЕ используй markdown-разметку, звёздочки или форматирование`;
+- Пиши ТОЧНО В ТОМ ЖЕ ФОРМАТЕ как в эталонах (без markdown-разметки, без звёздочек, без тегов в квадратных скобках, если их нет в эталонах)`;
       }
 
       if (slotDesc) {
@@ -3358,32 +3357,34 @@ ${existingList}
 
       const title = `${programType.name} ${dateStr} #${nextSlot}`;
 
-      if (isMultiSpeaker) {
-        const speakerList = speakerNames.join(", ");
-        prompt += `\n\nОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА: мульти-спикерный скрипт. Спикеры: ${speakerList}
+      if (!hasEpisodeContent && !hasUrlContent) {
+        if (isMultiSpeaker) {
+          const speakerList = speakerNames.join(", ");
+          prompt += `\n\nОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА: мульти-спикерный скрипт. Спикеры: ${speakerList}
 Каждая реплика ОБЯЗАТЕЛЬНО начинается с [Имя]: и содержит теги эмоций.
 Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
 Пример:
 [${speakerNames[0]}]: [energetic] [fast] Текст...
 [${speakerNames[1] || speakerNames[0]}]: [announcer] ЗАГОЛОВОК`;
-      } else if (speakerNames.length >= 1) {
-        prompt += `\n\nОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА: скрипт с ведущим. Ведущий(ая): ${speakerNames[0]}
+        } else if (speakerNames.length >= 1) {
+          prompt += `\n\nОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА: скрипт с ведущим. Ведущий(ая): ${speakerNames[0]}
 КАЖДЫЙ абзац/блок текста ОБЯЗАТЕЛЬНО начинается с [${speakerNames[0]}]: и содержит теги эмоций в квадратных скобках.
 Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
 Пример:
 [${speakerNames[0]}]: [energetic] [warm] Привет! Текст ведущего...
 [${speakerNames[0]}]: [thoughtful] Следующий блок текста...
 НЕ пиши текст без префикса [${speakerNames[0]}]:! Каждый блок должен начинаться с имени ведущего.`;
-      }
+        }
 
-      const scriptsWithFormat = existingPrograms
-        .filter(p => p.scriptText && p.scriptText.includes("]:"))
-        .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+        const scriptsWithFormat = existingPrograms
+          .filter(p => p.scriptText && p.scriptText.includes("]:"))
+          .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
 
-      const latestRef = scriptsWithFormat[0];
+        const latestRef = scriptsWithFormat[0];
 
-      if (latestRef?.scriptText) {
-        prompt += `\n\nОБРАЗЕЦ ФОРМАТА (копируй формат и стиль, но выбери новый аспект в рамках тематики передачи):\n---\n${latestRef.scriptText.substring(0, 3000)}\n---`;
+        if (latestRef?.scriptText) {
+          prompt += `\n\nОБРАЗЕЦ ФОРМАТА (копируй формат и стиль, но выбери новый аспект в рамках тематики передачи):\n---\n${latestRef.scriptText.substring(0, 3000)}\n---`;
+        }
       }
 
       const existingTitles = existingPrograms
@@ -3612,27 +3613,28 @@ ${expandedDefaultPrompt}
 
       if (hasEpisodeContent || hasUrlContent) {
         prompt += `\nКРИТИЧЕСКИ ВАЖНО:
-- Текст выше — ЭТАЛОННЫЕ ВЫПУСКИ. Создай новые ТОЧНО В ТАКОМ ЖЕ стиле и тематической области
+- Текст выше — ЭТАЛОННЫЕ ВЫПУСКИ. Создай новые ТОЧНО В ТАКОМ ЖЕ стиле, формате и тематической области
 - Тематика: оставайся В ТОЙ ЖЕ ПРЕДМЕТНОЙ ОБЛАСТИ (${fcKeywords.length > 0 ? fcKeywords.join(", ") : "как в эталонах"})
 - Каждый выпуск — НОВЫЙ аспект/угол внутри этой предметной области
 - Ведущий(ая): ${speakerNames.join(", ")}. Используй ТОЧНО ${speakerNames.length === 1 ? "это имя" : "эти имена"} ведущих
 - Сохраняй структуру: приветствие, основная часть, заключение — как в эталонах
-- Используй ОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА, описанный ниже (с [Имя]: и тегами эмоций)
-- НЕ используй markdown-разметку, звёздочки или форматирование
+- Пиши ТОЧНО В ТОМ ЖЕ ФОРМАТЕ как в эталонах (без markdown-разметки, без звёздочек, без тегов в квадратных скобках, если их нет в эталонах)
 `;
       }
 
-      if (isMultiSpeaker) {
-        const speakerList = speakerNames.join(", ");
-        prompt += `\nОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА: мульти-спикерный скрипт. Спикеры: ${speakerList}
+      const hasReferenceContent = !!referenceContent;
+      if (!hasEpisodeContent && !hasUrlContent && !hasReferenceContent) {
+        if (isMultiSpeaker) {
+          const speakerList = speakerNames.join(", ");
+          prompt += `\nОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА: мульти-спикерный скрипт. Спикеры: ${speakerList}
 Каждая реплика ОБЯЗАТЕЛЬНО начинается с [Имя]: и содержит теги эмоций.
 Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
 Пример:
 [${speakerNames[0]}]: [energetic] [fast] Текст...
 [${speakerNames[1] || speakerNames[0]}]: [announcer] ЗАГОЛОВОК
 \n`;
-      } else if (speakerNames.length >= 1) {
-        prompt += `\nОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА: скрипт с ведущим. Ведущий(ая): ${speakerNames[0]}
+        } else if (speakerNames.length >= 1) {
+          prompt += `\nОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА: скрипт с ведущим. Ведущий(ая): ${speakerNames[0]}
 КАЖДЫЙ абзац/блок текста ОБЯЗАТЕЛЬНО начинается с [${speakerNames[0]}]: и содержит теги эмоций в квадратных скобках.
 Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
 Пример:
@@ -3640,15 +3642,16 @@ ${expandedDefaultPrompt}
 [${speakerNames[0]}]: [thoughtful] Следующий блок текста...
 НЕ пиши текст без префикса [${speakerNames[0]}]:! Каждый блок должен начинаться с имени ведущего.
 \n`;
-      }
+        }
 
-      const latestRef = existingPrograms
-        .filter(p => p.scriptText && p.scriptText.includes("]:"))
-        .sort((a, b) => (b.id > a.id ? 1 : -1))
-        .slice(0, 1)[0];
+        const latestRef = existingPrograms
+          .filter(p => p.scriptText && p.scriptText.includes("]:"))
+          .sort((a, b) => (b.id > a.id ? 1 : -1))
+          .slice(0, 1)[0];
 
-      if (latestRef?.scriptText) {
-        prompt += `\nОБРАЗЕЦ — последний выпуск. Следуй ТОЧНО такому же формату и стилю:\n---\n${latestRef.scriptText.substring(0, 5000)}\n---\n`;
+        if (latestRef?.scriptText) {
+          prompt += `\nОБРАЗЕЦ — последний выпуск. Следуй ТОЧНО такому же формату и стилю:\n---\n${latestRef.scriptText.substring(0, 5000)}\n---\n`;
+        }
       }
 
       if (referenceContent) {
@@ -3674,11 +3677,14 @@ ${expandedDefaultPrompt}
         prompt += `\nДополнительные инструкции: ${instructions}\n`;
       }
 
-      const formatNote = isMultiSpeaker
-        ? ", в мульти-спикерном формате [Имя]: [теги] текст"
-        : speakerNames.length >= 1
-          ? `, от лица ${speakerNames[0]} в формате [${speakerNames[0]}]: [теги] текст`
-          : ", с репликами ведущих";
+      const hasReference = hasEpisodeContent || hasUrlContent || hasReferenceContent;
+      const formatNote = hasReference
+        ? ", в ТОЧНО таком же формате как в эталонах"
+        : isMultiSpeaker
+          ? ", в мульти-спикерном формате [Имя]: [теги] текст"
+          : speakerNames.length >= 1
+            ? `, от лица ${speakerNames[0]} в формате [${speakerNames[0]}]: [теги] текст`
+            : ", с репликами ведущих";
 
       prompt += `
 Ответь ТОЛЬКО JSON массивом из ${totalCount} объектов. Каждый объект:

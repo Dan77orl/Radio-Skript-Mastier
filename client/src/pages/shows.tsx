@@ -1656,27 +1656,36 @@ export default function ShowsPage() {
                 )}
               </div>
 
-              {voices && voices.length > 0 && (() => {
-                const assignedVoices = voices.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(settingsType.id));
-                return assignedVoices.length > 0 ? (
-                  <div className="space-y-2">
-                    <Label>{t("shows.assignedVoices")}</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {assignedVoices.map(voice => (
-                        <Badge key={voice.id} variant="secondary" className="text-sm py-1 px-3" data-testid={`badge-voice-${voice.id}`}>
-                          {getCleanVoiceName(voice)}
-                        </Badge>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{t("shows.voiceAssignmentHint")}</p>
+              {voices && voices.length > 0 && (
+                <div className="space-y-2">
+                  <Label>{t("shows.assignedVoices")}</Label>
+                  <div className="space-y-1.5">
+                    {voices.filter(v => v.isActive).map(voice => {
+                      const isAssigned = voice.assignedProgramTypeIds?.includes(settingsType.id) || false;
+                      return (
+                        <label key={voice.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded px-2 py-1" data-testid={`voice-assign-${voice.id}`}>
+                          <Checkbox
+                            checked={isAssigned}
+                            onCheckedChange={(checked) => {
+                              const currentIds = voice.assignedProgramTypeIds || [];
+                              const newIds = checked
+                                ? [...currentIds, settingsType.id]
+                                : currentIds.filter((id: string) => id !== settingsType.id);
+                              apiRequest("PATCH", `/api/voices/${voice.id}`, { assignedProgramTypeIds: newIds })
+                                .then(() => queryClient.invalidateQueries({ queryKey: ["/api/voices"] }));
+                            }}
+                            data-testid={`checkbox-voice-${voice.id}`}
+                          />
+                          <span className="text-sm">{getCleanVoiceName(voice)}</span>
+                          {voice.gender && (
+                            <span className="text-xs text-muted-foreground">({voice.gender === "male" ? "М" : "Ж"})</span>
+                          )}
+                        </label>
+                      );
+                    })}
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label>{t("shows.assignedVoices")}</Label>
-                    <p className="text-sm text-muted-foreground">{t("shows.noAssignedVoices")}</p>
-                  </div>
-                );
-              })()}
+                </div>
+              )}
 
               <div className="space-y-3 border rounded-lg p-3 sm:p-4 bg-muted/20 min-w-0">
                 <Label className="text-base font-semibold">{t("shows.firecrawlTitle")}</Label>
