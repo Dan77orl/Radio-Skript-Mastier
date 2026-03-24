@@ -55,8 +55,8 @@ Preferred communication style: Simple, everyday language.
 
 ### Core Entities
 1. **Users** - Authentication with email, password (hashed), name
-2. **Settings** - Application configuration (API keys, voice IDs, default prompts)
-3. **Dialogs** - Generated radio scripts with status tracking (pending, generating, ready, error)
+2. **Settings** - Application configuration (API keys, voice IDs, default prompts, dialog style, replicas count)
+3. **Dialogs** - Generated radio scripts with status tracking (pending, generating, ready, error); multi-turn `scriptText` format
 4. **Schedule Templates** - Per-weekday broadcast templates (name, weekdays, startHour, endHour, slotsPerHour, voiceIds)
 5. **Host Shifts** - Time-based host rotation within templates (templateId, startHour, endHour, voiceIds, label)
 
@@ -93,6 +93,13 @@ Preferred communication style: Simple, everyday language.
   - Audio generation: parses script into segments, matches speaker names to voices via `personaName`, synthesizes each segment separately, concatenates into one MP3 file
   - Frontend renders multi-speaker scripts with color-coded speaker names and styled emotion tags
   - Supports fuzzy speaker-to-voice matching (partial name match as fallback)
+- **Dialog Style Settings**: Configurable dialog generation styles stored in `settings` table
+  - `dialogStyle`: "lively" (interruptions, humor, reactions), "moderate" (light discussion), "simple" (turn-by-turn)
+  - `dialogReplicas`: 3-8 replicas per dialog (default 4)
+  - AI generates JSON with `replicas` array (speaker + text per line) instead of old maleText/femaleText blocks
+  - Frontend renders multi-turn dialogs with color-coded speaker lines and inline emotion tags
+  - Backward compatible: old maleText/femaleText format still displayed if scriptText is empty
+  - Script editor: single textarea with `SpeakerName: [tag] text` format per line
 
 ## External Dependencies
 

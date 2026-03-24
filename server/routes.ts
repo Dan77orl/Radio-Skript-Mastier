@@ -496,24 +496,64 @@ export async function registerRoutes(
       }
 
       const ctx = await buildStationContext(req.session.userId);
+      const settings = await storage.getSettings(req.session.userId);
+      const dialogStyle = (settings as any)?.dialogStyle || "lively";
+      const dialogReplicas = (settings as any)?.dialogReplicas || 4;
+
+      const styleInstructions = dialogStyle === "lively" 
+        ? `СТИЛЬ — ЖИВАЯ СТУДИЯ: Ведущие перебивают, реагируют ("Да ладно!", "Серьёзно?!"), подхватывают мысли, шутят. Каждая реплика 1-3 предложения.`
+        : dialogStyle === "simple"
+        ? `СТИЛЬ — ПРОСТОЙ: Один говорит, другой отвечает. Каждая реплика 2-4 предложения.`
+        : `СТИЛЬ — УМЕРЕННЫЙ: Лёгкая дискуссия, иногда реагируют друг на друга. Каждая реплика 1-3 предложения.`;
+
       const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}". 
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 Твоя задача - написать короткий диалог между ведущими: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
 Диалог должен быть на русском языке, дружелюбным и естественным.
 Длительность при чтении - 30-50 секунд.
+${styleInstructions}
 
 МЕТАТЕГИ ЭМОЦИЙ — ОБЯЗАТЕЛЬНО расставь в тексте:
 Доступные теги: [energetic], [fast], [slow], [surprised], [thoughtful], [happy], [calm], [warm], [confident], [excited], [gentle], [announcer]
 Ставь 1-2 тега в начало каждого смыслового блока/предложения.
-Пример: "[energetic] [warm] Доброе утро! [thoughtful] А вы знаете..."
 
-ВАЖНО: Ответ должен быть в формате JSON:
+ФОРМАТ ОТВЕТА — JSON с чередующимися репликами:
 {
-  "maleText": "текст для ${ctx.malePersona} с метатегами эмоций",
-  "femaleText": "текст для ${ctx.femalePersona} с метатегами эмоций"
+  "replicas": [
+    {"speaker": "${ctx.malePersona}", "text": "[energetic] [warm] реплика"},
+    {"speaker": "${ctx.femalePersona}", "text": "[happy] ответ"},
+    {"speaker": "${ctx.malePersona}", "text": "[thoughtful] реплика"}
+  ]
 }
+Минимум ${dialogReplicas} реплик.`;
 
-Реплики должны чередоваться логично, как естественный диалог.`;
+      function parseReplicasResponse(parsed: any) {
+        if (parsed.replicas && Array.isArray(parsed.replicas)) {
+          const maleLines: string[] = [];
+          const femaleLines: string[] = [];
+          const scriptLines: string[] = [];
+          const maleNames = ctx.malePersona.split(",").map(n => n.trim().toLowerCase()).filter(Boolean);
+          const femaleNames = ctx.femalePersona.split(",").map(n => n.trim().toLowerCase()).filter(Boolean);
+          
+          for (let ri = 0; ri < parsed.replicas.length; ri++) {
+            const r = parsed.replicas[ri];
+            const speaker = (r.speaker || "").trim();
+            scriptLines.push(`${speaker}: ${r.text}`);
+            const speakerLow = speaker.toLowerCase();
+            const matchesMale = maleNames.some(n => speakerLow.includes(n) || n.includes(speakerLow));
+            const matchesFemale = femaleNames.some(n => speakerLow.includes(n) || n.includes(speakerLow));
+            
+            const isMale = matchesMale && !matchesFemale ? true 
+              : matchesFemale && !matchesMale ? false 
+              : ri % 2 === 0;
+            
+            if (isMale) maleLines.push(r.text);
+            else femaleLines.push(r.text);
+          }
+          return { maleText: maleLines.join("\n"), femaleText: femaleLines.join("\n"), scriptText: scriptLines.join("\n") };
+        }
+        return { maleText: parsed.maleText || "", femaleText: parsed.femaleText || "", scriptText: "" };
+      }
 
       const anthropic = await getAnthropicClient(req.session.userId);
       
@@ -536,10 +576,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         }
 
         const parsed = JSON.parse(jsonMatch[0]);
-        return res.json({
-          maleText: parsed.maleText || "",
-          femaleText: parsed.femaleText || "",
-        });
+        return res.json(parseReplicasResponse(parsed));
       }
 
       const response = await openai.chat.completions.create({
@@ -558,10 +595,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       }
 
       const parsed = JSON.parse(content);
-      res.json({
-        maleText: parsed.maleText || "",
-        femaleText: parsed.femaleText || "",
-      });
+      res.json(parseReplicasResponse(parsed));
     } catch (error) {
       console.error("Error generating script:", error);
       res.status(500).json({ error: "Failed to generate script" });
@@ -861,6 +895,8 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const dailyPrompt = settings?.dailyPrompt || "";
       const slotPrompts = settings?.slotPrompts || [];
       const learnings = settings?.accumulatedLearnings || "";
+      const dialogStyle = (settings as any)?.dialogStyle || "lively";
+      const dialogReplicas = (settings as any)?.dialogReplicas || 4;
 
       const allVoices = await storage.getVoices();
       const generatedDialogs = [];
@@ -928,24 +964,43 @@ ${dailyPrompt ? `ОБЩИЕ ИНСТРУКЦИИ НА ДЕНЬ:\n${dailyPrompt}\
 ${slotPrompt ? `ИНСТРУКЦИИ ДЛЯ ЭТОГО СЛОТА:\n${slotPrompt}\n` : ""}
 ${learnings ? `НАКОПЛЕННЫЙ ОПЫТ:\n${learnings}\n` : ""}
 
-Создай короткий диалог (30-50 секунд при чтении).
+Создай короткий диалог (30-50 секунд при чтении) из ${dialogReplicas}-${dialogReplicas + 2} реплик с чередованием ведущих.
 ${firecrawlSection}
 Учитывай время суток и день недели.
 ${hour < 10 ? "Утренний слот: бодрое приветствие, энергичный тон." : ""}
 ${hour >= 18 ? "Вечерний слот: расслабленный тон, итоги дня." : ""}
 
+${dialogStyle === "lively" ? `СТИЛЬ ДИАЛОГА — ЖИВАЯ СТУДИЯ:
+- Это настоящий разговор, а НЕ зачитывание текста по очереди
+- Ведущие ПЕРЕБИВАЮТ друг друга, реагируют эмоционально: "Да ладно!", "Серьёзно?!", "Ой, кстати!"
+- Один может перехватить тему: "Подожди-подожди, а я вот что слышал..."
+- Включай микро-реакции: смех, удивление, согласие, несогласие
+- Допускай НЕЗАВЕРШЁННЫЕ мысли, которые подхватывает собеседник
+- Импровизация: "Кстати, пока шёл в студию...", "А вот мне вчера рассказали..."
+- НЕ делай "монологи по очереди" — каждая реплика 1-3 предложения максимум
+- Разнообразие: иногда один говорит чуть больше, иногда меньше` : dialogStyle === "simple" ? `СТИЛЬ ДИАЛОГА — ПРОСТОЙ:
+- Классический формат: один говорит, другой отвечает
+- Каждая реплика 2-4 предложения
+- Спокойный ритм, без перебиваний` : `СТИЛЬ ДИАЛОГА — СРЕДНИЙ:
+- Лёгкая дискуссия между ведущими
+- Иногда реагируют друг на друга, но без чрезмерных перебиваний
+- Каждая реплика 1-3 предложения`}
+
 МЕТАТЕГИ ЭМОЦИЙ — ОБЯЗАТЕЛЬНО расставь в тексте:
 Доступные теги: [energetic], [fast], [slow], [surprised], [thoughtful], [happy], [calm], [warm], [confident], [excited], [gentle], [announcer]
 Ставь 1-2 тега в начало каждого смыслового блока/предложения внутри реплики.
-Теги отражают интонацию и настроение фрагмента.
-Пример: "[energetic] [warm] Доброе утро, Аланья! [thoughtful] А вы знаете, что сегодня..."
 
-ВАЖНО: Ответ в формате JSON:
+ФОРМАТ ОТВЕТА — JSON с чередующимися репликами:
 {
   "title": "краткое название темы диалога",
-  "maleText": "текст для ${ctx.malePersona} с метатегами эмоций",
-  "femaleText": "текст для ${ctx.femalePersona} с метатегами эмоций"
-}`;
+  "replicas": [
+    {"speaker": "${ctx.malePersona}", "text": "[energetic] [warm] реплика с тегами"},
+    {"speaker": "${ctx.femalePersona}", "text": "[happy] ответная реплика"},
+    {"speaker": "${ctx.malePersona}", "text": "[thoughtful] следующая реплика"},
+    {"speaker": "${ctx.femalePersona}", "text": "[excited] и так далее..."}
+  ]
+}
+Каждая реплика — 1-3 предложения. Чередуй ведущих, минимум ${dialogReplicas} реплик.`;
 
         const userPrompt = `Создай диалог для слота #${slotNumber} (${timeLabel}, ${timeOfDay}).`;
 
@@ -953,7 +1008,61 @@ ${hour >= 18 ? "Вечерний слот: расслабленный тон, и
           const anthropic = await getAnthropicClient(req.session.userId);
           let maleText = "";
           let femaleText = "";
+          let scriptText = "";
           let title = `Слот #${slotNumber}`;
+
+          function parseDialogResponse(parsed: any) {
+            if (parsed.replicas && Array.isArray(parsed.replicas)) {
+              const maleLines: string[] = [];
+              const femaleLines: string[] = [];
+              const scriptLines: string[] = [];
+              const maleNames = ctx.malePersona.split(",").map(n => n.trim().toLowerCase()).filter(Boolean);
+              const femaleNames = ctx.femalePersona.split(",").map(n => n.trim().toLowerCase()).filter(Boolean);
+              let firstSpeakerIsMale: boolean | null = null;
+              
+              for (let ri = 0; ri < parsed.replicas.length; ri++) {
+                const r = parsed.replicas[ri];
+                const speaker = (r.speaker || "").trim();
+                const text = r.text || "";
+                scriptLines.push(`${speaker}: ${text}`);
+                const speakerLow = speaker.toLowerCase();
+                const matchesMale = maleNames.some(n => speakerLow.includes(n) || n.includes(speakerLow));
+                const matchesFemale = femaleNames.some(n => speakerLow.includes(n) || n.includes(speakerLow));
+                
+                let isMale: boolean;
+                if (matchesMale && !matchesFemale) {
+                  isMale = true;
+                } else if (matchesFemale && !matchesMale) {
+                  isMale = false;
+                } else {
+                  if (firstSpeakerIsMale === null) firstSpeakerIsMale = true;
+                  isMale = ri % 2 === 0 ? firstSpeakerIsMale : !firstSpeakerIsMale;
+                }
+                
+                if (firstSpeakerIsMale === null) firstSpeakerIsMale = isMale;
+                
+                if (isMale) {
+                  maleLines.push(text);
+                } else {
+                  femaleLines.push(text);
+                }
+              }
+              return {
+                maleText: maleLines.join("\n"),
+                femaleText: femaleLines.join("\n"),
+                scriptText: scriptLines.join("\n"),
+                title: parsed.title || title,
+              };
+            }
+            return {
+              maleText: parsed.maleText || "",
+              femaleText: parsed.femaleText || "",
+              scriptText: parsed.maleText && parsed.femaleText 
+                ? `${ctx.malePersona}: ${parsed.maleText}\n${ctx.femalePersona}: ${parsed.femaleText}` 
+                : "",
+              title: parsed.title || title,
+            };
+          }
 
           if (anthropic) {
             const response = await anthropic.messages.create({
@@ -968,9 +1077,11 @@ ${hour >= 18 ? "Вечерний слот: расслабленный тон, и
               const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
               if (jsonMatch) {
                 const parsed = JSON.parse(jsonMatch[0]);
-                maleText = parsed.maleText || "";
-                femaleText = parsed.femaleText || "";
-                title = parsed.title || title;
+                const result = parseDialogResponse(parsed);
+                maleText = result.maleText;
+                femaleText = result.femaleText;
+                scriptText = result.scriptText;
+                title = result.title;
               }
             }
           } else {
@@ -987,9 +1098,11 @@ ${hour >= 18 ? "Вечерний слот: расслабленный тон, и
             const content = response.choices[0]?.message?.content;
             if (content) {
               const parsed = JSON.parse(content);
-              maleText = parsed.maleText || "";
-              femaleText = parsed.femaleText || "";
-              title = parsed.title || title;
+              const result = parseDialogResponse(parsed);
+              maleText = result.maleText;
+              femaleText = result.femaleText;
+              scriptText = result.scriptText;
+              title = result.title;
             }
           }
 
@@ -1000,7 +1113,7 @@ ${hour >= 18 ? "Вечерний слот: расслабленный тон, и
             dialog = await storage.updateDialog(existingDialogId, {
               title,
               prompt: userPrompt,
-              scriptText: `${maleText}\n\n${femaleText}`,
+              scriptText: scriptText || `${maleText}\n\n${femaleText}`,
               maleText,
               femaleText,
               status: "pending",
@@ -1014,7 +1127,7 @@ ${hour >= 18 ? "Вечерний слот: расслабленный тон, и
             dialog = await storage.createDialog({
               title,
               prompt: userPrompt,
-              scriptText: `${maleText}\n\n${femaleText}`,
+              scriptText: scriptText || `${maleText}\n\n${femaleText}`,
               maleText,
               femaleText,
               audioUrl: null,

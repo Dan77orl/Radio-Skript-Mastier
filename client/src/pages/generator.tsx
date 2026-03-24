@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Wand2, Loader2, Calendar, Clock, User, Users, CheckCircle, Edit3, Send, RefreshCw, ChevronDown, ChevronUp, Play, FileText, Save, Search, Globe, X, Trash2, Plus } from "lucide-react";
+import { Wand2, Loader2, Calendar, Clock, User, Users, CheckCircle, Edit3, Send, RefreshCw, ChevronDown, ChevronUp, Play, FileText, Save, Search, Globe, X, Trash2, Plus, MessageSquare } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { VoiceInput } from "@/components/voice-input";
@@ -73,6 +73,8 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
   const [topicResults, setTopicResults] = useState<Record<string, { status: "pending" | "done" | "error"; preview: string }>>({});
   const [autoTopicsReasoning, setAutoTopicsReasoning] = useState<string>("");
   const [topicsInitialized, setTopicsInitialized] = useState(false);
+  const [dialogStyle, setDialogStyle] = useState<string>("lively");
+  const [dialogReplicas, setDialogReplicas] = useState<number>(4);
 
   const saveTopicsMutation = useMutation({
     mutationFn: async (topics: string[]) => {
@@ -105,6 +107,12 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
         setFirecrawlTopicsState(saved);
       } else {
         setFirecrawlTopicsState(["weather Alanya today", "news Turkey"]);
+      }
+      if ((settings as any).dialogStyle) {
+        setDialogStyle((settings as any).dialogStyle);
+      }
+      if ((settings as any).dialogReplicas) {
+        setDialogReplicas((settings as any).dialogReplicas);
       }
       setTopicsInitialized(true);
     }
@@ -307,12 +315,14 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
 
   const [editMaleText, setEditMaleText] = useState("");
   const [editFemaleText, setEditFemaleText] = useState("");
+  const [editScriptText, setEditScriptText] = useState("");
 
   const startEditing = (slotNumber: number, dialog: Dialog) => {
     setEditingSlot(slotNumber);
     setEditPrompt(dialog.prompt || "");
     setEditMaleText(dialog.maleText || "");
     setEditFemaleText(dialog.femaleText || "");
+    setEditScriptText(dialog.scriptText || "");
   };
 
   const cancelEditing = () => {
@@ -320,6 +330,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
     setEditPrompt("");
     setEditMaleText("");
     setEditFemaleText("");
+    setEditScriptText("");
   };
 
   const saveEdit = (dialog: Dialog) => {
@@ -327,9 +338,19 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
     regenerateSlotMutation.mutate({ dialogId: dialog.id, prompt: editPrompt });
   };
 
+  function parseScriptLines(scriptText: string) {
+    return scriptText.split("\n").filter(l => l.trim()).map(line => {
+      const match = line.match(/^(.+?):\s*(.+)$/);
+      if (match) {
+        return { speaker: match[1].trim(), text: match[2].trim() };
+      }
+      return { speaker: "", text: line.trim() };
+    });
+  }
+
   const saveTextMutation = useMutation({
-    mutationFn: async ({ dialogId, maleText, femaleText }: { dialogId: string; maleText: string; femaleText: string }) => {
-      const response = await apiRequest("PATCH", `/api/dialogs/${dialogId}`, { maleText, femaleText });
+    mutationFn: async ({ dialogId, maleText, femaleText, scriptText }: { dialogId: string; maleText: string; femaleText: string; scriptText?: string }) => {
+      const response = await apiRequest("PATCH", `/api/dialogs/${dialogId}`, { maleText, femaleText, scriptText });
       return response.json();
     },
     onSuccess: () => {
@@ -376,7 +397,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
     setFirecrawlTopics(firecrawlTopics.filter(t => t !== topic));
   };
 
-  const readyDialogsCount = dialogsForDate.filter(d => d.maleText && d.femaleText).length;
+  const readyDialogsCount = dialogsForDate.filter(d => (d.scriptText && d.scriptText.includes(":")) || (d.maleText && d.femaleText)).length;
   const hasAnyDialogs = dialogsForDate.length > 0;
 
   return (
@@ -607,7 +628,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                               <div className="flex items-center gap-2">
                                 {dialog ? (
                                   <>
-                                    {dialog.maleText && dialog.femaleText ? (
+                                    {(dialog.scriptText && dialog.scriptText.includes(":")) || (dialog.maleText && dialog.femaleText) ? (
                                       <Badge variant="default" className="bg-green-600">
                                         <CheckCircle className="mr-1 h-3 w-3" />
                                         {t("statuses.ready")}
@@ -655,44 +676,42 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
 
                                 {isEditing ? (
                                   <div className="space-y-3">
-                                    {(() => {
-                                      const maleVoice = slotInfo?.voiceIds?.[0] ? activeVoices.find(v => v.id === slotInfo.voiceIds[0]) : null;
-                                      const femaleVoice = slotInfo?.voiceIds?.[1] ? activeVoices.find(v => v.id === slotInfo.voiceIds[1]) : null;
-                                      const maleName = maleVoice?.personaName || maleVoice?.name || t("generator.maleVoice");
-                                      const femaleName = femaleVoice?.personaName || femaleVoice?.name || t("generator.femaleVoice");
-                                      return (
-                                        <>
-                                          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                                            <div className="flex items-center gap-2 mb-2">
-                                              <User className="h-4 w-4 text-blue-500" />
-                                              <span className="text-sm font-medium text-blue-700 dark:text-blue-400">{maleName}</span>
-                                            </div>
-                                            <Textarea
-                                              value={editMaleText}
-                                              onChange={(e) => setEditMaleText(e.target.value)}
-                                              className="min-h-[80px] bg-background"
-                                              data-testid={`textarea-male-${slotNumber}`}
-                                            />
-                                          </div>
-                                          <div className="p-3 rounded-lg bg-pink-500/10 border border-pink-500/20">
-                                            <div className="flex items-center gap-2 mb-2">
-                                              <User className="h-4 w-4 text-pink-500" />
-                                              <span className="text-sm font-medium text-pink-700 dark:text-pink-400">{femaleName}</span>
-                                            </div>
-                                            <Textarea
-                                              value={editFemaleText}
-                                              onChange={(e) => setEditFemaleText(e.target.value)}
-                                              className="min-h-[80px] bg-background"
-                                              data-testid={`textarea-female-${slotNumber}`}
-                                            />
-                                          </div>
-                                        </>
-                                      );
-                                    })()}
+                                    <div className="p-3 rounded-lg bg-muted/50 border">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <MessageSquare className="h-4 w-4 text-primary" />
+                                        <span className="text-sm font-medium">{t("generator.scriptText")}</span>
+                                      </div>
+                                      <Textarea
+                                        value={editScriptText}
+                                        onChange={(e) => setEditScriptText(e.target.value)}
+                                        className="min-h-[160px] bg-background font-mono text-sm"
+                                        placeholder={`${t("generator.maleVoice")}: [energetic] Реплика...\n${t("generator.femaleVoice")}: [happy] Ответ...`}
+                                        data-testid={`textarea-script-${slotNumber}`}
+                                      />
+                                      <p className="text-xs text-muted-foreground mt-1">{t("generator.scriptFormatHint")}</p>
+                                    </div>
                                     <div className="flex gap-2 flex-wrap">
                                       <Button
                                         size="sm"
-                                        onClick={() => saveTextMutation.mutate({ dialogId: dialog.id, maleText: editMaleText, femaleText: editFemaleText })}
+                                        onClick={() => {
+                                          const lines = parseScriptLines(editScriptText);
+                                          const speakers = [...new Set(lines.map(l => l.speaker).filter(Boolean))];
+                                          const firstSpeaker = speakers[0] || "";
+                                          const maleLines = lines.filter((l, i) => {
+                                            if (speakers.length >= 2) return l.speaker === firstSpeaker;
+                                            return i % 2 === 0;
+                                          }).map(l => l.text);
+                                          const femaleLines = lines.filter((l, i) => {
+                                            if (speakers.length >= 2) return l.speaker !== firstSpeaker;
+                                            return i % 2 !== 0;
+                                          }).map(l => l.text);
+                                          saveTextMutation.mutate({ 
+                                            dialogId: dialog.id, 
+                                            maleText: maleLines.join("\n"), 
+                                            femaleText: femaleLines.join("\n"),
+                                            scriptText: editScriptText,
+                                          });
+                                        }}
                                         disabled={saveTextMutation.isPending}
                                         data-testid={`button-save-text-${slotNumber}`}
                                       >
@@ -762,21 +781,59 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                     </Collapsible>
                                   </div>
                                 ) : (
-                                  <div className="space-y-3">
+                                  <div className="space-y-2">
                                     {(() => {
                                       const maleVoice = slotInfo?.voiceIds?.[0] ? activeVoices.find(v => v.id === slotInfo.voiceIds[0]) : null;
                                       const femaleVoice = slotInfo?.voiceIds?.[1] ? activeVoices.find(v => v.id === slotInfo.voiceIds[1]) : null;
                                       const maleName = maleVoice?.personaName || maleVoice?.name || t("generator.maleVoice");
                                       const femaleName = femaleVoice?.personaName || femaleVoice?.name || t("generator.femaleVoice");
+                                      
+                                      if (dialog.scriptText && dialog.scriptText.includes(":")) {
+                                        const lines = parseScriptLines(dialog.scriptText);
+                                        const speakerColors: Record<string, { bg: string; border: string; text: string; icon: string }> = {};
+                                        const colorPalette = [
+                                          { bg: "bg-blue-500/10", border: "border-blue-500/20", text: "text-blue-700 dark:text-blue-400", icon: "text-blue-500" },
+                                          { bg: "bg-pink-500/10", border: "border-pink-500/20", text: "text-pink-700 dark:text-pink-400", icon: "text-pink-500" },
+                                          { bg: "bg-green-500/10", border: "border-green-500/20", text: "text-green-700 dark:text-green-400", icon: "text-green-500" },
+                                          { bg: "bg-amber-500/10", border: "border-amber-500/20", text: "text-amber-700 dark:text-amber-400", icon: "text-amber-500" },
+                                        ];
+                                        let colorIdx = 0;
+                                        
+                                        return lines.map((line, i) => {
+                                          if (!speakerColors[line.speaker]) {
+                                            speakerColors[line.speaker] = colorPalette[colorIdx % colorPalette.length];
+                                            colorIdx++;
+                                          }
+                                          const colors = speakerColors[line.speaker];
+                                          const emotionTags = line.text.match(/\[([^\]]+)\]/g) || [];
+                                          const cleanText = line.text.replace(/\[([^\]]+)\]/g, "").trim();
+                                          
+                                          return (
+                                            <div key={i} className={`p-2.5 rounded-lg ${colors.bg} border ${colors.border}`}>
+                                              <div className="flex items-start gap-2">
+                                                <User className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${colors.icon}`} />
+                                                <div className="flex-1 min-w-0">
+                                                  <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                                                    <span className={`text-xs font-semibold ${colors.text}`}>{line.speaker}</span>
+                                                    {emotionTags.map((tag, ti) => (
+                                                      <span key={ti} className="text-[10px] px-1.5 py-0.5 rounded-full bg-background/50 text-muted-foreground">{tag}</span>
+                                                    ))}
+                                                  </div>
+                                                  <p className="text-sm leading-relaxed">{cleanText}</p>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          );
+                                        });
+                                      }
+                                      
                                       return (
                                         <>
                                           {dialog.maleText && (
                                             <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
                                               <div className="flex items-center gap-2 mb-2">
                                                 <User className="h-4 w-4 text-blue-500" />
-                                                <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
-                                                  {maleName}
-                                                </span>
+                                                <span className="text-sm font-medium text-blue-700 dark:text-blue-400">{maleName}</span>
                                               </div>
                                               <p className="text-sm">{dialog.maleText}</p>
                                             </div>
@@ -785,9 +842,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                             <div className="p-3 rounded-lg bg-pink-500/10 border border-pink-500/20">
                                               <div className="flex items-center gap-2 mb-2">
                                                 <User className="h-4 w-4 text-pink-500" />
-                                                <span className="text-sm font-medium text-pink-700 dark:text-pink-400">
-                                                  {femaleName}
-                                                </span>
+                                                <span className="text-sm font-medium text-pink-700 dark:text-pink-400">{femaleName}</span>
                                               </div>
                                               <p className="text-sm">{dialog.femaleText}</p>
                                             </div>
@@ -1014,6 +1069,59 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                   {t("generator.searchingInfo")} ({Object.values(topicResults).filter(r => r.status === "done").length}/{firecrawlTopics.length})
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                {t("generator.dialogStyle")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: "lively", label: t("generator.dialogStyleLively") },
+                    { value: "moderate", label: t("generator.dialogStyleModerate") },
+                    { value: "simple", label: t("generator.dialogStyleSimple") },
+                  ].map(opt => (
+                    <Button
+                      key={opt.value}
+                      size="sm"
+                      variant={dialogStyle === opt.value ? "default" : "outline"}
+                      onClick={() => {
+                        setDialogStyle(opt.value);
+                        apiRequest("POST", "/api/settings", { dialogStyle: opt.value });
+                      }}
+                      data-testid={`button-style-${opt.value}`}
+                    >
+                      {opt.label}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-muted-foreground">{t("generator.dialogReplicas")}:</span>
+                  <div className="flex items-center gap-2">
+                    {[3, 4, 5, 6, 8].map(n => (
+                      <Button
+                        key={n}
+                        size="sm"
+                        variant={dialogReplicas === n ? "default" : "outline"}
+                        className="h-7 w-7 p-0"
+                        onClick={() => {
+                          setDialogReplicas(n);
+                          apiRequest("POST", "/api/settings", { dialogReplicas: n });
+                        }}
+                        data-testid={`button-replicas-${n}`}
+                      >
+                        {n}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

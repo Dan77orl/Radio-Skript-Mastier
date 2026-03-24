@@ -65,6 +65,8 @@ export const settings = pgTable("settings", {
   stationAttachments: text("station_attachments").array(),
   freesoundApiKey: text("freesound_api_key"),
   globalFirecrawlTopics: text("global_firecrawl_topics").array(),
+  dialogStyle: text("dialog_style").default("lively"),
+  dialogReplicas: integer("dialog_replicas").default(4),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).omit({
