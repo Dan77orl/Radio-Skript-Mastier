@@ -45,3 +45,4 @@ integrations = ["javascript_openai_ai_integrations:2.0.0", "javascript_database:
 
 [userenv.shared]
 FIRECRAWL_API_KEY = "fc-16ab984a25aa43efbff48ee903efe25d"
+VOICE_AGENT_API_KEY = "43d9aa1afacdee1e8c063b0a58326af6fc048d67af04a8428c82cdc0894ed1de"
