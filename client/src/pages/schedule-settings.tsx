@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog as DialogUI,
   DialogContent,
@@ -74,7 +73,7 @@ function getVoiceColor(voiceId: string, allVoices: Voice[]) {
 export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [settingsTab, setSettingsTab] = useState("templates");
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
   const [holidayDialogOpen, setHolidayDialogOpen] = useState(false);
@@ -377,232 +376,166 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
         </div>
       )}
 
-      <Tabs value={settingsTab} onValueChange={setSettingsTab}>
-        <TabsList>
-          <TabsTrigger value="templates" className="gap-2" data-testid="tab-templates">
-            <Settings2 className="h-4 w-4" />
-            {t("scheduleSettings.title")}
-          </TabsTrigger>
-          <TabsTrigger value="holidays" className="gap-2" data-testid="tab-holidays">
-            <PartyPopper className="h-4 w-4" />
-            {t("scheduleSettings.holidays")}
-          </TabsTrigger>
-        </TabsList>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings2 className="h-5 w-5" />
+                  {t("scheduleSettings.title")}
+                </CardTitle>
+                <CardDescription>
+                  {t("scheduleSettings.subtitle")}
+                </CardDescription>
+              </div>
+              <Button onClick={openCreateDialog} data-testid="button-create-template">
+                <Plus className="mr-2 h-4 w-4" />
+                {t("common.add")}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : !templates?.length ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>{t("scheduleSettings.noTemplates")}</p>
+                  <p className="text-sm mt-1">{t("scheduleSettings.createTemplate")}</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {templates.map(tpl => (
+                    <TemplateCard
+                      key={tpl.id}
+                      template={tpl}
+                      voices={activeVoices}
+                      expanded={expandedTemplates.has(tpl.id)}
+                      onToggle={() => toggleExpanded(tpl.id)}
+                      onEdit={() => openEditDialog(tpl)}
+                      onDelete={() => deleteTemplateMutation.mutate(tpl.id)}
+                      onAddShift={() => openShiftDialog(tpl.id)}
+                      onEditShift={(shift) => openShiftDialog(tpl.id, shift)}
+                      onDeleteShift={(shiftId) => deleteShiftMutation.mutate({ id: shiftId, templateId: tpl.id })}
+                      totalSlots={totalSlots(tpl)}
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-        <TabsContent value="templates" className="mt-4">
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2 space-y-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between gap-4">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Settings2 className="h-5 w-5" />
-                      {t("scheduleSettings.title")}
-                    </CardTitle>
-                    <CardDescription>
-                      {t("scheduleSettings.subtitle")}
-                    </CardDescription>
-                  </div>
-                  <Button onClick={openCreateDialog} data-testid="button-create-template">
-                    <Plus className="mr-2 h-4 w-4" />
-                    {t("common.add")}
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                    </div>
-                  ) : !templates?.length ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>{t("scheduleSettings.noTemplates")}</p>
-                      <p className="text-sm mt-1">{t("scheduleSettings.createTemplate")}</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {templates.map(tpl => (
-                        <TemplateCard
-                          key={tpl.id}
-                          template={tpl}
-                          voices={activeVoices}
-                          expanded={expandedTemplates.has(tpl.id)}
-                          onToggle={() => toggleExpanded(tpl.id)}
-                          onEdit={() => openEditDialog(tpl)}
-                          onDelete={() => deleteTemplateMutation.mutate(tpl.id)}
-                          onAddShift={() => openShiftDialog(tpl.id)}
-                          onEditShift={(shift) => openShiftDialog(tpl.id, shift)}
-                          onDeleteShift={(shiftId) => deleteShiftMutation.mutate({ id: shiftId, templateId: tpl.id })}
-                          totalSlots={totalSlots(tpl)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Calendar className="h-4 w-4" />
-                    {t("scheduleSettings.holidays")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {upcomingHolidays.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("common.noData")}</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {upcomingHolidays.map((h, i) => (
-                        <div key={i} className="flex items-center gap-2 text-sm">
-                          <Badge variant={h.isPublic ? "default" : "outline"} className="shrink-0 text-xs">
-                            {h.date.slice(5)}
-                          </Badge>
-                          <span className="truncate">{h.nameRu}</span>
-                          <Badge variant="secondary" className="text-xs shrink-0">
-                            {h.country === "TR" ? "🇹🇷" : h.country === "RU" ? "🇷🇺" : "🌍"}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Users className="h-4 w-4" />
-                    {t("scheduleSettings.voices")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {activeVoices.map(v => {
-                      const color = getVoiceColor(v.id, activeVoices);
-                      return (
-                        <div key={v.id} className="flex items-center gap-2 text-sm">
-                          <div className={`w-3 h-3 rounded-full ${color.bg}`} />
-                          <span className="font-medium">{v.personaName || v.name}</span>
-                          <span className="text-muted-foreground text-xs">
-                            {v.gender === "male" ? t("common.maleShort") : t("common.femaleShort")}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="holidays" className="mt-4">
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2 space-y-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between gap-4">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <PartyPopper className="h-5 w-5" />
-                      {t("scheduleSettings.customHolidays")}
-                    </CardTitle>
-                    <CardDescription>
-                      {t("scheduleSettings.holidaysSubtitle")}
-                    </CardDescription>
-                  </div>
-                  <Button onClick={() => openHolidayDialog()} data-testid="button-add-holiday">
-                    <Plus className="mr-2 h-4 w-4" />
-                    {t("scheduleSettings.addHoliday")}
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  {!customHolidays?.length ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <PartyPopper className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>{t("scheduleSettings.noCustomHolidays")}</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {customHolidays.map(h => (
-                        <div
-                          key={h.id}
-                          className="flex items-center justify-between gap-3 rounded-lg border p-3"
-                          data-testid={`custom-holiday-${h.id}`}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <PartyPopper className="h-4 w-4" />
+                {t("scheduleSettings.holidays")}
+              </CardTitle>
+              <Button variant="outline" size="sm" onClick={() => openHolidayDialog()} data-testid="button-add-holiday">
+                <Plus className="mr-1 h-3 w-3" />
+                {t("common.add")}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {customHolidays && customHolidays.length > 0 && (
+                <div className="space-y-1.5 mb-3 pb-3 border-b">
+                  {customHolidays.map(h => (
+                    <div
+                      key={h.id}
+                      className="flex items-center justify-between gap-2 text-sm group"
+                      data-testid={`custom-holiday-${h.id}`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Badge variant={h.isPublic ? "default" : "outline"} className="shrink-0 font-mono text-xs">
+                          {h.date}
+                        </Badge>
+                        <span className="truncate">{h.nameRu}</span>
+                        <Badge variant="secondary" className="text-xs shrink-0">
+                          {h.country === "TR" ? "🇹🇷" : h.country === "RU" ? "🇷🇺" : "🌍"}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => openHolidayDialog(h)}
+                          data-testid={`button-edit-holiday-${h.id}`}
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <Badge variant={h.isPublic ? "default" : "outline"} className="shrink-0 font-mono text-xs">
-                              {h.date}
-                            </Badge>
-                            <div className="min-w-0">
-                              <div className="font-medium truncate">{h.nameRu}</div>
-                              <div className="text-xs text-muted-foreground truncate">{h.name}</div>
-                            </div>
-                            <Badge variant="secondary" className="text-xs shrink-0">
-                              {h.country === "TR" ? "🇹🇷" : h.country === "RU" ? "🇷🇺" : "🌍"}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => openHolidayDialog(h)}
-                              data-testid={`button-edit-holiday-${h.id}`}
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => deleteHolidayMutation.mutate(h.id)}
-                              data-testid={`button-delete-holiday-${h.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => deleteHolidayMutation.mutate(h.id)}
+                          data-testid={`button-delete-holiday-${h.id}`}
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                  ))}
+                </div>
+              )}
 
-            <div className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Globe className="h-4 w-4" />
-                    {t("scheduleSettings.builtInHolidays")}
-                  </CardTitle>
-                  <CardDescription>
-                    {holidays?.length || 0} {t("scheduleSettings.staticHolidaysCount")}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full">
+                    <Globe className="h-3.5 w-3.5" />
+                    <span>{t("scheduleSettings.builtInHolidays")} ({holidays?.length || 0})</span>
+                    <ChevronDown className="h-3.5 w-3.5 ml-auto" />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="space-y-1.5 mt-2 max-h-[400px] overflow-y-auto pr-1">
                     {holidays?.map((h, i) => (
                       <div key={i} className="flex items-center gap-2 text-sm">
                         <Badge variant={h.isPublic ? "default" : "outline"} className="shrink-0 text-xs font-mono">
                           {h.date.slice(5)}
                         </Badge>
-                        <span className="truncate text-sm">{h.nameRu}</span>
+                        <span className="truncate">{h.nameRu}</span>
                         <Badge variant="secondary" className="text-xs shrink-0">
                           {h.country === "TR" ? "🇹🇷" : h.country === "RU" ? "🇷🇺" : "🌍"}
                         </Badge>
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
+                </CollapsibleContent>
+              </Collapsible>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Users className="h-4 w-4" />
+                {t("scheduleSettings.voices")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {activeVoices.map(v => {
+                  const color = getVoiceColor(v.id, activeVoices);
+                  return (
+                    <div key={v.id} className="flex items-center gap-2 text-sm">
+                      <div className={`w-3 h-3 rounded-full ${color.bg}`} />
+                      <span className="font-medium">{v.personaName || v.name}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {v.gender === "male" ? t("common.maleShort") : t("common.femaleShort")}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       <DialogUI open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[520px]">
