@@ -502,10 +502,15 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 Диалог должен быть на русском языке, дружелюбным и естественным.
 Длительность при чтении - 30-50 секунд.
 
+МЕТАТЕГИ ЭМОЦИЙ — ОБЯЗАТЕЛЬНО расставь в тексте:
+Доступные теги: [energetic], [fast], [slow], [surprised], [thoughtful], [happy], [calm], [warm], [confident], [excited], [gentle], [announcer]
+Ставь 1-2 тега в начало каждого смыслового блока/предложения.
+Пример: "[energetic] [warm] Доброе утро! [thoughtful] А вы знаете..."
+
 ВАЖНО: Ответ должен быть в формате JSON:
 {
-  "maleText": "текст для ${ctx.malePersona} (все его реплики через пробел)",
-  "femaleText": "текст для ${ctx.femalePersona} (все её реплики через пробел)"
+  "maleText": "текст для ${ctx.malePersona} с метатегами эмоций",
+  "femaleText": "текст для ${ctx.femalePersona} с метатегами эмоций"
 }
 
 Реплики должны чередоваться логично, как естественный диалог.`;
@@ -912,11 +917,17 @@ ${learnings ? `НАКОПЛЕННЫЙ ОПЫТ:\n${learnings}\n` : ""}
 ${hour < 10 ? "Утренний слот: бодрое приветствие, энергичный тон." : ""}
 ${hour >= 18 ? "Вечерний слот: расслабленный тон, итоги дня." : ""}
 
+МЕТАТЕГИ ЭМОЦИЙ — ОБЯЗАТЕЛЬНО расставь в тексте:
+Доступные теги: [energetic], [fast], [slow], [surprised], [thoughtful], [happy], [calm], [warm], [confident], [excited], [gentle], [announcer]
+Ставь 1-2 тега в начало каждого смыслового блока/предложения внутри реплики.
+Теги отражают интонацию и настроение фрагмента.
+Пример: "[energetic] [warm] Доброе утро, Аланья! [thoughtful] А вы знаете, что сегодня..."
+
 ВАЖНО: Ответ в формате JSON:
 {
   "title": "краткое название темы диалога",
-  "maleText": "текст для ${ctx.malePersona}",
-  "femaleText": "текст для ${ctx.femalePersona}"
+  "maleText": "текст для ${ctx.malePersona} с метатегами эмоций",
+  "femaleText": "текст для ${ctx.femalePersona} с метатегами эмоций"
 }`;
 
         const userPrompt = `Создай диалог для слота #${slotNumber} (${timeLabel}, ${timeOfDay}).`;
