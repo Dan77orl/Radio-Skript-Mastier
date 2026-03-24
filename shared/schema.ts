@@ -64,6 +64,7 @@ export const settings = pgTable("settings", {
   stationLocation: text("station_location").default("Аланья, Турция"),
   stationAttachments: text("station_attachments").array(),
   freesoundApiKey: text("freesound_api_key"),
+  globalFirecrawlTopics: text("global_firecrawl_topics").array(),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).omit({

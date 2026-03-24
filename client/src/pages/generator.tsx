@@ -66,12 +66,27 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
   const [editPrompt, setEditPrompt] = useState<string>("");
   const [dailyPromptValue, setDailyPromptValue] = useState<string>("");
   const [isDailyPromptDirty, setIsDailyPromptDirty] = useState(false);
-  const [firecrawlTopics, setFirecrawlTopics] = useState<string[]>(["weather Alanya today", "news Turkey"]);
+  const [firecrawlTopics, setFirecrawlTopicsState] = useState<string[]>([]);
   const [newTopic, setNewTopic] = useState("");
   const [firecrawlContent, setFirecrawlContent] = useState<string>("");
   const [isFirecrawlOpen, setIsFirecrawlOpen] = useState(false);
   const [topicResults, setTopicResults] = useState<Record<string, { status: "pending" | "done" | "error"; preview: string }>>({});
   const [autoTopicsReasoning, setAutoTopicsReasoning] = useState<string>("");
+  const [topicsInitialized, setTopicsInitialized] = useState(false);
+
+  const saveTopicsMutation = useMutation({
+    mutationFn: async (topics: string[]) => {
+      await apiRequest("POST", "/api/settings", { globalFirecrawlTopics: topics });
+    },
+  });
+
+  const setFirecrawlTopics = (topicsOrFn: string[] | ((prev: string[]) => string[])) => {
+    setFirecrawlTopicsState(prev => {
+      const newTopics = typeof topicsOrFn === "function" ? topicsOrFn(prev) : topicsOrFn;
+      saveTopicsMutation.mutate(newTopics);
+      return newTopics;
+    });
+  };
 
   const { data: settings } = useQuery<Settings>({
     queryKey: ["/api/settings"],
@@ -82,6 +97,18 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
       setDailyPromptValue(settings.dailyPrompt);
     }
   }, [settings?.dailyPrompt, isDailyPromptDirty]);
+
+  useEffect(() => {
+    if (settings && !topicsInitialized) {
+      const saved = (settings as any).globalFirecrawlTopics;
+      if (saved && Array.isArray(saved) && saved.length > 0) {
+        setFirecrawlTopicsState(saved);
+      } else {
+        setFirecrawlTopicsState(["weather Alanya today", "news Turkey"]);
+      }
+      setTopicsInitialized(true);
+    }
+  }, [settings, topicsInitialized]);
 
   const { data: dialogs, isLoading: dialogsLoading } = useQuery<Dialog[]>({
     queryKey: ["/api/dialogs"],
