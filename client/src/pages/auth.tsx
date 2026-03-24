@@ -79,7 +79,7 @@ export default function AuthPage() {
             <Radio className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">RadioFlow AI</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{t("auth.appName")}</h1>
             <p className="text-sm text-muted-foreground">{t("auth.subtitle")}</p>
           </div>
         </div>
@@ -114,7 +114,7 @@ export default function AuthPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="your@email.com"
+                  placeholder={t("auth.emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required

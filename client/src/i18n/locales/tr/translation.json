@@ -71,7 +71,9 @@
     "registerError": "Kayıt hatası",
     "invalidCredentials": "Geçersiz e-posta veya şifre",
     "userExists": "Bu e-posta ile kayıtlı bir kullanıcı zaten var",
-    "subtitle": "AI Radyo Otomasyonu"
+    "subtitle": "AI Radyo Otomasyonu",
+    "appName": "RadioFlow AI",
+    "emailPlaceholder": "your@email.com"
   },
   "nav": {
     "dashboard": "Panel",

@@ -71,7 +71,9 @@
     "registerError": "Ошибка регистрации",
     "invalidCredentials": "Неверный email или пароль",
     "userExists": "Пользователь с таким email уже существует",
-    "subtitle": "AI Radio Automation"
+    "subtitle": "AI Radio Automation",
+    "appName": "RadioFlow AI",
+    "emailPlaceholder": "your@email.com"
   },
   "nav": {
     "dashboard": "Дашборд",
