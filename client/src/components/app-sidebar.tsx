@@ -56,7 +56,7 @@ export function AppSidebar() {
           )}
           <div className="flex flex-col">
             <span className="text-lg font-semibold">{stationName}</span>
-            <span className="text-xs text-muted-foreground">RadioFlow AI</span>
+            <span className="text-xs text-muted-foreground">{t("landing.productName")}</span>
           </div>
         </div>
       </SidebarHeader>
