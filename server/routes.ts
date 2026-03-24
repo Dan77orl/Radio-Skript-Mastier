@@ -2496,6 +2496,55 @@ ${instructions || "Создай альтернативный вариант с �
     return `\n\nАКТУАЛЬНЫЕ ДАННЫЕ ИЗ ИНТЕРНЕТА — ОБЯЗАТЕЛЬНО ИСПОЛЬЗУЙ:\n${allResults.map((r, i) => `--- Источник ${i + 1} ---\n${r}`).join("\n\n")}\n\nСТРОГОЕ ПРАВИЛО: Бери факты, цифры и исследования ТОЛЬКО из источников выше. НЕ ВЫДУМЫВАЙ названия институтов, университетов и исследований. Если в источниках нет конкретной статистики — дай практический совет без выдуманных цифр.`;
   }
 
+  app.post("/api/generate-search-topics", async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      if (!prompt) return res.status(400).json({ error: "Prompt required" });
+
+      const systemPrompt = `Ты — помощник для радиостанции. Проанализируй промпт для генерации радио-диалогов и создай 3-6 поисковых запросов для поиска актуальной информации в интернете. 
+
+Запросы должны быть:
+- На русском или английском (что лучше подходит для поиска)
+- Конкретными и актуальными (погода, новости, события)
+- Связанными с темами из промпта
+- Полезными для создания живого радио-контента
+
+Верни ТОЛЬКО JSON массив строк, без пояснений. Пример: ["weather Alanya today", "новости Аланья", "события Турция март 2026"]`;
+
+      const settings = await storage.getSettings(req.session.userId);
+      let topics: string[] = [];
+
+      if (settings?.anthropicApiKey) {
+        const anthropic = new Anthropic({ apiKey: settings.anthropicApiKey });
+        const response = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 300,
+          system: systemPrompt,
+          messages: [{ role: "user", content: prompt }],
+        });
+        const text = response.content[0].type === "text" ? response.content[0].text : "";
+        topics = JSON.parse(text);
+      } else {
+        const openai = new OpenAI();
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          max_tokens: 300,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: prompt },
+          ],
+        });
+        const text = response.choices[0]?.message?.content || "[]";
+        topics = JSON.parse(text);
+      }
+
+      res.json({ topics });
+    } catch (error) {
+      console.error("Error generating search topics:", error);
+      res.status(500).json({ error: "Failed to generate search topics" });
+    }
+  });
+
   app.post("/api/firecrawl/search", async (req, res) => {
     try {
       const { query, limit } = req.body;

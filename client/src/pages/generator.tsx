@@ -117,6 +117,21 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
   const unusedNews = newsItems?.filter(n => !n.isUsed).slice(0, 5) || [];
   const activeVoices = voices?.filter(v => v.isActive) || [];
 
+  const autoTopicsMutation = useMutation({
+    mutationFn: async (prompt: string) => {
+      const response = await apiRequest("POST", "/api/generate-search-topics", { prompt });
+      const data = await response.json() as { topics: string[] };
+      return data.topics;
+    },
+    onSuccess: (topics) => {
+      setFirecrawlTopics(topics);
+      toast({ title: t("generator.topicsGenerated"), description: `${topics.length} ${t("generator.topics")}` });
+    },
+    onError: () => {
+      toast({ title: t("common.error"), variant: "destructive" });
+    },
+  });
+
   const firecrawlSearchMutation = useMutation({
     mutationFn: async (topics: string[]) => {
       const results: string[] = [];
@@ -705,7 +720,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5 items-center">
                 {firecrawlTopics.map(topic => (
                   <Badge key={topic} variant="secondary" className="gap-1 pr-1">
                     {topic}
@@ -718,6 +733,21 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                     </button>
                   </Badge>
                 ))}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => autoTopicsMutation.mutate(dailyPromptValue || settings?.dailyPrompt || "")}
+                  disabled={autoTopicsMutation.isPending}
+                  data-testid="button-auto-topics"
+                >
+                  {autoTopicsMutation.isPending ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Wand2 className="mr-1 h-3 w-3" />
+                  )}
+                  {t("generator.autoTopics")}
+                </Button>
               </div>
               <div className="flex gap-1.5">
                 <Input

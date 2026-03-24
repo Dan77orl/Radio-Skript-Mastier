@@ -185,6 +185,8 @@
     "searchWebContent": "Поиск актуальной информации для подводок",
     "contentLoaded": "Контент загружен",
     "searchingInfo": "Ищем информацию...",
+    "autoTopics": "Авто",
+    "topicsGenerated": "Темы сгенерированы",
     "freshNews": "Свежие новости",
     "usedInGeneration": "Будут использованы в генерации",
     "promptSettings": "Настройки промптов",

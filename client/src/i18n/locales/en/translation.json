@@ -185,6 +185,8 @@
     "searchWebContent": "Search for current information for intros",
     "contentLoaded": "Content loaded",
     "searchingInfo": "Searching for information...",
+    "autoTopics": "Auto",
+    "topicsGenerated": "Topics generated",
     "freshNews": "Fresh news",
     "usedInGeneration": "Will be used in generation",
     "promptSettings": "Prompt settings",
