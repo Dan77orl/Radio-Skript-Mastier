@@ -3357,14 +3357,19 @@ ${existingList}
       const assignedVoices = resolveAssignedVoices(voicesList, programType);
       const isMultiSpeaker = assignedVoices.length >= 2;
 
-      let promptSpeaker = extractSpeakerFromPrompt(rawPrompt);
-      if (!promptSpeaker && fetchedContent) {
-        promptSpeaker = extractSpeakerFromPrompt(fetchedContent);
-      }
       const voicePersonaNames = assignedVoices.length > 0
         ? assignedVoices.map((v: any) => getCleanVoiceName(v))
-        : [programType.name];
-      const speakerNames = (promptSpeaker && !isMultiSpeaker) ? [promptSpeaker] : voicePersonaNames;
+        : [];
+      let speakerNames: string[];
+      if (voicePersonaNames.length > 0) {
+        speakerNames = voicePersonaNames;
+      } else {
+        let promptSpeaker = extractSpeakerFromPrompt(rawPrompt);
+        if (!promptSpeaker && fetchedContent) {
+          promptSpeaker = extractSpeakerFromPrompt(fetchedContent);
+        }
+        speakerNames = promptSpeaker ? [promptSpeaker] : [programType.name];
+      }
 
       const fullText = rawPrompt + (fetchedContent || "");
       const hasEpisodeContent = fullText.length > 300 
@@ -3670,14 +3675,19 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const { prompt: expandedDefaultPrompt, fetchedContent: urlContent } = await fetchAndExpandUrls(rawPrompt);
       const hasUrlContent = !!urlContent;
 
-      let promptSpeaker = extractSpeakerFromPrompt(rawPrompt);
-      if (!promptSpeaker && urlContent) {
-        promptSpeaker = extractSpeakerFromPrompt(urlContent);
-      }
       const voicePersonaNames = assignedVoices.length > 0
         ? assignedVoices.map((v: any) => getCleanVoiceName(v))
-        : [programType.name];
-      const speakerNames = (promptSpeaker && !isMultiSpeaker) ? [promptSpeaker] : voicePersonaNames;
+        : [];
+      let speakerNames: string[];
+      if (voicePersonaNames.length > 0) {
+        speakerNames = voicePersonaNames;
+      } else {
+        let promptSpeaker = extractSpeakerFromPrompt(rawPrompt);
+        if (!promptSpeaker && urlContent) {
+          promptSpeaker = extractSpeakerFromPrompt(urlContent);
+        }
+        speakerNames = promptSpeaker ? [promptSpeaker] : [programType.name];
+      }
 
       const fullText = rawPrompt + (urlContent || "");
       const hasEpisodeContent = fullText.length > 300
