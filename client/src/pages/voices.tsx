@@ -140,8 +140,15 @@ export default function VoicesPage() {
     },
   });
 
+  const [editPersonaName, setEditPersonaName] = useState("");
+  const [editGender, setEditGender] = useState("male");
+  const [editVoiceChanged, setEditVoiceChanged] = useState(false);
+  const [editSelectedElevenLabsVoice, setEditSelectedElevenLabsVoice] = useState<ElevenLabsVoice | null>(null);
+  const [editPlayingPreview, setEditPlayingPreview] = useState<string | null>(null);
+  const editAudioRef = useRef<HTMLAudioElement | null>(null);
+
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { assignedProgramTypeIds?: string[] } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: Record<string, any> }) => {
       const response = await apiRequest("PATCH", `/api/voices/${id}`, data);
       return response.json();
     },
@@ -150,9 +157,11 @@ export default function VoicesPage() {
       setIsEditDialogOpen(false);
       setEditingVoice(null);
       setSelectedProgramTypes([]);
+      setEditVoiceChanged(false);
+      setEditSelectedElevenLabsVoice(null);
       toast({
         title: t("common.saved"),
-        description: t("voices.assignmentsSaved"),
+        description: t("voices.settingsSaved"),
       });
     },
     onError: (error: Error) => {
@@ -254,16 +263,43 @@ export default function VoicesPage() {
 
   const handleEditVoice = (voice: Voice) => {
     setEditingVoice(voice);
+    setEditPersonaName(voice.name);
+    setEditGender(voice.gender);
     setSelectedProgramTypes(voice.assignedProgramTypeIds || []);
+    setEditVoiceChanged(false);
+    setEditSelectedElevenLabsVoice(null);
     setIsEditDialogOpen(true);
+  };
+
+  const playEditPreview = (url: string) => {
+    if (editAudioRef.current) {
+      editAudioRef.current.pause();
+    }
+    if (editPlayingPreview === url) {
+      setEditPlayingPreview(null);
+      return;
+    }
+    const audio = new Audio(url);
+    editAudioRef.current = audio;
+    setEditPlayingPreview(url);
+    audio.play();
+    audio.onended = () => setEditPlayingPreview(null);
+    audio.onerror = () => setEditPlayingPreview(null);
   };
 
   const handleSaveEdit = () => {
     if (!editingVoice) return;
-    updateMutation.mutate({
-      id: editingVoice.id,
-      data: { assignedProgramTypeIds: selectedProgramTypes },
-    });
+    const data: Record<string, any> = {
+      name: editPersonaName.trim() || editingVoice.name,
+      gender: editGender,
+      assignedProgramTypeIds: selectedProgramTypes,
+    };
+    if (editVoiceChanged && editSelectedElevenLabsVoice) {
+      data.elevenLabsVoiceId = editSelectedElevenLabsVoice.voice_id;
+      data.previewUrl = editSelectedElevenLabsVoice.preview_url;
+      data.description = editSelectedElevenLabsVoice.name;
+    }
+    updateMutation.mutate({ id: editingVoice.id, data });
   };
 
   const toggleProgramType = (programTypeId: string) => {
@@ -699,19 +735,121 @@ export default function VoicesPage() {
         )}
       </div>
 
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open && editAudioRef.current) editAudioRef.current.pause(); setIsEditDialogOpen(open); }}>
+        <DialogContent className="!w-[min(38rem,calc(100vw-2rem))] !max-w-none max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{t("voices.editAssignments")}</DialogTitle>
+            <DialogTitle>{t("voices.editVoice")}</DialogTitle>
             <DialogDescription>
-              {editingVoice?.name}
+              {editingVoice?.description && `ElevenLabs: ${editingVoice.description}`}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-5 py-2">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t("voices.personaName")}</label>
+                <Input
+                  value={editPersonaName}
+                  onChange={(e) => setEditPersonaName(e.target.value)}
+                  data-testid="input-edit-persona-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">{t("voices.gender")}</label>
+                <Select value={editGender} onValueChange={setEditGender}>
+                  <SelectTrigger data-testid="select-edit-gender">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">{t("generator.maleVoice")}</SelectItem>
+                    <SelectItem value="female">{t("generator.femaleVoice")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">{t("voices.elevenLabsVoice")}</label>
+                {editingVoice?.previewUrl && !editVoiceChanged && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => playEditPreview(editingVoice.previewUrl!)}
+                    data-testid="button-edit-current-preview"
+                  >
+                    {editPlayingPreview === editingVoice.previewUrl ? <Pause className="mr-1 h-3 w-3" /> : <Play className="mr-1 h-3 w-3" />}
+                    {t("voices.currentVoice")}
+                  </Button>
+                )}
+              </div>
+              {!editVoiceChanged ? (
+                <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
+                  <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm flex-1 truncate">{editingVoice?.description || editingVoice?.elevenLabsVoiceId}</span>
+                  <Button variant="outline" size="sm" onClick={() => setEditVoiceChanged(true)} data-testid="button-change-voice">
+                    {t("voices.changeVoice")}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {editSelectedElevenLabsVoice ? (
+                    <div className="flex items-center gap-2 p-3 border rounded-lg border-primary/50 bg-primary/5">
+                      <Volume2 className="h-4 w-4 text-primary shrink-0" />
+                      <span className="text-sm flex-1 truncate">{editSelectedElevenLabsVoice.name}</span>
+                      {editSelectedElevenLabsVoice.preview_url && (
+                        <Button variant="ghost" size="sm" onClick={() => playEditPreview(editSelectedElevenLabsVoice.preview_url)} data-testid="button-edit-new-preview">
+                          {editPlayingPreview === editSelectedElevenLabsVoice.preview_url ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => setEditSelectedElevenLabsVoice(null)} data-testid="button-clear-new-voice">
+                        &times;
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="border rounded-lg max-h-[200px] overflow-y-auto">
+                      {isLoadingElevenLabs ? (
+                        <div className="p-4 text-center text-sm text-muted-foreground">{t("common.loading")}...</div>
+                      ) : elevenLabsData?.voices && elevenLabsData.voices.length > 0 ? (
+                        elevenLabsData.voices.map((elv) => (
+                          <div
+                            key={elv.voice_id}
+                            className={`flex items-center gap-2 p-2 cursor-pointer hover:bg-accent/50 border-b last:border-b-0 ${editingVoice?.elevenLabsVoiceId === elv.voice_id ? "bg-accent/30" : ""}`}
+                            onClick={() => setEditSelectedElevenLabsVoice(elv)}
+                            data-testid={`edit-voice-option-${elv.voice_id}`}
+                          >
+                            <Volume2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm truncate block">{elv.name}</span>
+                              {elv.labels?.gender && (
+                                <span className="text-xs text-muted-foreground">{elv.labels.gender}</span>
+                              )}
+                            </div>
+                            {editingVoice?.elevenLabsVoiceId === elv.voice_id && (
+                              <Badge variant="secondary" className="text-xs shrink-0">{t("voices.current")}</Badge>
+                            )}
+                            {elv.preview_url && (
+                              <Button variant="ghost" size="sm" className="shrink-0 h-7 w-7 p-0" onClick={(e) => { e.stopPropagation(); playEditPreview(elv.preview_url); }}>
+                                {editPlayingPreview === elv.preview_url ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                              </Button>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-sm text-muted-foreground">{t("voices.noVoicesInElevenLabs")}</div>
+                      )}
+                    </div>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={() => { setEditVoiceChanged(false); setEditSelectedElevenLabsVoice(null); }} data-testid="button-cancel-voice-change">
+                    {t("common.cancel")}
+                  </Button>
+                </div>
+              )}
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium">{t("voices.assignToShows")}</label>
-              <div className="grid gap-2 max-h-[250px] overflow-y-auto border rounded-lg p-3">
+              <div className="grid gap-2 max-h-[200px] overflow-y-auto border rounded-lg p-3">
                 <div 
                   className="flex items-center gap-2 cursor-pointer hover-elevate p-2 rounded-md"
                   onClick={() => toggleProgramType("dialogs")}
@@ -753,7 +891,7 @@ export default function VoicesPage() {
             </Button>
             <Button
               onClick={handleSaveEdit}
-              disabled={updateMutation.isPending}
+              disabled={updateMutation.isPending || (editVoiceChanged && !editSelectedElevenLabsVoice)}
               data-testid="button-save-edit"
             >
               {updateMutation.isPending ? t("common.loading") : t("common.save")}

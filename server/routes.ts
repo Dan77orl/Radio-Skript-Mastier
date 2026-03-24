@@ -2757,7 +2757,7 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.patch("/api/voices/:id", async (req, res) => {
     try {
-      const allowedFields = ["name", "gender", "isActive", "sortOrder", "description", "personaName", "assignedProgramTypeIds"];
+      const allowedFields = ["name", "gender", "isActive", "sortOrder", "description", "personaName", "assignedProgramTypeIds", "elevenLabsVoiceId", "previewUrl"];
       const updates: Record<string, any> = {};
       for (const key of allowedFields) {
         if (key in req.body) {
