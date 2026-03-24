@@ -843,46 +843,44 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
 
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Globe className="h-5 w-5" />
-                  Firecrawl
-                </CardTitle>
-                <div className="flex gap-1.5">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => autoTopicsMutation.mutate({ prompt: dailyPromptValue || settings?.dailyPrompt || "", existingTopics: firecrawlTopics })}
-                    disabled={autoTopicsMutation.isPending}
-                    data-testid="button-auto-topics"
-                  >
-                    {autoTopicsMutation.isPending ? (
-                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Wand2 className="mr-1 h-3.5 w-3.5" />
-                    )}
-                    {t("generator.suggestTopics")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={firecrawlContent ? "default" : "outline"}
-                    className={firecrawlContent ? "bg-green-600 hover:bg-green-700" : ""}
-                    onClick={() => firecrawlSearchMutation.mutate(firecrawlTopics)}
-                    disabled={firecrawlSearchMutation.isPending || firecrawlTopics.length === 0}
-                    data-testid="button-firecrawl-search"
-                  >
-                    {firecrawlSearchMutation.isPending ? (
-                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Search className="mr-1 h-3.5 w-3.5" />
-                    )}
-                    {firecrawlContent ? t("common.refresh") : t("common.find")}
-                  </Button>
-                </div>
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                Firecrawl
+              </CardTitle>
               <CardDescription>
                 {t("generator.searchWebContent")}
               </CardDescription>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => autoTopicsMutation.mutate({ prompt: dailyPromptValue || settings?.dailyPrompt || "", existingTopics: firecrawlTopics })}
+                  disabled={autoTopicsMutation.isPending}
+                  data-testid="button-auto-topics"
+                >
+                  {autoTopicsMutation.isPending ? (
+                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Wand2 className="mr-1 h-3.5 w-3.5" />
+                  )}
+                  {t("generator.suggestTopics")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={firecrawlContent ? "default" : "outline"}
+                  className={firecrawlContent ? "bg-green-600 hover:bg-green-700" : ""}
+                  onClick={() => firecrawlSearchMutation.mutate(firecrawlTopics)}
+                  disabled={firecrawlSearchMutation.isPending || firecrawlTopics.length === 0}
+                  data-testid="button-firecrawl-search"
+                >
+                  {firecrawlSearchMutation.isPending ? (
+                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Search className="mr-1 h-3.5 w-3.5" />
+                  )}
+                  {firecrawlContent ? t("common.refresh") : t("common.find")}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {autoTopicsReasoning && (
