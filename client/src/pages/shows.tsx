@@ -66,6 +66,7 @@ import {
   Search,
   Filter,
   AudioLines,
+  Pencil,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
@@ -223,6 +224,7 @@ export default function ShowsPage() {
   const [batchProgress, setBatchProgress] = useState(0);
   const [viewScriptProgram, setViewScriptProgram] = useState<Program | null>(null);
   const [editingBlocks, setEditingBlocks] = useState<{ text: string; speaker: string }[] | null>(null);
+  const [editingText, setEditingText] = useState<string | null>(null);
   const [savingScript, setSavingScript] = useState(false);
   const [generatingTypeIds, setGeneratingTypeIds] = useState<Set<string>>(new Set());
   const [pipelineTypeIds, setPipelineTypeIds] = useState<Set<string>>(new Set());
@@ -650,6 +652,24 @@ export default function ShowsPage() {
       setViewScriptProgram({ ...viewScriptProgram, scriptText: newScript });
       setEditingBlocks(null);
       toast({ title: t("shows.scriptSaved"), description: t("shows.speakersUpdated") });
+    } catch (err) {
+      toast({ title: t("shows.error"), description: t("shows.saveFailed"), variant: "destructive" });
+    } finally {
+      setSavingScript(false);
+    }
+  };
+
+  const saveEditedText = async () => {
+    if (!viewScriptProgram || editingText === null) return;
+    setSavingScript(true);
+    try {
+      await apiRequest("PATCH", `/api/programs/${viewScriptProgram.id}`, {
+        scriptText: editingText,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/programs"] });
+      setViewScriptProgram({ ...viewScriptProgram, scriptText: editingText });
+      setEditingText(null);
+      toast({ title: t("shows.scriptSaved") });
     } catch (err) {
       toast({ title: t("shows.error"), description: t("shows.saveFailed"), variant: "destructive" });
     } finally {
@@ -2065,7 +2085,7 @@ export default function ShowsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!viewScriptProgram} onOpenChange={(open) => { if (!open) { setViewScriptProgram(null); setEditingBlocks(null); } }}>
+      <Dialog open={!!viewScriptProgram} onOpenChange={(open) => { if (!open) { setViewScriptProgram(null); setEditingBlocks(null); setEditingText(null); } }}>
         <DialogContent className="!w-[min(42rem,calc(100vw-2rem))] !max-w-none max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -2129,16 +2149,43 @@ export default function ShowsPage() {
                 </Button>
               </div>
             </div>
+          ) : editingText !== null ? (
+            <div className="mt-2 space-y-3">
+              <textarea
+                className="w-full min-h-[300px] p-3 border rounded-lg text-sm font-sans leading-relaxed bg-background resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                value={editingText}
+                onChange={(e) => setEditingText(e.target.value)}
+                data-testid="textarea-edit-script"
+              />
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setEditingText(null)} data-testid="button-cancel-edit-text">
+                  {t("shows.cancel")}
+                </Button>
+                <Button onClick={saveEditedText} disabled={savingScript} data-testid="button-save-text">
+                  {savingScript ? t("shows.saving") : t("shows.save")}
+                </Button>
+              </div>
+            </div>
           ) : (
             <div className="mt-2">
               {viewScriptProgram?.scriptText && hasFormattedSpeakers(viewScriptProgram.scriptText) ? (
                 <div className="space-y-0">{renderMultiSpeakerScript(viewScriptProgram.scriptText)}</div>
               ) : (
-                <pre className="whitespace-pre-wrap text-sm font-sans leading-relaxed">
-                  {viewScriptProgram?.scriptText}
-                </pre>
+                <div className="space-y-4">
+                  {viewScriptProgram?.scriptText?.split(/\n\s*\n/).map((paragraph, idx) => (
+                    <p key={idx} className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {paragraph.trim()}
+                    </p>
+                  ))}
+                </div>
               )}
               <div className="mt-4 flex justify-end gap-2">
+                {viewScriptProgram?.scriptText && (
+                  <Button variant="outline" onClick={() => setEditingText(viewScriptProgram.scriptText)} data-testid="button-edit-script-text">
+                    <Pencil className="mr-2 h-4 w-4" />
+                    {t("shows.editScript")}
+                  </Button>
+                )}
                 {viewScriptProgram?.programTypeId && getAssignedVoicesForType(viewScriptProgram.programTypeId).length >= 1 && (
                   <Button variant="outline" onClick={startEditingScript} data-testid="button-assign-speakers">
                     <Users className="mr-2 h-4 w-4" />
