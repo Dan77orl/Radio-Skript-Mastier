@@ -789,7 +789,11 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
         const slotPrompt = slotPrompts[slotNumber - 1] || "";
         
-        const matchingShift = shifts.find(s => hour >= s.startHour && hour < s.endHour);
+        const matchingShift = shifts.find(s => {
+          const shiftOvn = s.endHour <= s.startHour;
+          if (shiftOvn) return hour >= s.startHour || hour < s.endHour;
+          return hour >= s.startHour && hour < s.endHour;
+        });
         const slotVoiceIds = matchingShift?.voiceIds || template?.voiceIds || null;
         const slotVoiceNames = slotVoiceIds 
           ? allVoices.filter(v => slotVoiceIds.includes(v.id)).map(v => `${v.personaName || v.name} (${v.gender === "male" ? "мужчина" : "женщина"})`).join(", ")
@@ -1346,7 +1350,9 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
       if (count) {
         dailyCount = count;
       } else if (template) {
-        dailyCount = (template.endHour - template.startHour) * template.slotsPerHour;
+        const isOvn = template.endHour <= template.startHour;
+        const hrs = isOvn ? (24 - template.startHour + template.endHour) : (template.endHour - template.startHour);
+        dailyCount = hrs * template.slotsPerHour;
       } else {
         dailyCount = settings?.dailyDialogsCount || 12;
       }
@@ -3963,8 +3969,8 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
   app.post("/api/schedule-templates", async (req, res) => {
     try {
       const parsed = insertScheduleTemplateSchema.parse(req.body);
-      if (parsed.startHour >= parsed.endHour) {
-        return res.status(400).json({ error: "startHour must be less than endHour" });
+      if (parsed.startHour === parsed.endHour) {
+        return res.status(400).json({ error: "startHour and endHour cannot be the same" });
       }
       if (parsed.slotsPerHour < 1 || parsed.slotsPerHour > 4) {
         return res.status(400).json({ error: "slotsPerHour must be between 1 and 4" });
@@ -3985,8 +3991,8 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
   app.patch("/api/schedule-templates/:id", async (req, res) => {
     try {
       const parsed = insertScheduleTemplateSchema.partial().parse(req.body);
-      if (parsed.startHour !== undefined && parsed.endHour !== undefined && parsed.startHour >= parsed.endHour) {
-        return res.status(400).json({ error: "startHour must be less than endHour" });
+      if (parsed.startHour !== undefined && parsed.endHour !== undefined && parsed.startHour === parsed.endHour) {
+        return res.status(400).json({ error: "startHour and endHour cannot be the same" });
       }
       if (parsed.slotsPerHour !== undefined && (parsed.slotsPerHour < 1 || parsed.slotsPerHour > 4)) {
         return res.status(400).json({ error: "slotsPerHour must be between 1 and 4" });
@@ -4027,8 +4033,8 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
   app.post("/api/host-shifts", async (req, res) => {
     try {
       const parsed = insertHostShiftSchema.parse(req.body);
-      if (parsed.startHour >= parsed.endHour) {
-        return res.status(400).json({ error: "startHour must be less than endHour" });
+      if (parsed.startHour === parsed.endHour) {
+        return res.status(400).json({ error: "startHour and endHour cannot be the same" });
       }
       if (!parsed.voiceIds?.length) {
         return res.status(400).json({ error: "voiceIds must not be empty" });
@@ -4046,8 +4052,8 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
   app.patch("/api/host-shifts/:id", async (req, res) => {
     try {
       const parsed = insertHostShiftSchema.partial().parse(req.body);
-      if (parsed.startHour !== undefined && parsed.endHour !== undefined && parsed.startHour >= parsed.endHour) {
-        return res.status(400).json({ error: "startHour must be less than endHour" });
+      if (parsed.startHour !== undefined && parsed.endHour !== undefined && parsed.startHour === parsed.endHour) {
+        return res.status(400).json({ error: "startHour and endHour cannot be the same" });
       }
       const shift = await storage.updateHostShift(req.params.id, parsed);
       if (!shift) return res.status(404).json({ error: "Shift not found" });
@@ -4113,15 +4119,24 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       }
 
       const shifts = await storage.getHostShifts(template.id);
-      const totalSlots = (template.endHour - template.startHour) * template.slotsPerHour;
+      const isOvernight = template.endHour <= template.startHour;
+      const hoursSpan = isOvernight ? (24 - template.startHour + template.endHour) : (template.endHour - template.startHour);
+      const totalSlots = hoursSpan * template.slotsPerHour;
       const slots = [];
 
       for (let i = 0; i < totalSlots; i++) {
-        const slotHour = template.startHour + i / template.slotsPerHour;
+        const rawHour = template.startHour + i / template.slotsPerHour;
+        const slotHour = rawHour % 24;
         const hour = Math.floor(slotHour);
         const minutes = Math.round((slotHour - hour) * 60);
 
-        const matchingShift = shifts.find(s => hour >= s.startHour && hour < s.endHour);
+        const matchingShift = shifts.find(s => {
+          const shiftOvernight = s.endHour <= s.startHour;
+          if (shiftOvernight) {
+            return hour >= s.startHour || hour < s.endHour;
+          }
+          return hour >= s.startHour && hour < s.endHour;
+        });
         const voiceIds = matchingShift?.voiceIds || template.voiceIds || null;
 
         slots.push({

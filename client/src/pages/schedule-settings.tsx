@@ -351,7 +351,11 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
     });
   };
 
-  const totalSlots = (tpl: ScheduleTemplate) => (tpl.endHour - tpl.startHour) * tpl.slotsPerHour;
+  const totalSlots = (tpl: ScheduleTemplate) => {
+    const isOvernight = tpl.endHour <= tpl.startHour;
+    const hours = isOvernight ? (24 - tpl.startHour + tpl.endHour) : (tpl.endHour - tpl.startHour);
+    return hours * tpl.slotsPerHour;
+  };
 
   const upcomingHolidays = holidays
     ?.filter(h => {
@@ -683,8 +687,11 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
             </div>
 
             <div className="text-sm text-muted-foreground">
-              {(formEndHour - formStartHour) * formSlotsPerHour} slots/day
-              ({formStartHour}:00 — {formEndHour}:00)
+              {(() => {
+                const isOvn = formEndHour <= formStartHour;
+                const hrs = isOvn ? (24 - formStartHour + formEndHour) : (formEndHour - formStartHour);
+                return `${hrs * formSlotsPerHour} slots/day (${formStartHour}:00 — ${formEndHour}:00${isOvn ? " +1" : ""})`;
+              })()}
             </div>
 
             <div className="space-y-2">
@@ -1066,36 +1073,48 @@ function TemplateCard({
 
             <div className="pt-2">
               <h4 className="text-sm font-medium mb-2">{t("schedule.title")}</h4>
-              <div className="relative h-10 rounded-md overflow-hidden bg-muted">
-                {shifts?.map((shift, shiftIdx) => {
-                  const left = ((shift.startHour - template.startHour) / (template.endHour - template.startHour)) * 100;
-                  const width = ((shift.endHour - shift.startHour) / (template.endHour - template.startHour)) * 100;
-                  const firstVoiceColor = shift.voiceIds[0] ? getVoiceColor(shift.voiceIds[0], voices) : VOICE_COLORS[shiftIdx % VOICE_COLORS.length];
+              {(() => {
+                const isOvn = template.endHour <= template.startHour;
+                const totalHours = isOvn ? (24 - template.startHour + template.endHour) : (template.endHour - template.startHour);
+                return (
+                  <>
+                    <div className="relative h-10 rounded-md overflow-hidden bg-muted">
+                      {shifts?.map((shift, shiftIdx) => {
+                        const shiftOvn = shift.endHour <= shift.startHour;
+                        const shiftHours = shiftOvn ? (24 - shift.startHour + shift.endHour) : (shift.endHour - shift.startHour);
+                        let offsetHours = shift.startHour - template.startHour;
+                        if (offsetHours < 0) offsetHours += 24;
+                        const left = (offsetHours / totalHours) * 100;
+                        const width = (shiftHours / totalHours) * 100;
+                        const firstVoiceColor = shift.voiceIds[0] ? getVoiceColor(shift.voiceIds[0], voices) : VOICE_COLORS[shiftIdx % VOICE_COLORS.length];
 
-                  return (
-                    <div
-                      key={shift.id}
-                      className={`absolute top-0 h-full ${firstVoiceColor.bgLight} border-x border-background flex items-center justify-center gap-1`}
-                      style={{ left: `${left}%`, width: `${width}%` }}
-                      title={`${shift.startHour}:00—${shift.endHour}:00 ${shift.label || ""}`}
-                    >
-                      {shift.voiceIds.map(vid => {
-                        const c = getVoiceColor(vid, voices);
-                        return <div key={vid} className={`w-2.5 h-2.5 rounded-full ${c.bg}`} />;
+                        return (
+                          <div
+                            key={shift.id}
+                            className={`absolute top-0 h-full ${firstVoiceColor.bgLight} border-x border-background flex items-center justify-center gap-1`}
+                            style={{ left: `${left}%`, width: `${width}%` }}
+                            title={`${shift.startHour}:00—${shift.endHour}:00 ${shift.label || ""}`}
+                          >
+                            {shift.voiceIds.map(vid => {
+                              const c = getVoiceColor(vid, voices);
+                              return <div key={vid} className={`w-2.5 h-2.5 rounded-full ${c.bg}`} />;
+                            })}
+                            {width > 15 && (
+                              <span className="text-xs font-medium text-foreground/80 ml-1">
+                                {shift.label || `${shift.startHour}-${shift.endHour}`}
+                              </span>
+                            )}
+                          </div>
+                        );
                       })}
-                      {width > 15 && (
-                        <span className="text-xs font-medium text-foreground/80 ml-1">
-                          {shift.label || `${shift.startHour}-${shift.endHour}`}
-                        </span>
-                      )}
                     </div>
-                  );
-                })}
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>{template.startHour}:00</span>
-                <span>{template.endHour}:00</span>
-              </div>
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>{template.startHour}:00</span>
+                      <span>{template.endHour}:00</span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </CollapsibleContent>
