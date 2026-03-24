@@ -3035,45 +3035,115 @@ ${instructions || "Создай альтернативный вариант с �
     }
   });
 
-  async function firecrawlSearch(query: string, limit: number = 5): Promise<string[]> {
-    const apiKey = process.env.FIRECRAWL_API_KEY;
-    if (!apiKey) return [];
-
+  async function fallbackWebSearch(query: string, limit: number = 5): Promise<string[]> {
     try {
-      const response = await fetch("https://api.firecrawl.dev/v1/search", {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      const response = await fetch("https://www.startpage.com/sp/search", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
         },
-        body: JSON.stringify({
-          query,
-          limit,
-          lang: "ru",
-          scrapeOptions: { formats: ["markdown"] },
-        }),
+        body: `query=${encodeURIComponent(query)}&language=english`,
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
-      if (!response.ok) {
-        console.error(`Firecrawl search error: ${response.status}`);
-        return [];
-      }
-
-      const data = await response.json();
+      if (!response.ok) return [];
+      const html = await response.text();
+      const $ = cheerio.load(html);
       const results: string[] = [];
 
-      for (const item of (data.data || [])) {
-        const content = item.markdown || item.description || "";
-        if (content.trim()) {
-          results.push(content.substring(0, 2000));
-        }
-      }
+      const extractRealUrl = (href: string): string => {
+        if (!href) return "";
+        try {
+          const u = new URL(href);
+          const redirected = u.searchParams.get("url") || u.searchParams.get("u") || u.searchParams.get("q");
+          if (redirected && redirected.startsWith("http")) return redirected;
+        } catch {}
+        return href;
+      };
 
+      $(".result, [class*='w-gl__result']").each((i, el) => {
+        if (results.length >= limit) return false;
+        const title = $(el).find("h2, h3").first().text().trim();
+        if (!title || title.length < 5) return;
+        let link = "";
+        $(el).find("a[href]").each((_, a) => {
+          if (link) return false;
+          const raw = $(a).attr("href") || "";
+          const real = extractRealUrl(raw);
+          if (real.startsWith("http") && !real.includes("startpage.com")) {
+            link = real;
+          }
+        });
+        if (!link) return;
+        let snippet = "";
+        $(el).find("p").each((_, p) => {
+          const t = $(p).text().trim();
+          if (t.length > 30 && !snippet) {
+            snippet = t.substring(0, 400);
+          }
+        });
+        results.push(`${title}\n${link}\n${snippet}`);
+      });
+
+      console.log(`Startpage search for "${query}": ${results.length} results`);
       return results;
     } catch (err: any) {
-      console.error("Firecrawl search error:", err.message);
+      console.error("Startpage search error:", err.message);
       return [];
     }
+  }
+
+  async function firecrawlSearch(query: string, limit: number = 5): Promise<string[]> {
+    const apiKey = process.env.FIRECRAWL_API_KEY;
+
+    if (apiKey) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        const response = await fetch("https://api.firecrawl.dev/v1/search", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            query,
+            limit,
+            lang: "ru",
+            scrapeOptions: { formats: ["markdown"] },
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => "");
+          console.error(`Firecrawl search error: ${response.status} ${errorText}`);
+        } else {
+          const data = await response.json();
+          console.log(`Firecrawl search for "${query}": ${(data.data || []).length} results`);
+          const results: string[] = [];
+
+          for (const item of (data.data || [])) {
+            const content = item.markdown || item.description || "";
+            if (content.trim()) {
+              results.push(content.substring(0, 2000));
+            }
+          }
+
+          if (results.length > 0) return results;
+        }
+      } catch (err: any) {
+        console.error("Firecrawl search error:", err.message);
+      }
+    }
+
+    console.log(`Firecrawl unavailable, falling back to Startpage for "${query}"`);
+    return fallbackWebSearch(query, limit);
   }
 
   async function researchForProgram(topics: string[]): Promise<string> {
