@@ -13,6 +13,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import type { Settings as SettingsType } from "@shared/schema";
@@ -21,6 +22,8 @@ export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout, isLoggingOut } = useAuth();
   const { t } = useTranslation();
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
 
   const { data: settings } = useQuery<SettingsType>({
     queryKey: ["/api/settings"],
@@ -40,29 +43,31 @@ export function AppSidebar() {
   ];
 
   return (
-    <Sidebar>
-      <SidebarHeader className="p-4">
-        <div className="flex items-center gap-3">
+    <Sidebar collapsible="icon">
+      <SidebarHeader className={isCollapsed ? "p-2" : "p-4"}>
+        <div className={`flex items-center ${isCollapsed ? "justify-center" : "gap-3"}`}>
           {stationLogo ? (
             <img
               src={stationLogo}
               alt={stationName}
-              className="h-10 w-10 rounded-lg object-cover"
+              className={`rounded-lg object-cover shrink-0 ${isCollapsed ? "h-8 w-8" : "h-10 w-10"}`}
             />
           ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-              <Radio className="h-5 w-5 text-primary-foreground" />
+            <div className={`flex items-center justify-center rounded-lg bg-primary shrink-0 ${isCollapsed ? "h-8 w-8" : "h-10 w-10"}`}>
+              <Radio className={isCollapsed ? "h-4 w-4 text-primary-foreground" : "h-5 w-5 text-primary-foreground"} />
             </div>
           )}
-          <div className="flex flex-col">
-            <span className="text-lg font-semibold">{stationName}</span>
-            <span className="text-xs text-muted-foreground">{t("landing.productName")}</span>
-          </div>
+          {!isCollapsed && (
+            <div className="flex flex-col min-w-0">
+              <span className="text-lg font-semibold truncate">{stationName}</span>
+              <span className="text-xs text-muted-foreground">{t("landing.productName")}</span>
+            </div>
+          )}
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>{t("nav.menu")}</SidebarGroupLabel>
+          {!isCollapsed && <SidebarGroupLabel>{t("nav.menu")}</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
@@ -70,10 +75,11 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={location === item.url}
+                    tooltip={item.title}
                     data-testid={`nav-${item.url.replace("/", "") || "dashboard"}`}
                   >
                     <Link href={item.url}>
-                      <item.icon className="h-4 w-4" />
+                      <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -83,13 +89,15 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4 space-y-3">
+      <SidebarFooter className={isCollapsed ? "p-2" : "p-4 space-y-3"}>
         {user && (
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col min-w-0">
-              <span className="text-sm font-medium truncate">{user.name || user.email}</span>
-              <span className="text-xs text-muted-foreground truncate">{user.email}</span>
-            </div>
+          <div className={`flex items-center ${isCollapsed ? "justify-center" : "justify-between"}`}>
+            {!isCollapsed && (
+              <div className="flex flex-col min-w-0">
+                <span className="text-sm font-medium truncate">{user.name || user.email}</span>
+                <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+              </div>
+            )}
             <button
               onClick={logout}
               disabled={isLoggingOut}
@@ -101,7 +109,7 @@ export function AppSidebar() {
             </button>
           </div>
         )}
-        {stationLocation && (
+        {!isCollapsed && stationLocation && (
           <div className="text-xs text-muted-foreground text-center">
             {stationLocation}
           </div>
