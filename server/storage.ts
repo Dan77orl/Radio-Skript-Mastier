@@ -144,23 +144,18 @@ export class DatabaseStorage implements IStorage {
   async saveSettings(newSettings: InsertSettings, userId?: string): Promise<Settings> {
     const existing = await this.getSettings(userId);
     if (existing) {
+      const merged: Record<string, unknown> = { userId: userId || existing.userId };
+      for (const key of Object.keys(newSettings) as (keyof InsertSettings)[]) {
+        if (key === "id") continue;
+        merged[key] = newSettings[key] ?? (existing as Record<string, unknown>)[key];
+      }
+      for (const key of Object.keys(existing) as string[]) {
+        if (!(key in merged) && key !== "id") {
+          merged[key] = (existing as Record<string, unknown>)[key];
+        }
+      }
       const [updated] = await db.update(settings)
-        .set({
-          userId: userId || existing.userId,
-          elevenLabsApiKey: newSettings.elevenLabsApiKey ?? existing.elevenLabsApiKey,
-          yandexDiskToken: newSettings.yandexDiskToken ?? existing.yandexDiskToken,
-          maleVoiceId: newSettings.maleVoiceId ?? existing.maleVoiceId,
-          femaleVoiceId: newSettings.femaleVoiceId ?? existing.femaleVoiceId,
-          dailyDialogsCount: newSettings.dailyDialogsCount ?? existing.dailyDialogsCount,
-          defaultPrompt: newSettings.defaultPrompt ?? existing.defaultPrompt,
-          anthropicApiKey: newSettings.anthropicApiKey ?? existing.anthropicApiKey,
-          stationName: newSettings.stationName ?? existing.stationName,
-          stationLogo: newSettings.stationLogo ?? existing.stationLogo,
-          stationDescription: newSettings.stationDescription ?? existing.stationDescription,
-          stationWebsite: newSettings.stationWebsite ?? existing.stationWebsite,
-          stationLocation: newSettings.stationLocation ?? existing.stationLocation,
-          stationAttachments: newSettings.stationAttachments ?? existing.stationAttachments,
-        })
+        .set(merged)
         .where(eq(settings.id, existing.id))
         .returning();
       return updated;
