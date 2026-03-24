@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import {
-  Mic, Calendar, CheckCircle, Clock, AlertCircle, Plus, PlayCircle, PauseCircle,
+  Mic, Calendar, CheckCircle, Clock, AlertCircle, PlayCircle, PauseCircle,
   Radio, Zap, Volume2, Upload, AudioLines, TrendingUp, Activity, Podcast,
-  ArrowRight, BarChart3, CircleDot
+  ArrowRight, BarChart3
 } from "lucide-react";
 import type { Program, ProgramType, Settings } from "@shared/schema";
 
@@ -45,24 +46,10 @@ function StatCard({
   );
 }
 
-function getStatusBadge(status: string) {
-  switch (status) {
-    case "ready":
-      return <Badge variant="default" className="bg-green-600 text-xs"><CheckCircle className="mr-1 h-3 w-3" />Готов</Badge>;
-    case "script_ready":
-      return <Badge variant="secondary" className="text-xs"><CheckCircle className="mr-1 h-3 w-3" />Сценарий</Badge>;
-    case "generating":
-      return <Badge variant="secondary" className="text-xs"><Clock className="mr-1 h-3 w-3 animate-spin" />Генерация</Badge>;
-    case "error":
-      return <Badge variant="destructive" className="text-xs"><AlertCircle className="mr-1 h-3 w-3" />Ошибка</Badge>;
-    default:
-      return <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3" />Ожидание</Badge>;
-  }
-}
-
 export default function Dashboard() {
   const [playingId, setPlayingId] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { t } = useTranslation();
 
   const { data: programs, isLoading: programsLoading } = useQuery<Program[]>({
     queryKey: ["/api/programs"],
@@ -106,9 +93,9 @@ export default function Dashboard() {
   const todayWithAudio = todayPrograms.filter(p => p.audioUrl).length;
   const todayWithScript = todayPrograms.filter(p => p.scriptText).length;
   const todayErrors = todayPrograms.filter(p => p.status === "error").length;
-  const totalDailyNorm = programTypes?.reduce((acc, t) => acc + (t.dailyCount || 1), 0) || 0;
+  const totalDailyNorm = programTypes?.reduce((acc, pt) => acc + (pt.dailyCount || 1), 0) || 0;
 
-  const autoTypes = programTypes?.filter(t => t.autoGenerate) || [];
+  const autoTypes = programTypes?.filter(pt => pt.autoGenerate) || [];
 
   const recentPrograms = programs
     ?.slice()
@@ -119,30 +106,45 @@ export default function Dashboard() {
     })
     .slice(0, 8) || [];
 
-  const typeMap = new Map(programTypes?.map(t => [t.id, t]) || []);
+  const typeMap = new Map(programTypes?.map(pt => [pt.id, pt]) || []);
 
   const isLoading = programsLoading || typesLoading || settingsLoading;
+
+  function getStatusBadge(status: string) {
+    switch (status) {
+      case "ready":
+        return <Badge variant="default" className="bg-green-600 text-xs"><CheckCircle className="mr-1 h-3 w-3" />{t("statuses.ready")}</Badge>;
+      case "script_ready":
+        return <Badge variant="secondary" className="text-xs"><CheckCircle className="mr-1 h-3 w-3" />{t("statuses.script_ready")}</Badge>;
+      case "generating":
+        return <Badge variant="secondary" className="text-xs"><Clock className="mr-1 h-3 w-3 animate-spin" />{t("statuses.generating")}</Badge>;
+      case "error":
+        return <Badge variant="destructive" className="text-xs"><AlertCircle className="mr-1 h-3 w-3" />{t("statuses.error")}</Badge>;
+      default:
+        return <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3" />{t("statuses.pending")}</Badge>;
+    }
+  }
 
   return (
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Дашборд</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("dashboard.title")}</h1>
           <p className="text-muted-foreground">
-            {settings?.stationName || "Радио"} — {new Date().toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })}
+            {settings?.stationName || "Radio"} — {new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
           </p>
         </div>
         <div className="flex gap-2">
           <Link href="/shows">
             <Button variant="outline" data-testid="button-go-shows">
               <Podcast className="mr-2 h-4 w-4" />
-              Передачи
+              {t("nav.shows")}
             </Button>
           </Link>
           <Link href="/podvodki">
             <Button variant="outline" data-testid="button-go-podvodki">
               <Mic className="mr-2 h-4 w-4" />
-              Подводки
+              {t("nav.podvodki")}
             </Button>
           </Link>
         </div>
@@ -150,33 +152,33 @@ export default function Dashboard() {
 
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Сегодня готово"
+          title={t("dashboard.readyToday")}
           value={`${todayReady}/${totalDailyNorm}`}
-          description={`Со звуком: ${todayWithAudio}, сценарии: ${todayWithScript}`}
+          description={t("dashboard.withAudio", { count: todayWithAudio, scripts: todayWithScript })}
           icon={Activity}
           color="text-green-600"
           loading={isLoading}
         />
         <StatCard
-          title="Ошибки сегодня"
+          title={t("dashboard.errorsToday")}
           value={todayErrors}
-          description={todayErrors > 0 ? "Требуют внимания" : "Всё в порядке"}
+          description={todayErrors > 0 ? t("dashboard.needAttention") : t("dashboard.allGood")}
           icon={AlertCircle}
           color={todayErrors > 0 ? "text-red-500" : "text-muted-foreground"}
           loading={isLoading}
         />
         <StatCard
-          title="Автогенерация"
+          title={t("dashboard.autoGeneration")}
           value={`${autoTypes.length}/${programTypes?.length || 0}`}
-          description={autoTypes.length > 0 ? "Типов на автомате" : "Не настроена"}
+          description={autoTypes.length > 0 ? t("dashboard.typesOnAuto") : t("dashboard.notConfigured")}
           icon={Zap}
           color={autoTypes.length > 0 ? "text-yellow-500" : "text-muted-foreground"}
           loading={isLoading}
         />
         <StatCard
-          title="Всего программ"
+          title={t("dashboard.totalPrograms")}
           value={programs?.length || 0}
-          description="За всё время"
+          description={t("common.allTime")}
           icon={BarChart3}
           loading={isLoading}
         />
@@ -187,12 +189,12 @@ export default function Dashboard() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Сегодня по передачам</CardTitle>
-                <CardDescription>Статус выпусков на {new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}</CardDescription>
+                <CardTitle>{t("dashboard.todayByShows")}</CardTitle>
+                <CardDescription>{t("dashboard.statusForDate", { date: new Date().toLocaleDateString(undefined, { day: "numeric", month: "long" }) })}</CardDescription>
               </div>
               <Link href="/shows">
                 <Button variant="ghost" size="sm">
-                  Все передачи
+                  {t("dashboard.allShows")}
                   <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>
               </Link>
@@ -225,11 +227,11 @@ export default function Dashboard() {
                           {hasAuto && (
                             <span className="flex items-center gap-1 text-xs text-green-600">
                               <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                              авто
+                              {t("dashboard.auto")}
                             </span>
                           )}
                           {errors > 0 && (
-                            <Badge variant="destructive" className="text-xs h-5">{errors} ош.</Badge>
+                            <Badge variant="destructive" className="text-xs h-5">{errors} {t("dashboard.errors")}</Badge>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -246,12 +248,12 @@ export default function Dashboard() {
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {ready > 0 && (
-                          <span className="flex items-center gap-0.5 text-xs text-green-600" title="Готово к эфиру">
+                          <span className="flex items-center gap-0.5 text-xs text-green-600" title={t("dashboard.readyForAir")}>
                             <Volume2 className="h-3.5 w-3.5" />{ready}
                           </span>
                         )}
                         {withScript > 0 && (
-                          <span className="flex items-center gap-0.5 text-xs text-blue-600" title="Есть сценарий">
+                          <span className="flex items-center gap-0.5 text-xs text-blue-600" title={t("dashboard.hasScript")}>
                             <Mic className="h-3.5 w-3.5" />{withScript}
                           </span>
                         )}
@@ -263,9 +265,9 @@ export default function Dashboard() {
             ) : (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Podcast className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <p className="text-muted-foreground">Типы передач не созданы</p>
+                <p className="text-muted-foreground">{t("dashboard.noTypes")}</p>
                 <Link href="/shows">
-                  <Button variant="ghost" className="mt-2">Настроить</Button>
+                  <Button variant="ghost" className="mt-2">{t("common.configure")}</Button>
                 </Link>
               </div>
             )}
@@ -274,8 +276,8 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle>Автогенерация</CardTitle>
-            <CardDescription>Типы на автомате</CardDescription>
+            <CardTitle>{t("dashboard.autoGeneration")}</CardTitle>
+            <CardDescription>{t("dashboard.typesOnAuto")}</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -294,28 +296,28 @@ export default function Dashboard() {
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
                         {type.scheduleDays && type.scheduleDays.length > 0
-                          ? (type.scheduleDays as number[]).map(d => ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"][d]).join(", ")
-                          : "Ежедневно"
-                        } в {type.scheduleTime || "09:00"}
+                          ? (type.scheduleDays as number[]).map(d => ["Su","Mo","Tu","We","Th","Fr","Sa"][d]).join(", ")
+                          : t("common.daily")
+                        } {type.scheduleTime || "09:00"}
                       </div>
                       <div className="flex items-center gap-1">
                         <TrendingUp className="h-3 w-3" />
-                        {type.weeklyCount || 7}/нед
+                        {type.weeklyCount || 7}{t("dashboard.perWeek")}
                       </div>
                       <div className="flex gap-2 flex-wrap mt-1">
                         {type.autoVoice !== false && (
                           <span className="flex items-center gap-0.5 text-green-600 dark:text-green-400">
-                            <Volume2 className="h-3 w-3" />озвучка
+                            <Volume2 className="h-3 w-3" />{t("dashboard.voicing")}
                           </span>
                         )}
                         {type.autoIsolate && (
                           <span className="flex items-center gap-0.5 text-green-600 dark:text-green-400">
-                            <AudioLines className="h-3 w-3" />шумодав
+                            <AudioLines className="h-3 w-3" />{t("dashboard.denoiser")}
                           </span>
                         )}
                         {type.autoUpload !== false && (
                           <span className="flex items-center gap-0.5 text-green-600 dark:text-green-400">
-                            <Upload className="h-3 w-3" />выгрузка
+                            <Upload className="h-3 w-3" />{t("dashboard.uploading")}
                           </span>
                         )}
                       </div>
@@ -326,8 +328,8 @@ export default function Dashboard() {
             ) : (
               <div className="flex flex-col items-center justify-center py-6 text-center">
                 <Zap className="h-10 w-10 text-muted-foreground/50 mb-3" />
-                <p className="text-sm text-muted-foreground">Автогенерация не настроена</p>
-                <p className="text-xs text-muted-foreground mt-1">Включите в настройках передачи</p>
+                <p className="text-sm text-muted-foreground">{t("dashboard.autoNotConfigured")}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t("dashboard.enableInSettings")}</p>
               </div>
             )}
           </CardContent>
@@ -338,12 +340,12 @@ export default function Dashboard() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Последние выпуски</CardTitle>
-              <CardDescription>Недавно созданные программы</CardDescription>
+              <CardTitle>{t("dashboard.recentEpisodes")}</CardTitle>
+              <CardDescription>{t("dashboard.recentDescription")}</CardDescription>
             </div>
             <Link href="/shows">
               <Button variant="ghost" size="sm">
-                Все передачи
+                {t("dashboard.allShows")}
                 <ArrowRight className="ml-1 h-4 w-4" />
               </Button>
             </Link>
@@ -369,7 +371,7 @@ export default function Dashboard() {
                         <Mic className="h-4 w-4" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm truncate">{program.title || "Без названия"}</p>
+                        <p className="font-medium text-sm truncate">{program.title || t("dashboard.noTitle")}</p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           {pType && <span className="truncate">{pType.name}</span>}
                           <span>{program.scheduledDate || "—"}</span>
@@ -379,7 +381,7 @@ export default function Dashboard() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {program.audioUrl?.includes("_isolated") && (
-                        <span className="text-green-600" title="Шум убран">
+                        <span className="text-green-600">
                           <AudioLines className="h-4 w-4" />
                         </span>
                       )}
@@ -407,9 +409,9 @@ export default function Dashboard() {
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Radio className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">Пока нет программ</p>
+              <p className="text-muted-foreground">{t("dashboard.noPrograms")}</p>
               <Link href="/shows">
-                <Button variant="ghost" className="mt-2">Создать первую</Button>
+                <Button variant="ghost" className="mt-2">{t("dashboard.createFirst")}</Button>
               </Link>
             </div>
           )}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -18,7 +19,6 @@ import { Newspaper, Plus, Trash2, Edit2, Globe, Loader2, RefreshCw, Download } f
 import { VoiceInput } from "@/components/voice-input";
 import type { NewsSource, NewsItem } from "@shared/schema";
 import { format } from "date-fns";
-import { ru } from "date-fns/locale";
 
 const sourceFormSchema = z.object({
   name: z.string().min(1, "Введите название"),
@@ -32,6 +32,7 @@ const sourceFormSchema = z.object({
 type SourceFormValues = z.infer<typeof sourceFormSchema>;
 
 export default function NewsSources() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSource, setEditingSource] = useState<NewsSource | null>(null);
@@ -67,10 +68,10 @@ export default function NewsSources() {
       queryClient.invalidateQueries({ queryKey: ["/api/news-sources"] });
       setIsDialogOpen(false);
       form.reset();
-      toast({ title: "Источник добавлен", description: "Новый источник новостей сохранён" });
+      toast({ title: t("common.saved") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -84,10 +85,10 @@ export default function NewsSources() {
       setIsDialogOpen(false);
       setEditingSource(null);
       form.reset();
-      toast({ title: "Источник обновлён" });
+      toast({ title: t("common.saved") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -97,10 +98,10 @@ export default function NewsSources() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/news-sources"] });
-      toast({ title: "Источник удалён" });
+      toast({ title: t("common.deleted") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -113,13 +114,13 @@ export default function NewsSources() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/news-items"] });
       toast({
-        title: "Новости получены",
-        description: `Загружено ${data.fetched} новостей, сохранено ${data.saved}`,
+        title: t("newsSources.newsLoaded"),
+        description: `${data.fetched} / ${data.saved}`,
       });
       setFetchingSourceId(null);
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
       setFetchingSourceId(null);
     },
   });
@@ -166,22 +167,22 @@ export default function NewsSources() {
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Источники новостей</h1>
-          <p className="text-muted-foreground">Управление RSS и новостными источниками</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("newsSources.title")}</h1>
+          <p className="text-muted-foreground">{t("newsSources.subtitle")}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={openCreateDialog} data-testid="button-add-source">
                 <Plus className="mr-2 h-4 w-4" />
-                Добавить источник
+                {t("newsSources.addSource")}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{editingSource ? "Редактировать источник" : "Добавить источник"}</DialogTitle>
+                <DialogTitle>{editingSource ? t("newsSources.editSource") : t("newsSources.addSource")}</DialogTitle>
                 <DialogDescription>
-                  {editingSource ? "Измените данные источника" : "Добавьте новый источник новостей"}
+                  {editingSource ? t("newsSources.editSourceDesc") : t("newsSources.addSourceDesc")}
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
@@ -191,7 +192,7 @@ export default function NewsSources() {
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Название</FormLabel>
+                        <FormLabel>{t("newsSources.sourceName")}</FormLabel>
                         <div className="flex gap-1 items-center">
                           <FormControl>
                             <Input placeholder="Alanya News" {...field} data-testid="input-source-name" className="flex-1" />
@@ -221,7 +222,7 @@ export default function NewsSources() {
                       name="type"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Тип</FormLabel>
+                          <FormLabel>{t("newsSources.sourceType")}</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger data-testid="select-source-type">
@@ -242,7 +243,7 @@ export default function NewsSources() {
                       name="language"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Язык</FormLabel>
+                          <FormLabel>{t("newsSources.sourceLanguage")}</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger data-testid="select-source-language">
@@ -250,9 +251,9 @@ export default function NewsSources() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="ru">Русский</SelectItem>
-                              <SelectItem value="en">English</SelectItem>
-                              <SelectItem value="tr">Turkce</SelectItem>
+                              <SelectItem value="ru">{t("languages.ru")}</SelectItem>
+                              <SelectItem value="en">{t("languages.en")}</SelectItem>
+                              <SelectItem value="tr">{t("languages.tr")}</SelectItem>
                             </SelectContent>
                           </Select>
                         </FormItem>
@@ -264,10 +265,10 @@ export default function NewsSources() {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Описание</FormLabel>
+                        <FormLabel>{t("newsSources.descriptionLabel")}</FormLabel>
                         <div className="flex gap-1 items-center">
                           <FormControl>
-                            <Input placeholder="Краткое описание источника" {...field} data-testid="input-source-description" className="flex-1" />
+                            <Input placeholder={t("newsSources.descriptionPlaceholder")} {...field} data-testid="input-source-description" className="flex-1" />
                           </FormControl>
                           <VoiceInput onTranscript={(text) => field.onChange((field.value || "") + text)} />
                         </div>
@@ -280,7 +281,7 @@ export default function NewsSources() {
                     name="isActive"
                     render={({ field }) => (
                       <FormItem className="flex items-center justify-between">
-                        <FormLabel>Активен</FormLabel>
+                        <FormLabel>{t("newsSources.activeLabel")}</FormLabel>
                         <FormControl>
                           <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-source-active" />
                         </FormControl>
@@ -289,13 +290,13 @@ export default function NewsSources() {
                   />
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                      Отмена
+                      {t("common.cancel")}
                     </Button>
                     <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-source">
                       {(createMutation.isPending || updateMutation.isPending) && (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       )}
-                      Сохранить
+                      {t("common.save")}
                     </Button>
                   </div>
                 </form>
@@ -314,7 +315,7 @@ export default function NewsSources() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Newspaper className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <p className="text-muted-foreground text-center">
-              Нет источников новостей. Добавьте первый источник.
+              {t("newsSources.noSources")}
             </p>
           </CardContent>
         </Card>
@@ -329,7 +330,7 @@ export default function NewsSources() {
                     <CardDescription className="truncate">{source.url}</CardDescription>
                   </div>
                   <Badge variant={source.isActive ? "default" : "secondary"}>
-                    {source.isActive ? "Активен" : "Неактивен"}
+                    {source.isActive ? t("common.active") : t("common.inactive")}
                   </Badge>
                 </div>
               </CardHeader>
@@ -392,9 +393,9 @@ export default function NewsSources() {
       {newsItems.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Загруженные новости</CardTitle>
+            <CardTitle>{t("newsSources.loadedNews")}</CardTitle>
             <CardDescription>
-              {newsItems.length} новостей из источников
+              {newsItems.length} {t("newsSources.newsCount")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -407,7 +408,7 @@ export default function NewsSources() {
                       <div className="flex items-start justify-between gap-2">
                         <span className="font-medium text-sm">{item.title}</span>
                         {item.isUsed && (
-                          <Badge variant="secondary" className="text-xs shrink-0">Использовано</Badge>
+                          <Badge variant="secondary" className="text-xs shrink-0">{t("newsSources.used")}</Badge>
                         )}
                       </div>
                       {item.summary && (
@@ -416,7 +417,7 @@ export default function NewsSources() {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         {source && <span>{source.name}</span>}
                         {item.publishedAt && (
-                          <span>{format(new Date(item.publishedAt), "d MMM, HH:mm", { locale: ru })}</span>
+                          <span>{format(new Date(item.publishedAt), "d MMM, HH:mm")}</span>
                         )}
                         {item.category && <Badge variant="outline" className="text-xs">{item.category}</Badge>}
                       </div>

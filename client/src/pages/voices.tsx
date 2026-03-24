@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,7 @@ interface ElevenLabsVoice {
 }
 
 export default function VoicesPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -125,14 +127,14 @@ export default function VoicesPage() {
       setPersonaGender("male");
       setSelectedProgramTypes([]);
       toast({
-        title: "Голос добавлен",
-        description: "Персона успешно создана",
+        title: t("voices.voiceAdded"),
+        description: t("voices.personaCreated"),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось добавить голос",
+        title: t("common.error"),
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -149,14 +151,14 @@ export default function VoicesPage() {
       setEditingVoice(null);
       setSelectedProgramTypes([]);
       toast({
-        title: "Сохранено",
-        description: "Назначения персоны обновлены",
+        title: t("common.saved"),
+        description: t("voices.assignmentsSaved"),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось обновить персону",
+        title: t("common.error"),
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -169,8 +171,8 @@ export default function VoicesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/voices"] });
       toast({
-        title: "Удалено",
-        description: "Голос удален",
+        title: t("common.deleted"),
+        description: t("voices.voiceDeleted"),
       });
     },
     onError: (error: Error) => {
@@ -201,8 +203,8 @@ export default function VoicesPage() {
     audio.onerror = () => {
       setPlayingVoiceId(null);
       toast({
-        title: "Ошибка воспроизведения",
-        description: "Не удалось воспроизвести образец голоса",
+        title: t("voices.playbackError"),
+        description: t("voices.playbackErrorDescription"),
         variant: "destructive",
       });
     };
@@ -211,8 +213,8 @@ export default function VoicesPage() {
   const handleAddVoice = async () => {
     if (!selectedElevenLabsVoice || !personaName.trim()) {
       toast({
-        title: "Заполните все поля",
-        description: "Введите имя персоны и выберите голос",
+        title: t("voices.fillAllFields"),
+        description: t("voices.enterNameAndVoice"),
         variant: "destructive",
       });
       return;
@@ -232,8 +234,8 @@ export default function VoicesPage() {
         voiceId = data.voice_id;
       } catch (err) {
         toast({
-          title: "Ошибка",
-          description: "Не удалось добавить голос из библиотеки в ваш аккаунт",
+          title: t("common.error"),
+          description: t("voices.libraryAddError"),
           variant: "destructive",
         });
         return;
@@ -275,7 +277,7 @@ export default function VoicesPage() {
   const getProgramTypeNames = (ids: string[] | null | undefined): string[] => {
     if (!ids) return [];
     return ids.map(id => {
-      if (id === "dialogs") return "Подводки / Диалоги";
+      if (id === "dialogs") return t("voices.dialogs");
       return programTypes?.find(pt => pt.id === id)?.name;
     }).filter(Boolean) as string[];
   };
@@ -286,36 +288,36 @@ export default function VoicesPage() {
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Голоса</h1>
-          <p className="text-muted-foreground">Управление персонами для радио-диалогов</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("voices.title")}</h1>
+          <p className="text-muted-foreground">{t("voices.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-sm">
             <Users className="mr-1 h-3 w-3" />
-            {voicesCount} персон
+            {voicesCount} {t("voices.personas")}
           </Badge>
           <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (open) { setVoiceTab("my"); setVoiceSearch(""); setVoiceSearchQuery(""); setSearchGender("all"); } setIsAddDialogOpen(open); }}>
             <DialogTrigger asChild>
               <Button data-testid="button-add-voice">
                 <Plus className="mr-2 h-4 w-4" />
-                Добавить персону
+                {t("voices.addPersona")}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Добавить персону</DialogTitle>
+                <DialogTitle>{t("voices.addPersonaTitle")}</DialogTitle>
                 <DialogDescription>
-                  Выберите голос из коллекции ElevenLabs и задайте имя персоны
+                  {t("voices.addPersonaDescription")}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Имя персоны</label>
+                    <label className="text-sm font-medium">{t("voices.personaName")}</label>
                     <div className="flex gap-1 items-center">
                       <Input
-                        placeholder="Например: Алексей"
+                        placeholder={t("voices.personaNamePlaceholder")}
                         value={personaName}
                         onChange={(e) => setPersonaName(e.target.value)}
                         data-testid="input-persona-name"
@@ -325,21 +327,21 @@ export default function VoicesPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Пол</label>
+                    <label className="text-sm font-medium">{t("voices.gender")}</label>
                     <Select value={personaGender} onValueChange={setPersonaGender}>
                       <SelectTrigger data-testid="select-gender">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="male">Мужской</SelectItem>
-                        <SelectItem value="female">Женский</SelectItem>
+                        <SelectItem value="male">{t("common.male")}</SelectItem>
+                        <SelectItem value="female">{t("common.female")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Назначить на передачи</label>
+                  <label className="text-sm font-medium">{t("voices.assignToShows")}</label>
                   <div className="grid gap-2 max-h-[150px] overflow-y-auto border rounded-lg p-3">
                     <div 
                       className="flex items-center gap-2 cursor-pointer"
@@ -352,7 +354,7 @@ export default function VoicesPage() {
                       />
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">Подводки / Диалоги</span>
+                        <span className="text-sm">{t("voices.dialogs")}</span>
                       </div>
                     </div>
                     {programTypes?.map((pt) => (
@@ -374,19 +376,19 @@ export default function VoicesPage() {
                     ))}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Выберите передачи, которые будет вести эта персона
+                    {t("voices.selectShowsHint")}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Голос ElevenLabs</label>
+                  <label className="text-sm font-medium">{t("voices.elevenLabsVoice")}</label>
                   <Tabs value={voiceTab} onValueChange={(v) => setVoiceTab(v as "my" | "search")}>
                     <TabsList className="w-full">
                       <TabsTrigger value="my" className="flex-1" data-testid="tab-my-voices" onClick={() => setSelectedElevenLabsVoice(null)}>
-                        <Mic className="h-4 w-4 mr-1" /> Мои голоса
+                        <Mic className="h-4 w-4 mr-1" /> {t("voices.myVoices")}
                       </TabsTrigger>
                       <TabsTrigger value="search" className="flex-1" data-testid="tab-search-voices" onClick={() => setSelectedElevenLabsVoice(null)}>
-                        <Globe className="h-4 w-4 mr-1" /> Поиск в библиотеке
+                        <Globe className="h-4 w-4 mr-1" /> {t("voices.searchLibrary")}
                       </TabsTrigger>
                     </TabsList>
                     <TabsContent value="my" className="mt-2">
@@ -399,8 +401,8 @@ export default function VoicesPage() {
                       ) : isElevenLabsError ? (
                         <div className="text-center py-6 border rounded-lg bg-destructive/5">
                           <Volume2 className="h-10 w-10 mx-auto mb-2 text-destructive/50" />
-                          <p className="text-sm text-destructive mb-1">Не удалось загрузить голоса</p>
-                          <p className="text-xs text-muted-foreground">Проверьте API ключ в настройках</p>
+                          <p className="text-sm text-destructive mb-1">{t("voices.loadError")}</p>
+                          <p className="text-xs text-muted-foreground">{t("voices.checkApiKey")}</p>
                         </div>
                       ) : elevenLabsData?.voices && elevenLabsData.voices.length > 0 ? (
                         <div className="grid gap-2 max-h-[300px] overflow-y-auto">
@@ -420,7 +422,7 @@ export default function VoicesPage() {
                                   <span className="font-medium">{voice.name}</span>
                                   {voice.labels?.gender && (
                                     <Badge variant="secondary" className="text-xs">
-                                      {voice.labels.gender === "male" ? "М" : "Ж"}
+                                      {voice.labels.gender === "male" ? t("common.maleShort") : t("common.femaleShort")}
                                     </Badge>
                                   )}
                                   {voice.category && (
@@ -431,7 +433,7 @@ export default function VoicesPage() {
                                 </div>
                                 {voice.labels?.accent && (
                                   <p className="text-xs text-muted-foreground mt-1">
-                                    Акцент: {voice.labels.accent}
+                                    {t("common.accent")}: {voice.labels.accent}
                                   </p>
                                 )}
                               </div>
@@ -458,7 +460,7 @@ export default function VoicesPage() {
                       ) : (
                         <div className="text-center py-6 text-muted-foreground">
                           <Volume2 className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">Добавьте API ключ ElevenLabs в настройках</p>
+                          <p className="text-sm">{t("voices.addApiKey")}</p>
                         </div>
                       )}
                     </TabsContent>
@@ -467,7 +469,7 @@ export default function VoicesPage() {
                         <div className="relative flex-1">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input
-                            placeholder="Поиск голосов..."
+                            placeholder={t("voices.searchVoices")}
                             value={voiceSearch}
                             onChange={(e) => handleSearchInput(e.target.value)}
                             className="pl-9"
@@ -479,22 +481,22 @@ export default function VoicesPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all">Все</SelectItem>
-                            <SelectItem value="male">Мужские</SelectItem>
-                            <SelectItem value="female">Женские</SelectItem>
+                            <SelectItem value="all">{t("common.all")}</SelectItem>
+                            <SelectItem value="male">{t("common.male")}</SelectItem>
+                            <SelectItem value="female">{t("common.female")}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       {isSearching ? (
                         <div className="flex items-center justify-center py-8">
                           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                          <span className="ml-2 text-sm text-muted-foreground">Поиск...</span>
+                          <span className="ml-2 text-sm text-muted-foreground">{t("common.loading")}</span>
                         </div>
                       ) : isSearchError ? (
                         <div className="text-center py-6 border rounded-lg bg-destructive/5">
                           <Volume2 className="h-10 w-10 mx-auto mb-2 text-destructive/50" />
-                          <p className="text-sm text-destructive mb-1">Ошибка поиска голосов</p>
-                          <p className="text-xs text-muted-foreground">Проверьте API ключ ElevenLabs в настройках</p>
+                          <p className="text-sm text-destructive mb-1">{t("voices.searchError")}</p>
+                          <p className="text-xs text-muted-foreground">{t("voices.checkApiKey")}</p>
                         </div>
                       ) : searchData?.voices && searchData.voices.length > 0 ? (
                         <div className="grid gap-2 max-h-[300px] overflow-y-auto">
@@ -514,7 +516,7 @@ export default function VoicesPage() {
                                   <span className="font-medium truncate">{voice.name}</span>
                                   {voice.labels?.gender && (
                                     <Badge variant="secondary" className="text-xs">
-                                      {voice.labels.gender === "male" ? "М" : "Ж"}
+                                      {voice.labels.gender === "male" ? t("common.maleShort") : t("common.femaleShort")}
                                     </Badge>
                                   )}
                                   <Badge variant="outline" className="text-xs">
@@ -567,14 +569,14 @@ export default function VoicesPage() {
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                  Отмена
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   onClick={handleAddVoice}
                   disabled={!selectedElevenLabsVoice || !personaName.trim() || createMutation.isPending}
                   data-testid="button-confirm-add"
                 >
-                  {createMutation.isPending ? "Добавление..." : "Добавить"}
+                  {createMutation.isPending ? t("common.loading") : t("common.add")}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -601,7 +603,7 @@ export default function VoicesPage() {
                     <div>
                       <CardTitle className="text-lg">{voice.name}</CardTitle>
                       <CardDescription>
-                        {voice.gender === "female" ? "Женский голос" : "Мужской голос"}
+                        {voice.gender === "female" ? t("generator.femaleVoice") : t("generator.maleVoice")}
                       </CardDescription>
                     </div>
                   </div>
@@ -636,12 +638,12 @@ export default function VoicesPage() {
                         {playingVoiceId === voice.id ? (
                           <>
                             <Pause className="mr-2 h-4 w-4" />
-                            Стоп
+                            {t("common.pause")}
                           </>
                         ) : (
                           <>
                             <Play className="mr-2 h-4 w-4" />
-                            Прослушать
+                            {t("generator.listen")}
                           </>
                         )}
                       </Button>
@@ -662,15 +664,15 @@ export default function VoicesPage() {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Удалить персону?</AlertDialogTitle>
+                          <AlertDialogTitle>{t("voices.deleteVoice")}?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Персона "{voice.name}" будет удалена. Это действие нельзя отменить.
+                            {t("voices.deleteVoiceConfirm")}
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Отмена</AlertDialogCancel>
+                          <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                           <AlertDialogAction onClick={() => deleteMutation.mutate(voice.id)}>
-                            Удалить
+                            {t("common.delete")}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
@@ -684,13 +686,13 @@ export default function VoicesPage() {
           <Card className="col-span-full">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Users className="h-16 w-16 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-medium mb-2">Нет персон</h3>
+              <h3 className="text-lg font-medium mb-2">{t("voices.noVoicesConfigured")}</h3>
               <p className="text-muted-foreground text-center mb-4">
-                Добавьте персоны с голосами для радио-диалогов
+                {t("voices.addFirstVoice")}
               </p>
               <Button onClick={() => { setVoiceTab("my"); setVoiceSearch(""); setVoiceSearchQuery(""); setSearchGender("all"); setIsAddDialogOpen(true); }}>
                 <Plus className="mr-2 h-4 w-4" />
-                Добавить первую персону
+                {t("voices.addPersona")}
               </Button>
             </CardContent>
           </Card>
@@ -700,15 +702,15 @@ export default function VoicesPage() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Редактировать персону</DialogTitle>
+            <DialogTitle>{t("voices.editAssignments")}</DialogTitle>
             <DialogDescription>
-              Назначьте передачи для {editingVoice?.name}
+              {editingVoice?.name}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Назначить на передачи</label>
+              <label className="text-sm font-medium">{t("voices.assignToShows")}</label>
               <div className="grid gap-2 max-h-[250px] overflow-y-auto border rounded-lg p-3">
                 <div 
                   className="flex items-center gap-2 cursor-pointer hover-elevate p-2 rounded-md"
@@ -721,7 +723,7 @@ export default function VoicesPage() {
                   />
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">Подводки / Диалоги</span>
+                    <span className="text-sm">{t("voices.dialogs")}</span>
                   </div>
                 </div>
                 {programTypes?.map((pt) => (
@@ -747,14 +749,14 @@ export default function VoicesPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Отмена
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={handleSaveEdit}
               disabled={updateMutation.isPending}
               data-testid="button-save-edit"
             >
-              {updateMutation.isPending ? "Сохранение..." : "Сохранить"}
+              {updateMutation.isPending ? t("common.loading") : t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,10 +52,11 @@ interface Holiday {
   isPublic: boolean;
 }
 
-const WEEKDAY_NAMES = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const WEEKDAY_VALUES = [1, 2, 3, 4, 5, 6, 7];
 
 export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
@@ -99,9 +101,9 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/schedule-templates"] });
       setDialogOpen(false);
-      toast({ title: "Шаблон создан" });
+      toast({ title: t("scheduleSettings.templateCreated") });
     },
-    onError: () => toast({ title: "Ошибка создания", variant: "destructive" }),
+    onError: () => toast({ title: t("common.error"), variant: "destructive" }),
   });
 
   const updateTemplateMutation = useMutation({
@@ -112,9 +114,9 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/schedule-templates"] });
       setDialogOpen(false);
-      toast({ title: "Шаблон обновлён" });
+      toast({ title: t("scheduleSettings.templateUpdated") });
     },
-    onError: () => toast({ title: "Ошибка обновления", variant: "destructive" }),
+    onError: () => toast({ title: t("common.error"), variant: "destructive" }),
   });
 
   const deleteTemplateMutation = useMutation({
@@ -123,9 +125,9 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/schedule-templates"] });
-      toast({ title: "Шаблон удалён" });
+      toast({ title: t("scheduleSettings.templateDeleted") });
     },
-    onError: () => toast({ title: "Ошибка удаления", variant: "destructive" }),
+    onError: () => toast({ title: t("common.error"), variant: "destructive" }),
   });
 
   const createShiftMutation = useMutation({
@@ -136,9 +138,9 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/schedule-templates", variables.templateId, "shifts"] });
       setShiftDialogOpen(false);
-      toast({ title: "Смена добавлена" });
+      toast({ title: t("scheduleSettings.shiftCreated") });
     },
-    onError: () => toast({ title: "Ошибка", variant: "destructive" }),
+    onError: () => toast({ title: t("common.error"), variant: "destructive" }),
   });
 
   const deleteShiftMutation = useMutation({
@@ -148,9 +150,9 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
     },
     onSuccess: (templateId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/schedule-templates", templateId, "shifts"] });
-      toast({ title: "Смена удалена" });
+      toast({ title: t("scheduleSettings.shiftDeleted") });
     },
-    onError: () => toast({ title: "Ошибка", variant: "destructive" }),
+    onError: () => toast({ title: t("common.error"), variant: "destructive" }),
   });
 
   const openCreateDialog = () => {
@@ -250,8 +252,8 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
       {!embedded && (
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Настройка расписания</h1>
-            <p className="text-muted-foreground">Шаблоны эфирного дня и смены ведущих</p>
+            <h1 className="text-3xl font-bold tracking-tight">{t("scheduleSettings.title")}</h1>
+            <p className="text-muted-foreground">{t("scheduleSettings.subtitle")}</p>
           </div>
         </div>
       )}
@@ -263,15 +265,15 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Settings2 className="h-5 w-5" />
-                  Шаблоны расписания
+                  {t("scheduleSettings.title")}
                 </CardTitle>
                 <CardDescription>
-                  Настройте часы эфира, количество слотов и назначьте ведущих для каждого дня недели
+                  {t("scheduleSettings.subtitle")}
                 </CardDescription>
               </div>
               <Button onClick={openCreateDialog} data-testid="button-create-template">
                 <Plus className="mr-2 h-4 w-4" />
-                Добавить
+                {t("common.add")}
               </Button>
             </CardHeader>
             <CardContent>
@@ -282,8 +284,8 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
               ) : !templates?.length ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Нет шаблонов расписания</p>
-                  <p className="text-sm mt-1">Создайте шаблон, чтобы настроить эфирный день</p>
+                  <p>{t("scheduleSettings.noTemplates")}</p>
+                  <p className="text-sm mt-1">{t("scheduleSettings.createTemplate")}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -312,12 +314,12 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Calendar className="h-4 w-4" />
-                Ближайшие праздники
+                {t("schedule.title")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {upcomingHolidays.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Нет данных</p>
+                <p className="text-sm text-muted-foreground">{t("common.noData")}</p>
               ) : (
                 <div className="space-y-2">
                   {upcomingHolidays.map((h, i) => (
@@ -340,7 +342,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Users className="h-4 w-4" />
-                Доступные голоса
+                {t("scheduleSettings.voices")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -350,7 +352,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
                     <div className={`w-2 h-2 rounded-full ${v.gender === "male" ? "bg-blue-500" : "bg-pink-500"}`} />
                     <span>{v.personaName || v.name}</span>
                     <span className="text-muted-foreground text-xs">
-                      {v.gender === "male" ? "М" : "Ж"}
+                      {v.gender === "male" ? t("common.maleShort") : t("common.femaleShort")}
                     </span>
                   </div>
                 ))}
@@ -364,25 +366,25 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
             <DialogTitle>
-              {editingTemplate ? "Редактировать шаблон" : "Новый шаблон расписания"}
+              {editingTemplate ? t("common.edit") : t("scheduleSettings.addTemplate")}
             </DialogTitle>
             <DialogDescription>
-              Настройте часы эфира и количество слотов
+              {t("scheduleSettings.broadcastHours")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Название</Label>
+              <Label>{t("common.name")}</Label>
               <Input
                 value={formName}
                 onChange={e => setFormName(e.target.value)}
-                placeholder="Например: Рабочие дни"
+                placeholder={t("scheduleSettings.templateNamePlaceholder")}
                 data-testid="input-template-name"
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Дни недели</Label>
+              <Label>{t("scheduleSettings.weekdays")}</Label>
               <div className="flex gap-2 flex-wrap">
                 {WEEKDAY_VALUES.map((day, i) => (
                   <Button
@@ -393,7 +395,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
                     onClick={() => toggleWeekday(day)}
                     data-testid={`button-weekday-${day}`}
                   >
-                    {WEEKDAY_NAMES[i]}
+                    {t(`schedule.weekdays.${WEEKDAY_KEYS[i]}`)}
                   </Button>
                 ))}
               </div>
@@ -401,7 +403,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
 
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Начало</Label>
+                <Label>{t("scheduleSettings.from")}</Label>
                 <Select value={String(formStartHour)} onValueChange={v => setFormStartHour(Number(v))}>
                   <SelectTrigger data-testid="select-start-hour">
                     <SelectValue />
@@ -414,7 +416,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Конец</Label>
+                <Label>{t("scheduleSettings.to")}</Label>
                 <Select value={String(formEndHour)} onValueChange={v => setFormEndHour(Number(v))}>
                   <SelectTrigger data-testid="select-end-hour">
                     <SelectValue />
@@ -427,7 +429,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Слотов/час</Label>
+                <Label>{t("scheduleSettings.slotsPerHour")}</Label>
                 <Select value={String(formSlotsPerHour)} onValueChange={v => setFormSlotsPerHour(Number(v))}>
                   <SelectTrigger data-testid="select-slots-per-hour">
                     <SelectValue />
@@ -443,12 +445,12 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
             </div>
 
             <div className="text-sm text-muted-foreground">
-              Итого: {(formEndHour - formStartHour) * formSlotsPerHour} слотов/день
+              {(formEndHour - formStartHour) * formSlotsPerHour} slots/day
               ({formStartHour}:00 — {formEndHour}:00)
             </div>
 
             <div className="space-y-2">
-              <Label>Голоса по умолчанию</Label>
+              <Label>{t("scheduleSettings.voices")}</Label>
               <div className="flex gap-2 flex-wrap">
                 {activeVoices.map(v => (
                   <Button
@@ -465,12 +467,12 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                Эти голоса будут использоваться для слотов без отдельной смены
+                {t("scheduleSettings.subtitle")}
               </p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Отмена</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{t("common.cancel")}</Button>
             <Button
               onClick={submitTemplate}
               disabled={!formName.trim() || formWeekdays.length === 0 || createTemplateMutation.isPending || updateTemplateMutation.isPending}
@@ -479,7 +481,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
               {(createTemplateMutation.isPending || updateTemplateMutation.isPending) && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              {editingTemplate ? "Сохранить" : "Создать"}
+              {editingTemplate ? t("common.save") : t("common.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -488,25 +490,25 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
       <DialogUI open={shiftDialogOpen} onOpenChange={setShiftDialogOpen}>
         <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
-            <DialogTitle>Добавить смену ведущих</DialogTitle>
+            <DialogTitle>{t("scheduleSettings.addShift")}</DialogTitle>
             <DialogDescription>
-              Назначьте голоса на определённый период эфира
+              {t("scheduleSettings.hostShifts")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Название смены (опционально)</Label>
+              <Label>{t("scheduleSettings.shiftLabel")}</Label>
               <Input
                 value={shiftLabel}
                 onChange={e => setShiftLabel(e.target.value)}
-                placeholder="Например: Утреннее шоу"
+                placeholder={t("scheduleSettings.shiftLabel")}
                 data-testid="input-shift-label"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>С</Label>
+                <Label>{t("scheduleSettings.from")}</Label>
                 <Select value={String(shiftStartHour)} onValueChange={v => setShiftStartHour(Number(v))}>
                   <SelectTrigger data-testid="select-shift-start">
                     <SelectValue />
@@ -519,7 +521,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>До</Label>
+                <Label>{t("scheduleSettings.to")}</Label>
                 <Select value={String(shiftEndHour)} onValueChange={v => setShiftEndHour(Number(v))}>
                   <SelectTrigger data-testid="select-shift-end">
                     <SelectValue />
@@ -534,7 +536,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
             </div>
 
             <div className="space-y-2">
-              <Label>Ведущие смены</Label>
+              <Label>{t("scheduleSettings.hostShifts")}</Label>
               <div className="flex gap-2 flex-wrap">
                 {activeVoices.map(v => (
                   <Button
@@ -553,14 +555,14 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShiftDialogOpen(false)}>Отмена</Button>
+            <Button variant="outline" onClick={() => setShiftDialogOpen(false)}>{t("common.cancel")}</Button>
             <Button
               onClick={submitShift}
               disabled={shiftVoiceIds.length === 0 || createShiftMutation.isPending}
               data-testid="button-submit-shift"
             >
               {createShiftMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Добавить
+              {t("common.add")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -590,6 +592,7 @@ function TemplateCard({
   onDeleteShift: (id: string) => void;
   totalSlots: number;
 }) {
+  const { t } = useTranslation();
   const { data: shifts } = useQuery<HostShift[]>({
     queryKey: ["/api/schedule-templates", template.id, "shifts"],
     queryFn: async () => {
@@ -619,7 +622,7 @@ function TemplateCard({
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
-                    {WEEKDAY_NAMES[i]}
+                    {t(`schedule.weekdays.${WEEKDAY_KEYS[i]}`)}
                   </span>
                 ))}
               </div>
@@ -629,7 +632,7 @@ function TemplateCard({
                   <Clock className="h-3 w-3" />
                   {template.startHour}:00 — {template.endHour}:00
                   <span>•</span>
-                  {totalSlots} слотов
+                  {totalSlots} {t("generator.noSlots")}
                   {voiceNames.length > 0 && (
                     <>
                       <span>•</span>
@@ -657,17 +660,17 @@ function TemplateCard({
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-medium flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                Смены ведущих
+                {t("scheduleSettings.hostShifts")}
               </h4>
               <Button variant="outline" size="sm" onClick={onAddShift} data-testid={`button-add-shift-${template.id}`}>
                 <Plus className="mr-1 h-3 w-3" />
-                Добавить смену
+                {t("scheduleSettings.addShift")}
               </Button>
             </div>
 
             {!shifts?.length ? (
               <p className="text-sm text-muted-foreground py-2">
-                Нет смен. Будут использованы голоса по умолчанию из шаблона.
+                {t("scheduleSettings.createTemplate")}
               </p>
             ) : (
               <div className="space-y-2">
@@ -706,7 +709,7 @@ function TemplateCard({
             )}
 
             <div className="pt-2">
-              <h4 className="text-sm font-medium mb-2">Временная шкала</h4>
+              <h4 className="text-sm font-medium mb-2">{t("schedule.title")}</h4>
               <div className="relative h-8 rounded-md overflow-hidden bg-muted">
                 {shifts?.map(shift => {
                   const left = ((shift.startHour - template.startHour) / (template.endHour - template.startHour)) * 100;

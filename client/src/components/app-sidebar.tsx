@@ -1,5 +1,6 @@
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { LayoutDashboard, Mic, Settings, Radio, Megaphone, Users, Podcast, LogOut } from "lucide-react";
 import {
   Sidebar,
@@ -7,67 +8,44 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import type { Settings as SettingsType } from "@shared/schema";
 
-const menuItems = [
-  {
-    title: "Дашборд",
-    url: "/",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Подводки",
-    url: "/podvodki",
-    icon: Mic,
-  },
-  {
-    title: "Передачи",
-    url: "/shows",
-    icon: Podcast,
-  },
-  {
-    title: "Реклама",
-    url: "/ads",
-    icon: Megaphone,
-  },
-  {
-    title: "Голоса",
-    url: "/voices",
-    icon: Users,
-  },
-  {
-    title: "Настройки",
-    url: "/settings",
-    icon: Settings,
-  },
-];
-
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout, isLoggingOut } = useAuth();
-  
+  const { t } = useTranslation();
+
   const { data: settings } = useQuery<SettingsType>({
     queryKey: ["/api/settings"],
   });
 
   const stationName = settings?.stationName || "Alanya FM";
   const stationLogo = settings?.stationLogo;
-  const stationLocation = settings?.stationLocation || "Аланья, Турция";
+  const stationLocation = settings?.stationLocation;
+
+  const menuItems = [
+    { title: t("nav.dashboard"), url: "/", icon: LayoutDashboard },
+    { title: t("nav.podvodki"), url: "/podvodki", icon: Mic },
+    { title: t("nav.shows"), url: "/shows", icon: Podcast },
+    { title: t("nav.ads"), url: "/ads", icon: Megaphone },
+    { title: t("nav.voices"), url: "/voices", icon: Users },
+    { title: t("nav.settings"), url: "/settings", icon: Settings },
+  ];
 
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
           {stationLogo ? (
-            <img 
-              src={stationLogo} 
+            <img
+              src={stationLogo}
               alt={stationName}
               className="h-10 w-10 rounded-lg object-cover"
             />
@@ -84,11 +62,11 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Меню</SidebarGroupLabel>
+          <SidebarGroupLabel>{t("nav.menu")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
                     asChild
                     isActive={location === item.url}
@@ -116,16 +94,18 @@ export function AppSidebar() {
               onClick={logout}
               disabled={isLoggingOut}
               className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              title="Выйти"
+              title={t("auth.logout")}
               data-testid="button-logout"
             >
               <LogOut className="h-4 w-4" />
             </button>
           </div>
         )}
-        <div className="text-xs text-muted-foreground text-center">
-          {stationLocation}
-        </div>
+        {stationLocation && (
+          <div className="text-xs text-muted-foreground text-center">
+            {stationLocation}
+          </div>
+        )}
       </SidebarFooter>
     </Sidebar>
   );

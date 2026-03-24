@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,11 +39,11 @@ interface ResolvedSlots {
   holidays: Array<{ nameRu: string; isPublic: boolean; country: string }>;
 }
 
-function getTimeOfDayFromHour(hour: number): string {
-  if (hour < 10) return "Утро";
-  if (hour < 14) return "День";
-  if (hour < 18) return "Вечер";
-  return "Поздний вечер";
+function getTimeOfDayKey(hour: number): string {
+  if (hour < 10) return "morning";
+  if (hour < 14) return "afternoon";
+  if (hour < 18) return "evening";
+  return "lateEvening";
 }
 
 function formatDate(dateString: string): string {
@@ -53,11 +54,12 @@ function formatDate(dateString: string): string {
     month: 'long', 
     day: 'numeric' 
   };
-  return date.toLocaleDateString('ru-RU', options);
+  return date.toLocaleDateString(undefined, options);
 }
 
 export default function Generator({ embedded }: { embedded?: boolean }) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [expandedSlots, setExpandedSlots] = useState<Set<number>>(new Set());
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
@@ -130,14 +132,14 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
     onSuccess: (content) => {
       setFirecrawlContent(content);
       toast({
-        title: "Контент найден",
-        description: "Информация из интернета загружена и будет использована при генерации",
+        title: t("generator.contentFound"),
+        description: t("generator.webContentLoaded"),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка поиска",
-        description: error.message || "Не удалось найти контент",
+        title: t("generator.searchError"),
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -151,8 +153,8 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/dialogs"] });
       toast({
-        title: "Диалоги сгенерированы",
-        description: `Создано ${data.generatedCount} диалогов на ${formatDate(selectedDate)}`,
+        title: t("generator.dialogsGenerated"),
+        description: t("generator.createdCount", { count: data.generatedCount, date: formatDate(selectedDate) }),
       });
     },
     onError: (error: Error) => {
@@ -174,8 +176,8 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
       setEditingSlot(null);
       setEditPrompt("");
       toast({
-        title: "Диалог обновлён",
-        description: "Текст успешно перегенерирован",
+        title: t("generator.dialogUpdated"),
+        description: t("generator.textRegenerated"),
       });
     },
     onError: (error: Error) => {
@@ -195,8 +197,8 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/dialogs"] });
       toast({
-        title: "Отправлено в автоматизацию",
-        description: `${data.queued} диалогов добавлено в очередь на генерацию аудио`,
+        title: t("generator.sentToAutomation"),
+        description: t("generator.addedToQueue", { count: data.queued }),
       });
     },
     onError: (error: Error) => {
@@ -217,7 +219,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
       setIsDailyPromptDirty(false);
       toast({
-        title: "Промпт дня сохранён",
+        title: t("generator.dailyPromptSaved"),
       });
     },
     onError: (error: Error) => {
@@ -285,8 +287,8 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
       {!embedded && (
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Генератор диалогов</h1>
-            <p className="text-muted-foreground">Автоматическая генерация подводок на весь день</p>
+            <h1 className="text-3xl font-bold tracking-tight">{t("generator.title")}</h1>
+            <p className="text-muted-foreground">{t("generator.subtitle")}</p>
           </div>
         </div>
       )}
@@ -299,7 +301,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Calendar className="h-5 w-5" />
-                    Выбор дня
+                    {t("generator.selectDay")}
                   </CardTitle>
                   <CardDescription>
                     {formatDate(selectedDate)}
@@ -336,7 +338,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                   ) : (
                     <Wand2 className="mr-2 h-4 w-4" />
                   )}
-                  Сгенерировать все слоты ({totalSlots})
+                  {t("generator.generateAllSlots", { count: totalSlots })}
                 </Button>
                 
                 {hasAnyDialogs && (
@@ -351,7 +353,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                     ) : (
                       <Send className="mr-2 h-4 w-4" />
                     )}
-                    Отправить в автоматизацию ({readyDialogsCount})
+                    {t("generator.sendToAutomation", { count: readyDialogsCount })}
                   </Button>
                 )}
               </div>
@@ -360,11 +362,11 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                 <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/30 p-3">
                   <div className="flex items-center gap-2 mb-1">
                     <Globe className="h-4 w-4 text-green-600" />
-                    <span className="text-sm font-medium text-green-700 dark:text-green-400">Контент из интернета подключён</span>
-                    <Badge variant="secondary" className="text-xs">{firecrawlContent.split('\n').filter(l => l.startsWith('---')).length} тем</Badge>
+                    <span className="text-sm font-medium text-green-700 dark:text-green-400">{t("generator.webContentConnected")}</span>
+                    <Badge variant="secondary" className="text-xs">{firecrawlContent.split('\n').filter(l => l.startsWith('---')).length} {t("generator.topics")}</Badge>
                   </div>
                   <p className="text-xs text-green-600 dark:text-green-400">
-                    Будет использован при генерации диалогов для точности фактов
+                    {t("generator.usedForAccuracy")}
                   </p>
                 </div>
               )}
@@ -373,8 +375,8 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                 <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
                   <Loader2 className="h-5 w-5 animate-spin" />
                   <div>
-                    <p className="font-medium">Генерируем диалоги...</p>
-                    <p className="text-sm text-muted-foreground">Это может занять 1-2 минуты</p>
+                    <p className="font-medium">{t("generator.generating")}</p>
+                    <p className="text-sm text-muted-foreground">{t("generator.generatingTime")}</p>
                   </div>
                 </div>
               )}
@@ -386,7 +388,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
-                  Общий промпт для диалогов
+                  {t("generator.dailyPrompt")}
                 </CardTitle>
                 {isDailyPromptDirty && (
                   <Button
@@ -400,12 +402,12 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                     ) : (
                       <Save className="mr-2 h-3 w-3" />
                     )}
-                    Сохранить
+                    {t("common.save")}
                   </Button>
                 )}
               </div>
               <CardDescription>
-                Этот промпт применяется ко всем слотам. Контекст станции и персон добавляется автоматически.
+                {t("generator.dailyPromptDescription")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -416,7 +418,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                     setDailyPromptValue(e.target.value);
                     setIsDailyPromptDirty(true);
                   }}
-                  placeholder="Инструкции для генерации диалогов на весь день..."
+                  placeholder={t("generator.dailyPromptPlaceholder")}
                   className="min-h-[120px] text-sm pr-12"
                   data-testid="textarea-daily-prompt"
                 />
@@ -436,9 +438,9 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="h-5 w-5" />
-                Слоты дня ({dialogsForDate.length}/{totalSlots})
+                {t("generator.slotsOfDay", { current: dialogsForDate.length, total: totalSlots })}
               </CardTitle>
-              <CardDescription>Кликните на слот для просмотра и редактирования</CardDescription>
+              <CardDescription>{t("generator.clickToExpand")}</CardDescription>
             </CardHeader>
             <CardContent>
               {dialogsLoading ? (
@@ -455,7 +457,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                       const isEditing = editingSlot === slotNumber;
                       const slotInfo = resolvedSlots?.slots?.[i];
                       const timeLabel = slotInfo?.time || `${Math.floor(7 + (i * 15 / totalSlots))}:00`;
-                      const timeOfDay = getTimeOfDayFromHour(slotInfo?.hour || Math.floor(7 + (i * 15 / totalSlots)));
+                      const _hour = slotInfo?.hour || Math.floor(7 + (i * 15 / totalSlots));
 
                       const slotVoiceNames = slotInfo?.voiceIds
                         ?.map(id => activeVoices.find(v => v.id === id))
@@ -480,10 +482,10 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                   {timeLabel}
                                 </Badge>
                                 <span className="text-sm font-medium">
-                                  Слот #{slotNumber}
+                                  {t("generator.slot")} #{slotNumber}
                                 </span>
                                 <Badge variant="secondary">
-                                  {timeOfDay}
+                                  {t(`generator.timeOfDay.${getTimeOfDayKey(slotInfo?.hour || Math.floor(7 + (i * 15 / totalSlots)))}`)}
                                 </Badge>
                                 {slotInfo?.shiftLabel && (
                                   <Badge variant="outline" className="text-xs">
@@ -503,17 +505,17 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                     {dialog.maleText && dialog.femaleText ? (
                                       <Badge variant="default" className="bg-green-600">
                                         <CheckCircle className="mr-1 h-3 w-3" />
-                                        Готов
+                                        {t("statuses.ready")}
                                       </Badge>
                                     ) : (
                                       <Badge variant="secondary">
                                         <Clock className="mr-1 h-3 w-3" />
-                                        В процессе
+                                        {t("statuses.generating")}
                                       </Badge>
                                     )}
                                   </>
                                 ) : (
-                                  <Badge variant="outline">Пусто</Badge>
+                                  <Badge variant="outline">{t("generator.empty")}</Badge>
                                 )}
                                 {isExpanded ? (
                                   <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -540,7 +542,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                         data-testid={`button-edit-${slotNumber}`}
                                       >
                                         <Edit3 className="mr-1 h-3 w-3" />
-                                        Редактировать
+                                        {t("common.edit")}
                                       </Button>
                                     )}
                                   </div>
@@ -551,7 +553,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                     <Textarea
                                       value={editPrompt}
                                       onChange={(e) => setEditPrompt(e.target.value)}
-                                      placeholder="Введите промпт для перегенерации..."
+                                      placeholder={t("generator.regeneratePromptPlaceholder")}
                                       className="min-h-[100px]"
                                       data-testid={`textarea-edit-${slotNumber}`}
                                     />
@@ -567,7 +569,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                         ) : (
                                           <RefreshCw className="mr-1 h-3 w-3" />
                                         )}
-                                        Перегенерировать
+                                        {t("generator.regenerate")}
                                       </Button>
                                       <Button
                                         size="sm"
@@ -575,7 +577,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                         onClick={cancelEditing}
                                         data-testid={`button-cancel-${slotNumber}`}
                                       >
-                                        Отмена
+                                        {t("common.cancel")}
                                       </Button>
                                     </div>
                                   </div>
@@ -586,7 +588,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                         <div className="flex items-center gap-2 mb-2">
                                           <User className="h-4 w-4 text-blue-500" />
                                           <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
-                                            Мужской голос
+                                            {t("generator.maleVoice")}
                                           </span>
                                         </div>
                                         <p className="text-sm">{dialog.maleText}</p>
@@ -597,7 +599,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                         <div className="flex items-center gap-2 mb-2">
                                           <User className="h-4 w-4 text-pink-500" />
                                           <span className="text-sm font-medium text-pink-700 dark:text-pink-400">
-                                            Женский голос
+                                            {t("generator.femaleVoice")}
                                           </span>
                                         </div>
                                         <p className="text-sm">{dialog.femaleText}</p>
@@ -608,7 +610,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                         <Button size="sm" variant="outline" asChild>
                                           <a href={dialog.audioUrl} target="_blank" rel="noopener noreferrer">
                                             <Play className="mr-1 h-3 w-3" />
-                                            Прослушать
+                                            {t("generator.listen")}
                                           </a>
                                         </Button>
                                       </div>
@@ -619,7 +621,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                             ) : (
                               <div className="mt-2 p-4 rounded-lg border bg-muted/30 text-center">
                                 <p className="text-sm text-muted-foreground">
-                                  Диалог ещё не сгенерирован. Нажмите "Сгенерировать все слоты" выше.
+                                  {t("generator.notGenerated")}
                                 </p>
                               </div>
                             )}
@@ -637,31 +639,31 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
         <div className="space-y-6">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle>Статистика дня</CardTitle>
+              <CardTitle>{t("generator.dayStats")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="text-center p-3 rounded-lg bg-muted">
                   <p className="text-2xl font-bold">{dialogsForDate.length}</p>
-                  <p className="text-xs text-muted-foreground">Создано</p>
+                  <p className="text-xs text-muted-foreground">{t("generator.created")}</p>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-muted">
                   <p className="text-2xl font-bold">{readyDialogsCount}</p>
-                  <p className="text-xs text-muted-foreground">Готово</p>
+                  <p className="text-xs text-muted-foreground">{t("statuses.ready")}</p>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-muted">
                   <p className="text-2xl font-bold">{dialogsForDate.filter(d => d.audioUrl).length}</p>
-                  <p className="text-xs text-muted-foreground">С аудио</p>
+                  <p className="text-xs text-muted-foreground">{t("generator.withAudio")}</p>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-muted">
                   <p className="text-2xl font-bold">{totalSlots - dialogsForDate.length}</p>
-                  <p className="text-xs text-muted-foreground">Осталось</p>
+                  <p className="text-xs text-muted-foreground">{t("generator.remaining")}</p>
                 </div>
               </div>
               {dialogsForDate.length > 0 && (
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Прогресс</span>
+                    <span>{t("generator.progress")}</span>
                     <span>{Math.round((dialogsForDate.length / totalSlots) * 100)}%</span>
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -695,11 +697,11 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                   ) : (
                     <Search className="mr-1 h-3.5 w-3.5" />
                   )}
-                  {firecrawlContent ? "Обновить" : "Найти"}
+                  {firecrawlContent ? t("common.refresh") : t("common.find")}
                 </Button>
               </div>
               <CardDescription>
-                Поиск актуальной информации для подводок
+                {t("generator.searchWebContent")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -721,7 +723,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                 <Input
                   value={newTopic}
                   onChange={(e) => setNewTopic(e.target.value)}
-                  placeholder="Добавить тему..."
+                  placeholder={t("generator.addTopic")}
                   className="h-8 text-xs"
                   onKeyDown={(e) => e.key === "Enter" && addTopic()}
                   data-testid="input-new-topic"
@@ -736,7 +738,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                   <CollapsibleTrigger asChild>
                     <button className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 hover:underline w-full">
                       <CheckCircle className="h-3 w-3" />
-                      Контент загружен
+                      {t("generator.contentLoaded")}
                       {isFirecrawlOpen ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
                     </button>
                   </CollapsibleTrigger>
@@ -751,7 +753,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                       onClick={() => setFirecrawlContent("")}
                     >
                       <Trash2 className="mr-1 h-3 w-3" />
-                      Очистить
+                      {t("common.clear")}
                     </Button>
                   </CollapsibleContent>
                 </Collapsible>
@@ -760,7 +762,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
               {firecrawlSearchMutation.isPending && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Ищем информацию...
+                  {t("generator.searchingInfo")}
                 </div>
               )}
             </CardContent>
@@ -769,8 +771,8 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
           {unusedNews.length > 0 && (
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle>Свежие новости</CardTitle>
-                <CardDescription>Будут использованы в генерации</CardDescription>
+                <CardTitle>{t("generator.freshNews")}</CardTitle>
+                <CardDescription>{t("generator.usedInGeneration")}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -794,12 +796,12 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle>Настройки промптов</CardTitle>
-              <CardDescription>Большой дневной промпт и слотовые промпты настраиваются в разделе "Настройки"</CardDescription>
+              <CardTitle>{t("generator.promptSettings")}</CardTitle>
+              <CardDescription>{t("generator.promptSettingsDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
               <Button variant="outline" className="w-full" asChild>
-                <a href="/settings">Перейти в настройки</a>
+                <a href="/settings">{t("generator.goToSettings")}</a>
               </Button>
             </CardContent>
           </Card>

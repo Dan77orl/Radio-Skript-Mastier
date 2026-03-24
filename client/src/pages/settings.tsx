@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -38,6 +39,7 @@ const settingsFormSchema = z.object({
 type SettingsFormValues = z.infer<typeof settingsFormSchema>;
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [showApiKey, setShowApiKey] = useState(false);
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
@@ -109,13 +111,13 @@ export default function SettingsPage() {
         body: formData,
       });
       
-      if (!response.ok) throw new Error("Ошибка загрузки");
+      if (!response.ok) throw new Error(t("settings.logoUploadError"));
       
       const data = await response.json();
       form.setValue("stationLogo", data.url);
-      toast({ title: "Логотип загружен" });
+      toast({ title: t("settings.logoUploaded") });
     } catch (error) {
-      toast({ title: "Ошибка загрузки логотипа", variant: "destructive" });
+      toast({ title: t("settings.logoUploadError"), variant: "destructive" });
     } finally {
       setUploadingLogo(false);
     }
@@ -134,14 +136,14 @@ export default function SettingsPage() {
         body: formData,
       });
       
-      if (!response.ok) throw new Error("Ошибка загрузки");
+      if (!response.ok) throw new Error(t("settings.fileUploadError"));
       
       const data = await response.json();
       const currentAttachments = form.getValues("stationAttachments") || [];
       form.setValue("stationAttachments", [...currentAttachments, data.url]);
-      toast({ title: "Файл добавлен" });
+      toast({ title: t("settings.fileAdded") });
     } catch (error) {
-      toast({ title: "Ошибка загрузки файла", variant: "destructive" });
+      toast({ title: t("settings.fileUploadError"), variant: "destructive" });
     }
   };
 
@@ -157,14 +159,14 @@ export default function SettingsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
       toast({
-        title: "Сохранено",
-        description: "Настройки успешно обновлены",
+        title: t("common.saved"),
+        description: t("settings.settingsSaved"),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось сохранить настройки",
+        title: t("common.error"),
+        description: error.message || t("settings.settingsError"),
         variant: "destructive",
       });
     },
@@ -178,14 +180,14 @@ export default function SettingsPage() {
     },
     onSuccess: () => {
       toast({
-        title: "Успешно",
-        description: "Подключение к ElevenLabs работает",
+        title: t("common.success"),
+        description: t("settings.connectionSuccess"),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка подключения",
-        description: error.message || "Не удалось подключиться к ElevenLabs",
+        title: t("settings.connectionError"),
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -199,14 +201,14 @@ export default function SettingsPage() {
     },
     onSuccess: () => {
       toast({
-        title: "Успешно",
-        description: "Подключение к Claude (Anthropic) работает",
+        title: t("common.success"),
+        description: t("settings.connectionSuccess"),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка подключения",
-        description: error.message || "Не удалось подключиться к Anthropic",
+        title: t("settings.connectionError"),
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -220,14 +222,14 @@ export default function SettingsPage() {
     },
     onSuccess: () => {
       toast({
-        title: "Успешно",
-        description: "Подключение к Яндекс.Диску работает",
+        title: t("common.success"),
+        description: t("settings.connectionSuccess"),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка подключения",
-        description: error.message || "Не удалось подключиться к Яндекс.Диску",
+        title: t("settings.connectionError"),
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -240,14 +242,14 @@ export default function SettingsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
       toast({
-        title: "Сохранено",
-        description: "API ключ сохранён",
+        title: t("common.saved"),
+        description: t("settings.keySaved"),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось сохранить",
+        title: t("common.error"),
+        description: error.message || t("settings.settingsError"),
         variant: "destructive",
       });
     },
@@ -268,8 +270,8 @@ export default function SettingsPage() {
   return (
     <div className="flex-1 space-y-6 p-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight" data-testid="text-settings-title">Настройки</h1>
-        <p className="text-muted-foreground">Управление параметрами приложения</p>
+        <h1 className="text-3xl font-bold tracking-tight" data-testid="text-settings-title">{t("settings.title")}</h1>
+        <p className="text-muted-foreground">{t("settings.subtitle")}</p>
       </div>
 
       <Form {...form}>
@@ -278,15 +280,15 @@ export default function SettingsPage() {
             <TabsList className="grid w-full grid-cols-3" data-testid="tabs-settings">
               <TabsTrigger value="api-keys" data-testid="tab-api-keys">
                 <Key className="mr-2 h-4 w-4" />
-                API-ключи
+                {t("settings.apiKeys")}
               </TabsTrigger>
               <TabsTrigger value="knowledge" data-testid="tab-knowledge">
                 <BookOpen className="mr-2 h-4 w-4" />
-                База знаний
+                {t("settings.knowledge")}
               </TabsTrigger>
               <TabsTrigger value="account" data-testid="tab-account">
                 <User className="mr-2 h-4 w-4" />
-                Аккаунт
+                {t("settings.account")}
               </TabsTrigger>
             </TabsList>
 
@@ -295,9 +297,9 @@ export default function SettingsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Key className="h-5 w-5" />
-                    API-ключи сервисов
+                    {t("settings.apiKeysTitle")}
                   </CardTitle>
-                  <CardDescription>Ключи для подключения к внешним сервисам</CardDescription>
+                  <CardDescription>{t("settings.apiKeysDescription")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <FormField
@@ -305,12 +307,12 @@ export default function SettingsPage() {
                     name="elevenLabsApiKey"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>ElevenLabs API Key</FormLabel>
+                        <FormLabel>{t("settings.elevenLabsKey")}</FormLabel>
                         <div className="flex gap-2 items-center">
                           <FormControl>
                             <Input
                               type={showApiKey ? "text" : "password"}
-                              placeholder="Введите API ключ ElevenLabs"
+                              placeholder={t("settings.elevenLabsPlaceholder")}
                               {...field}
                               data-testid="input-elevenlabs-key"
                               className="flex-1"
@@ -348,12 +350,12 @@ export default function SettingsPage() {
                             {testElevenLabsMutation.isPending ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              "Проверить"
+                              t("common.check")
                             )}
                           </Button>
                         </div>
                         <FormDescription>
-                          Озвучка голосов. Получите ключ на{" "}
+                          {t("settings.elevenLabsDescription")}{" "}
                           <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary underline">
                             elevenlabs.io
                           </a>
@@ -370,12 +372,12 @@ export default function SettingsPage() {
                     name="anthropicApiKey"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Claude (Anthropic) API Key</FormLabel>
+                        <FormLabel>{t("settings.anthropicKey")}</FormLabel>
                         <div className="flex gap-2 items-center">
                           <FormControl>
                             <Input
                               type={showAnthropicKey ? "text" : "password"}
-                              placeholder="Введите API ключ Anthropic"
+                              placeholder={t("settings.anthropicPlaceholder")}
                               {...field}
                               data-testid="input-anthropic-key"
                               className="flex-1"
@@ -413,12 +415,12 @@ export default function SettingsPage() {
                             {testAnthropicMutation.isPending ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              "Проверить"
+                              t("common.check")
                             )}
                           </Button>
                         </div>
                         <FormDescription>
-                          Генерация текстов. Получите ключ на{" "}
+                          {t("settings.anthropicDescription")}{" "}
                           <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" className="text-primary underline">
                             console.anthropic.com
                           </a>
@@ -437,13 +439,13 @@ export default function SettingsPage() {
                       <FormItem>
                         <FormLabel className="flex items-center gap-2">
                           <HardDrive className="h-4 w-4" />
-                          Яндекс.Диск OAuth Token
+                          {t("settings.yandexToken")}
                         </FormLabel>
                         <div className="flex gap-2 items-center">
                           <FormControl>
                             <Input
                               type={showYandexToken ? "text" : "password"}
-                              placeholder="Введите OAuth токен Яндекс.Диска"
+                              placeholder={t("settings.yandexPlaceholder")}
                               {...field}
                               data-testid="input-yandex-token"
                               className="flex-1"
@@ -481,12 +483,12 @@ export default function SettingsPage() {
                             {testYandexMutation.isPending ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              "Проверить"
+                              t("common.check")
                             )}
                           </Button>
                         </div>
                         <FormDescription>
-                          Облачное хранилище для аудиофайлов
+                          {t("settings.yandexDescription")}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -502,13 +504,13 @@ export default function SettingsPage() {
                       <FormItem>
                         <FormLabel className="flex items-center gap-2">
                           <Globe className="h-4 w-4" />
-                          Freesound API Key
+                          {t("settings.freesoundKey")}
                         </FormLabel>
                         <div className="flex gap-2 items-center">
                           <FormControl>
                             <Input
                               type={showFreesoundKey ? "text" : "password"}
-                              placeholder="Введите API ключ Freesound"
+                              placeholder={t("settings.freesoundPlaceholder")}
                               {...field}
                               data-testid="input-freesound-key"
                               className="flex-1"
@@ -538,7 +540,7 @@ export default function SettingsPage() {
                           </Button>
                         </div>
                         <FormDescription>
-                          Для подбора фоновой музыки. Получите ключ на freesound.org
+                          {t("settings.freesoundDescription")}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -553,9 +555,9 @@ export default function SettingsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Radio className="h-5 w-5" />
-                    О радиостанции
+                    {t("settings.aboutStation")}
                   </CardTitle>
-                  <CardDescription>Информация используется AI при генерации контента</CardDescription>
+                  <CardDescription>{t("settings.aboutStationDescription")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -564,7 +566,7 @@ export default function SettingsPage() {
                       name="stationName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Название станции</FormLabel>
+                          <FormLabel>{t("settings.stationName")}</FormLabel>
                           <FormControl>
                             <Input placeholder="Alanya FM" {...field} data-testid="input-station-name" />
                           </FormControl>
@@ -579,7 +581,7 @@ export default function SettingsPage() {
                         <FormItem>
                           <FormLabel className="flex items-center gap-2">
                             <Globe className="h-4 w-4" />
-                            Сайт станции
+                            {t("settings.stationWebsiteLabel")}
                           </FormLabel>
                           <FormControl>
                             <Input placeholder="https://alanyafm.com" {...field} data-testid="input-station-website" />
@@ -593,12 +595,12 @@ export default function SettingsPage() {
                       name="stationLocation"
                       render={({ field }) => (
                         <FormItem className="sm:col-span-2">
-                          <FormLabel>Местоположение</FormLabel>
+                          <FormLabel>{t("settings.stationLocationLabel")}</FormLabel>
                           <FormControl>
-                            <Input placeholder="Аланья, Турция" {...field} data-testid="input-station-location" />
+                            <Input placeholder={t("settings.stationLocationLabel")} {...field} data-testid="input-station-location" />
                           </FormControl>
                           <FormDescription>
-                            Отображается внизу боковой панели
+                            {t("settings.stationLocationHint")}
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -611,13 +613,13 @@ export default function SettingsPage() {
                     name="stationLogo"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Логотип</FormLabel>
+                        <FormLabel>{t("settings.stationLogo")}</FormLabel>
                         <div className="flex items-center gap-4">
                           {field.value ? (
                             <div className="relative">
                               <img 
                                 src={field.value} 
-                                alt="Логотип" 
+                                alt={t("settings.stationLogo")} 
                                 className="h-16 w-16 rounded-md object-cover border"
                               />
                               <Button
@@ -655,12 +657,12 @@ export default function SettingsPage() {
                               ) : (
                                 <Upload className="mr-2 h-4 w-4" />
                               )}
-                              Загрузить логотип
+                              {t("settings.uploadLogo")}
                             </Button>
                           </div>
                         </div>
                         <FormDescription>
-                          Рекомендуемый размер: 200x200 px
+                          {t("settings.logoRecommendedSize")}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -674,11 +676,11 @@ export default function SettingsPage() {
                     name="stationDescription"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Описание / Промпт о станции</FormLabel>
+                        <FormLabel>{t("settings.stationDescriptionLabel")}</FormLabel>
                         <div className="flex gap-1 items-start">
                           <FormControl>
                             <Textarea
-                              placeholder="Опишите вашу радиостанцию: формат, аудиторию, стиль вещания. Эта информация будет использоваться в генерации контента."
+                              placeholder={t("settings.stationDescriptionPlaceholder")}
                               className="min-h-[120px] flex-1"
                               {...field}
                               data-testid="textarea-station-description"
@@ -687,7 +689,7 @@ export default function SettingsPage() {
                           <VoiceInput onTranscript={(text) => field.onChange(field.value + " " + text)} />
                         </div>
                         <FormDescription>
-                          Используется как контекст при генерации диалогов и передач
+                          {t("settings.stationDescriptionHint")}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -703,7 +705,7 @@ export default function SettingsPage() {
                       <FormItem>
                         <FormLabel className="flex items-center gap-2">
                           <FileText className="h-4 w-4" />
-                          Прикреплённые файлы
+                          {t("settings.attachedFiles")}
                         </FormLabel>
                         <div className="space-y-2">
                           {(field.value || []).map((url, index) => (
@@ -735,12 +737,12 @@ export default function SettingsPage() {
                               data-testid="button-add-attachment"
                             >
                               <Upload className="mr-2 h-4 w-4" />
-                              Добавить файл
+                              {t("settings.addAttachment")}
                             </Button>
                           </div>
                         </div>
                         <FormDescription>
-                          Дополнительные материалы о станции (PDF, документы)
+                          {t("settings.attachedFilesHint")}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -753,9 +755,9 @@ export default function SettingsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Settings2 className="h-5 w-5" />
-                    Генерация по умолчанию
+                    {t("settings.defaultGeneration")}
                   </CardTitle>
-                  <CardDescription>Параметры создания подводок</CardDescription>
+                  <CardDescription>{t("settings.defaultGenerationDescription")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <FormField
@@ -763,7 +765,7 @@ export default function SettingsPage() {
                     name="dailyDialogsCount"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Количество подводок в день</FormLabel>
+                        <FormLabel>{t("settings.dailyCountLabel")}</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -774,7 +776,7 @@ export default function SettingsPage() {
                             data-testid="input-daily-count"
                           />
                         </FormControl>
-                        <FormDescription>От 1 до 50 подводок в день</FormDescription>
+                        <FormDescription>{t("settings.dailyCountHint")}</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -787,11 +789,11 @@ export default function SettingsPage() {
                     name="defaultPrompt"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Промпт по умолчанию</FormLabel>
+                        <FormLabel>{t("settings.defaultPrompt")}</FormLabel>
                         <div className="flex gap-1 items-start">
                           <FormControl>
                             <Textarea
-                              placeholder="Базовый промпт для генерации диалогов..."
+                              placeholder={t("settings.defaultPromptPlaceholder")}
                               className="min-h-[150px] flex-1"
                               {...field}
                               data-testid="textarea-default-prompt"
@@ -800,7 +802,7 @@ export default function SettingsPage() {
                           <VoiceInput onTranscript={(text) => field.onChange(field.value + " " + text)} />
                         </div>
                         <FormDescription>
-                          Этот промпт будет использоваться по умолчанию при создании новых подводок
+                          {t("settings.defaultPromptHint")}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -815,47 +817,47 @@ export default function SettingsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <User className="h-5 w-5" />
-                    Профиль пользователя
+                    {t("settings.userProfile")}
                   </CardTitle>
-                  <CardDescription>Настройки входа и профиль</CardDescription>
+                  <CardDescription>{t("settings.userProfileDescription")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label>E-mail</Label>
+                      <Label>{t("settings.email")}</Label>
                       <Input placeholder="admin@alanyafm.com" disabled data-testid="input-email" />
-                      <p className="text-xs text-muted-foreground">Скоро будет доступно</p>
+                      <p className="text-xs text-muted-foreground">{t("settings.comingSoon")}</p>
                     </div>
                     <div className="space-y-2">
-                      <Label>Телефон</Label>
+                      <Label>{t("settings.phone")}</Label>
                       <Input placeholder="+90 ..." disabled data-testid="input-phone" />
-                      <p className="text-xs text-muted-foreground">Скоро будет доступно</p>
+                      <p className="text-xs text-muted-foreground">{t("settings.comingSoon")}</p>
                     </div>
                   </div>
 
                   <Separator />
 
                   <div className="space-y-2">
-                    <Label>Смена пароля</Label>
+                    <Label>{t("settings.changePassword")}</Label>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <Input type="password" placeholder="Текущий пароль" disabled data-testid="input-current-password" />
-                      <Input type="password" placeholder="Новый пароль" disabled data-testid="input-new-password" />
+                      <Input type="password" placeholder={t("settings.currentPassword")} disabled data-testid="input-current-password" />
+                      <Input type="password" placeholder={t("settings.newPassword")} disabled data-testid="input-new-password" />
                     </div>
-                    <p className="text-xs text-muted-foreground">Скоро будет доступно</p>
+                    <p className="text-xs text-muted-foreground">{t("settings.comingSoon")}</p>
                   </div>
 
                   <Separator />
 
                   <div className="space-y-2">
-                    <Label>Управление пользователями</Label>
+                    <Label>{t("settings.userManagement")}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Добавление и управление доступом других пользователей к системе.
+                      {t("settings.userManagementDescription")}
                     </p>
                     <Button variant="outline" disabled data-testid="button-manage-users">
                       <User className="mr-2 h-4 w-4" />
-                      Управление пользователями
+                      {t("settings.userManagement")}
                     </Button>
-                    <p className="text-xs text-muted-foreground">Скоро будет доступно</p>
+                    <p className="text-xs text-muted-foreground">{t("settings.comingSoon")}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -868,7 +870,7 @@ export default function SettingsPage() {
                 ) : (
                   <Save className="mr-2 h-4 w-4" />
                 )}
-                Сохранить настройки
+                {t("settings.saveSettings")}
               </Button>
             </div>
           </Tabs>

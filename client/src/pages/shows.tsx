@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -184,6 +185,7 @@ const iconMap: Record<string, typeof Radio> = {
 };
 
 export default function ShowsPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [isAddTypeDialogOpen, setIsAddTypeDialogOpen] = useState(false);
@@ -230,7 +232,7 @@ export default function ShowsPage() {
     queryKey: ["/api/voices"],
   });
 
-  const stationName = appSettings?.stationName || "Радио";
+  const stationName = appSettings?.stationName || t("shows.stationDefault");
   const defaultProgramTypes = getDefaultProgramTypes(stationName);
 
   const { data: programTypes, isLoading: isLoadingTypes } = useQuery<ProgramType[]>({
@@ -277,10 +279,10 @@ export default function ShowsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/program-types"] });
       setIsAddTypeDialogOpen(false);
       resetNewTypeForm();
-      toast({ title: "Тип передачи создан" });
+      toast({ title: t("shows.typeCreated") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("shows.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -295,10 +297,10 @@ export default function ShowsPage() {
       setIsSettingsDialogOpen(false);
       setEditingType(null);
       setSettingsType(null);
-      toast({ title: "Настройки обновлены" });
+      toast({ title: t("shows.settingsUpdated") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("shows.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -309,10 +311,10 @@ export default function ShowsPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
-      toast({ title: "Передача создана", description: data.title });
+      toast({ title: t("shows.programCreated"), description: data.title });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("shows.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -323,10 +325,10 @@ export default function ShowsPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
-      toast({ title: "Пайплайн завершён", description: `Создано ${data.succeeded} из ${data.total}` });
+      toast({ title: t("shows.pipelineCompleted"), description: t("shows.pipelineResult", { succeeded: data.succeeded, total: data.total }) });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка пайплайна", description: error.message, variant: "destructive" });
+      toast({ title: t("shows.pipelineErrorMsg"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -353,9 +355,9 @@ export default function ShowsPage() {
               }
               return prev;
             });
-            toast({ title: "Аудио сгенерировано", description: data?.title || "" });
+            toast({ title: t("shows.audioGenerated"), description: data?.title || "" });
           } catch (error: any) {
-            toast({ title: "Ошибка озвучки", description: error.message, variant: "destructive" });
+            toast({ title: t("shows.audioError"), description: error.message, variant: "destructive" });
           }
           audioQueueRef.current = audioQueueRef.current.filter(qId => qId !== nextId);
           setAudioQueue(prev => prev.filter(qId => qId !== nextId));
@@ -374,10 +376,10 @@ export default function ShowsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
-      toast({ title: "Скрипт сгенерирован" });
+      toast({ title: t("shows.scriptGenerated") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("shows.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -387,10 +389,10 @@ export default function ShowsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
-      toast({ title: "Передача удалена" });
+      toast({ title: t("shows.programDeleted") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("shows.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -402,11 +404,11 @@ export default function ShowsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
-      toast({ title: "Голосоизолятор применён", description: "Шум удалён, аудио обновлено" });
+      toast({ title: t("shows.voiceIsolated"), description: t("shows.noiseRemoved") });
       setIsolatingId(null);
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка голосоизолятора", description: error.message, variant: "destructive" });
+      toast({ title: t("shows.voiceIsolateError"), description: error.message, variant: "destructive" });
       setIsolatingId(null);
     },
   });
@@ -418,10 +420,10 @@ export default function ShowsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/program-types"] });
       setActiveTab(null);
-      toast({ title: "Тип передачи удалён" });
+      toast({ title: t("shows.typeDeleted") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("shows.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -470,14 +472,14 @@ export default function ShowsPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
-      pending: { label: "Ожидает", variant: "outline" },
-      script_ready: { label: "Скрипт готов", variant: "secondary" },
-      ready: { label: "Готово", variant: "default" },
-      error: { label: "Ошибка", variant: "destructive" },
+    const variants: Record<string, { labelKey: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+      pending: { labelKey: "shows.statusPending", variant: "outline" },
+      script_ready: { labelKey: "shows.statusScriptReady", variant: "secondary" },
+      ready: { labelKey: "shows.statusReady", variant: "default" },
+      error: { labelKey: "shows.statusError", variant: "destructive" },
     };
     const config = variants[status] || variants.pending;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    return <Badge variant={config.variant}>{t(config.labelKey)}</Badge>;
   };
 
   const speakerColors = [
@@ -622,9 +624,9 @@ export default function ShowsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/programs"] });
       setViewScriptProgram({ ...viewScriptProgram, scriptText: newScript });
       setEditingBlocks(null);
-      toast({ title: "Скрипт сохранён", description: "Назначение дикторов обновлено" });
+      toast({ title: t("shows.scriptSaved"), description: t("shows.speakersUpdated") });
     } catch (err) {
-      toast({ title: "Ошибка", description: "Не удалось сохранить скрипт", variant: "destructive" });
+      toast({ title: t("shows.error"), description: t("shows.saveFailed"), variant: "destructive" });
     } finally {
       setSavingScript(false);
     }
@@ -688,18 +690,18 @@ export default function ShowsPage() {
           await response.json();
           results.created++;
         } catch (err: any) {
-          results.errors.push(`#${i + 1}: ${err.message || "Ошибка"}`);
+          results.errors.push(`#${i + 1}: ${err.message || t("shows.error")}`);
         }
       }
 
       setBatchResult(results);
       queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
       toast({ 
-        title: "Готово!", 
-        description: `Создано ${results.created} из ${results.total} передач`,
+        title: t("shows.batchDone"), 
+        description: t("shows.batchCreated", { created: results.created, total: results.total }),
       });
     } catch (error) {
-      toast({ title: "Ошибка", description: error instanceof Error ? error.message : "Ошибка генерации", variant: "destructive" });
+      toast({ title: t("shows.error"), description: error instanceof Error ? error.message : t("shows.errorGeneric"), variant: "destructive" });
     } finally {
       setBatchGenerating(false);
       setBatchProgress(0);
@@ -737,9 +739,9 @@ export default function ShowsPage() {
         <Card>
           <CardHeader className="text-center">
             <Radio className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <CardTitle>Нет типов передач</CardTitle>
+            <CardTitle>{t("shows.noTypes")}</CardTitle>
             <CardDescription>
-              Создайте типы передач для генерации контента
+              {t("shows.noTypeDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center gap-4">
@@ -747,16 +749,16 @@ export default function ShowsPage() {
               {createTypeMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Создание...
+                  {t("shows.creating")}
                 </>
               ) : (
-                "Создать стандартные типы"
+                t("shows.createDefaultTypes")
               )}
             </Button>
-            <span className="text-sm text-muted-foreground">или</span>
+            <span className="text-sm text-muted-foreground">{t("shows.or")}</span>
             <Button variant="outline" onClick={() => setIsAddTypeDialogOpen(true)} data-testid="button-create-custom-type">
               <Plus className="mr-2 h-4 w-4" />
-              Создать свой тип
+              {t("shows.createCustomType")}
             </Button>
           </CardContent>
         </Card>
@@ -776,14 +778,14 @@ export default function ShowsPage() {
       <Dialog open={isAddTypeDialogOpen} onOpenChange={setIsAddTypeDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Новый тип передачи</DialogTitle>
+            <DialogTitle>{t("shows.newTypeTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Название</Label>
+              <Label>{t("shows.typeName")}</Label>
               <div className="flex gap-1">
                 <Input
-                  placeholder="Например: Прогноз погоды"
+                  placeholder={t("shows.namePlaceholder")}
                   value={newTypeName}
                   onChange={(e) => {
                     setNewTypeName(e.target.value);
@@ -797,7 +799,7 @@ export default function ShowsPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Slug (для URL)</Label>
+              <Label>{t("shows.slugForUrl")}</Label>
               <Input
                 placeholder="weather"
                 value={newTypeSlug}
@@ -805,10 +807,10 @@ export default function ShowsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Описание</Label>
+              <Label>{t("shows.typeDescription")}</Label>
               <div className="flex gap-1">
                 <Input
-                  placeholder="Краткое описание"
+                  placeholder={t("shows.briefDescription")}
                   value={newTypeDescription}
                   onChange={(e) => setNewTypeDescription(e.target.value)}
                   className="flex-1"
@@ -817,7 +819,7 @@ export default function ShowsPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Выпусков в день</Label>
+              <Label>{t("shows.episodesPerDay")}</Label>
               <Select value={String(newTypeDailyCount)} onValueChange={(v) => setNewTypeDailyCount(Number(v))}>
                 <SelectTrigger>
                   <SelectValue />
@@ -830,10 +832,10 @@ export default function ShowsPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Промпт по умолчанию</Label>
+              <Label>{t("shows.promptDefault")}</Label>
               <div className="flex gap-1 items-start">
                 <Textarea
-                  placeholder="Промпт для генерации..."
+                  placeholder={t("shows.promptPlaceholder")}
                   value={newTypePrompt}
                   onChange={(e) => setNewTypePrompt(e.target.value)}
                   rows={5}
@@ -845,7 +847,7 @@ export default function ShowsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddTypeDialogOpen(false)}>
-              Отмена
+              {t("shows.cancel")}
             </Button>
             <Button
               onClick={() => createTypeMutation.mutate({
@@ -857,7 +859,7 @@ export default function ShowsPage() {
               })}
               disabled={!newTypeName || !newTypeSlug || !newTypePrompt || createTypeMutation.isPending}
             >
-              Создать
+              {t("shows.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -869,8 +871,8 @@ export default function ShowsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Передачи</h1>
-          <p className="text-muted-foreground">Генерация контента для радиопередач</p>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">{t("shows.title")}</h1>
+          <p className="text-muted-foreground">{t("shows.subtitle")}</p>
         </div>
       </div>
 
@@ -889,7 +891,7 @@ export default function ShowsPage() {
           </TabsList>
           <Button variant="outline" size="sm" onClick={() => setIsAddTypeDialogOpen(true)} data-testid="button-add-type">
             <Plus className="mr-2 h-4 w-4" />
-            Новый тип
+            {t("shows.newType")}
           </Button>
         </div>
 
@@ -915,18 +917,18 @@ export default function ShowsPage() {
                       <div className="flex items-center gap-3 flex-wrap text-sm text-muted-foreground pt-1">
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3.5 w-3.5" />
-                          {typeTodayCount}/{typeDaily} на сегодня
+                          {t("shows.todayOf", { count: typeTodayCount, total: typeDaily })}
                         </span>
                         {type.sponsorName && (
                           <span className="flex items-center gap-1">
                             <Megaphone className="h-3.5 w-3.5" />
-                            Спонсор: {type.sponsorName}
+                            {t("shows.sponsor", { name: type.sponsorName })}
                           </span>
                         )}
                         {currentSlotDesc && typeCanCreate && (
                           <span className="flex items-center gap-1">
                             <Clock className="h-3.5 w-3.5" />
-                            След.: {currentSlotDesc.length > 50 ? currentSlotDesc.substring(0, 50) + "..." : currentSlotDesc}
+                            {t("shows.next", { desc: currentSlotDesc.length > 50 ? currentSlotDesc.substring(0, 50) + "..." : currentSlotDesc })}
                           </span>
                         )}
                       </div>
@@ -942,7 +944,7 @@ export default function ShowsPage() {
                         data-testid="button-edit-prompt"
                       >
                         <FileText className="mr-2 h-4 w-4" />
-                        Промпт
+                        {t("shows.prompt")}
                       </Button>
                       <Button
                         variant="outline"
@@ -951,14 +953,14 @@ export default function ShowsPage() {
                         data-testid="button-type-settings"
                       >
                         <Settings className="mr-2 h-4 w-4" />
-                        Настройки
+                        {t("shows.settings")}
                       </Button>
                     </div>
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t mt-3">
                     <div className="flex items-center gap-2 rounded-lg border px-3 py-2 bg-muted/30">
-                      <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Вручную:</span>
+                      <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">{t("shows.manual")}</span>
                       <div className="flex items-center gap-1.5">
                         <Button
                           size="sm"
@@ -971,7 +973,7 @@ export default function ShowsPage() {
                           ) : (
                             <Zap className="mr-1.5 h-4 w-4" />
                           )}
-                          Сценарий
+                          {t("shows.script")}
                         </Button>
                         <Button
                           variant="outline"
@@ -983,7 +985,7 @@ export default function ShowsPage() {
                           data-testid="button-batch-create"
                         >
                           <PackagePlus className="mr-1.5 h-4 w-4" />
-                          Пакет
+                          {t("shows.batch")}
                         </Button>
                         {selectedPrograms.size > 0 && (
                           <Button
@@ -999,7 +1001,7 @@ export default function ShowsPage() {
                             data-testid="button-bulk-voice"
                           >
                             <Volume2 className="mr-1.5 h-4 w-4" />
-                            Озвучить ({selectedPrograms.size})
+                            {t("shows.voiceSelected", { count: selectedPrograms.size })}
                           </Button>
                         )}
                       </div>
@@ -1009,17 +1011,17 @@ export default function ShowsPage() {
                       <div className="flex items-center gap-2.5 rounded-lg border px-3 py-2 bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800">
                         <div className="flex items-center gap-1.5 shrink-0">
                           <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                          <span className="text-xs font-medium text-green-700 dark:text-green-400">Авто:</span>
+                          <span className="text-xs font-medium text-green-700 dark:text-green-400">{t("shows.auto")}</span>
                         </div>
                         <span className="text-xs text-green-600 dark:text-green-400 leading-relaxed">
                           {type.scheduleDays && type.scheduleDays.length > 0
-                            ? `${type.scheduleDays.map((d: number) => ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"][d]).join(", ")} в ${type.scheduleTime || "09:00"}`
-                            : `Ежедневно в ${type.scheduleTime || "09:00"}`
+                            ? `${type.scheduleDays.map((d: number) => [t("shows.daySun"),t("shows.dayMon"),t("shows.dayTue"),t("shows.dayWed"),t("shows.dayThu"),t("shows.dayFri"),t("shows.daySat")][d]).join(", ")} ${type.scheduleTime || "09:00"}`
+                            : t("shows.dailyAt", { time: type.scheduleTime || "09:00" })
                           }
-                          {" · "}{type.weeklyCount || 7}/нед
-                          {type.autoVoice !== false && " · озвучка"}
-                          {type.autoIsolate && " · шумодав"}
-                          {type.autoUpload !== false && " · выгрузка"}
+                          {" · "}{type.weeklyCount || 7}{t("shows.perWeek")}
+                          {type.autoVoice !== false && ` · ${t("shows.voice")}`}
+                          {type.autoIsolate && ` · ${t("shows.denoise")}`}
+                          {type.autoUpload !== false && ` · ${t("shows.upload")}`}
                         </span>
                         <Button
                           variant="outline"
@@ -1034,7 +1036,7 @@ export default function ShowsPage() {
                           ) : (
                             <Zap className="mr-1 h-3.5 w-3.5" />
                           )}
-                          Запустить
+                          {t("shows.run")}
                         </Button>
                       </div>
                     )}
@@ -1046,7 +1048,7 @@ export default function ShowsPage() {
                 <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Поиск по названию, тексту, дате..."
+                    placeholder={t("shows.searchPlaceholder")}
                     value={programFilter}
                     onChange={(e) => setProgramFilter(e.target.value)}
                     className="pl-9 h-9"
@@ -1059,12 +1061,12 @@ export default function ShowsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Все статусы</SelectItem>
-                    <SelectItem value="pending">Без сценария</SelectItem>
-                    <SelectItem value="script_ready">Сценарий готов</SelectItem>
-                    <SelectItem value="no_audio">Без аудио</SelectItem>
-                    <SelectItem value="has_audio">С аудио</SelectItem>
-                    <SelectItem value="ready">Готово</SelectItem>
+                    <SelectItem value="all">{t("shows.allStatuses")}</SelectItem>
+                    <SelectItem value="pending">{t("shows.noScript")}</SelectItem>
+                    <SelectItem value="script_ready">{t("shows.statusScriptReady")}</SelectItem>
+                    <SelectItem value="no_audio">{t("shows.noAudio")}</SelectItem>
+                    <SelectItem value="has_audio">{t("shows.hasAudio")}</SelectItem>
+                    <SelectItem value="ready">{t("shows.statusReady")}</SelectItem>
                   </SelectContent>
                 </Select>
                 {(programFilter || statusFilter !== "all") && (
@@ -1074,10 +1076,10 @@ export default function ShowsPage() {
                     onClick={() => { setProgramFilter(""); setStatusFilter("all"); }}
                     data-testid="button-clear-filter"
                   >
-                    <XCircle className="h-4 w-4 mr-1" /> Сброс
+                    <XCircle className="h-4 w-4 mr-1" /> {t("shows.reset")}
                   </Button>
                 )}
-                <span className="text-xs text-muted-foreground">{filteredPrograms.length} из {allTypePrograms.length}</span>
+                <span className="text-xs text-muted-foreground">{t("shows.ofTotal", { count: filteredPrograms.length, total: allTypePrograms.length })}</span>
               </div>
 
               {isLoadingPrograms ? (
@@ -1090,15 +1092,15 @@ export default function ShowsPage() {
                 <Card>
                   <CardContent className="py-8 text-center">
                     <Volume2 className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                    <p className="text-muted-foreground">Нет передач этого типа</p>
+                    <p className="text-muted-foreground">{t("shows.noShows")}</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Нажмите «Сценарий» для генерации
+                      {t("shows.noShowsHint")}
                     </p>
                   </CardContent>
                 </Card>
               ) : (() => {
                 const grouped = filteredPrograms.reduce<Record<string, Program[]>>((acc, p) => {
-                  const date = p.scheduledDate || "Без даты";
+                  const date = p.scheduledDate || t("shows.noDate");
                   if (!acc[date]) acc[date] = [];
                   acc[date].push(p);
                   return acc;
@@ -1175,7 +1177,7 @@ export default function ShowsPage() {
                                 {isMultiSpeaker(program.scriptText) ? (
                                   <div className="flex items-center gap-1.5">
                                     <Users className="h-3.5 w-3.5 text-violet-500" />
-                                    <span className="text-xs text-violet-600 dark:text-violet-400 font-medium">Мульти-спикер</span>
+                                    <span className="text-xs text-violet-600 dark:text-violet-400 font-medium">{t("shows.multiSpeaker")}</span>
                                     <span className="text-xs text-muted-foreground">•</span>
                                     <span className="text-xs text-muted-foreground truncate max-w-xs">
                                       {program.scriptText.match(/^\[([^\]]+)\]:/gm)?.map(m => m.replace(/[\[\]:]/g, "")).filter((v, i, a) => a.indexOf(v) === i).join(", ")}
@@ -1201,7 +1203,7 @@ export default function ShowsPage() {
                                 {generateScriptMutation.isPending ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
-                                  "Сгенерировать скрипт"
+                                  t("shows.generateScriptBtn")
                                 )}
                               </Button>
                             )}
@@ -1226,11 +1228,11 @@ export default function ShowsPage() {
                                 {generatingAudioId === program.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : audioQueue.includes(program.id) ? (
-                                  <>В очереди ({audioQueue.indexOf(program.id) + 1})</>
+                                  <>{t("shows.inQueue", { pos: audioQueue.indexOf(program.id) + 1 })}</>
                                 ) : program.audioUrl ? (
-                                  "Переозвучить"
+                                  t("shows.revoice")
                                 ) : (
-                                  "Озвучить"
+                                  t("shows.voiceBtn")
                                 )}
                               </Button>
                             )}
@@ -1257,7 +1259,7 @@ export default function ShowsPage() {
                                   size="icon"
                                   variant={program.audioUrl?.includes("_isolated") ? "default" : "outline"}
                                   className={program.audioUrl?.includes("_isolated") ? "bg-green-600 hover:bg-green-700 text-white" : ""}
-                                  title={program.audioUrl?.includes("_isolated") ? "Шум убран ✓" : "Голосоизолятор — убрать шум"}
+                                  title={program.audioUrl?.includes("_isolated") ? t("shows.noiseRemovedMark") : t("shows.voiceIsolator")}
                                   onClick={() => voiceIsolateMutation.mutate(program.id)}
                                   disabled={isolatingId === program.id}
                                   data-testid={`button-isolate-${program.id}`}
@@ -1278,17 +1280,17 @@ export default function ShowsPage() {
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
-                                  <AlertDialogTitle>Удалить передачу?</AlertDialogTitle>
+                                  <AlertDialogTitle>{t("shows.deleteProgram")}</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    Это действие нельзя отменить.
+                                    {t("shows.deleteIrreversible")}
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                  <AlertDialogCancel>Отмена</AlertDialogCancel>
+                                  <AlertDialogCancel>{t("shows.cancel")}</AlertDialogCancel>
                                   <AlertDialogAction
                                     onClick={() => deleteProgramMutation.mutate(program.id)}
                                   >
-                                    Удалить
+                                    {t("shows.delete")}
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
@@ -1316,9 +1318,9 @@ export default function ShowsPage() {
       <Dialog open={isEditPromptDialogOpen} onOpenChange={setIsEditPromptDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Редактировать промпт: {editingType?.name}</DialogTitle>
+            <DialogTitle>{t("shows.editPromptTitle", { name: editingType?.name })}</DialogTitle>
             <DialogDescription>
-              Этот промпт используется для генерации всех выпусков этого типа
+              {t("shows.editPromptDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -1334,7 +1336,7 @@ export default function ShowsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditPromptDialogOpen(false)}>
-              Отмена
+              {t("shows.cancel")}
             </Button>
             <Button
               onClick={() => editingType && updateTypeMutation.mutate({
@@ -1343,7 +1345,7 @@ export default function ShowsPage() {
               })}
               disabled={updateTypeMutation.isPending}
             >
-              {updateTypeMutation.isPending ? "Сохранение..." : "Сохранить"}
+              {updateTypeMutation.isPending ? t("shows.saving") : t("shows.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1352,16 +1354,16 @@ export default function ShowsPage() {
       <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Настройки: {settingsType?.name}</DialogTitle>
+            <DialogTitle>{t("shows.settingsTitle", { name: settingsType?.name })}</DialogTitle>
             <DialogDescription>
-              Расписание, спонсоры, голоса и другие параметры
+              {t("shows.settingsDesc")}
             </DialogDescription>
           </DialogHeader>
           {settingsType && (
             <div className="space-y-6 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Выпусков в день</Label>
+                  <Label>{t("shows.episodesPerDay")}</Label>
                   <Select
                     value={String(settingsType.dailyCount || 1)}
                     onValueChange={(v) => {
@@ -1385,7 +1387,7 @@ export default function ShowsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Длительность (сек)</Label>
+                  <Label>{t("shows.durationSec")}</Label>
                   <Input
                     type="number"
                     value={settingsType.defaultDurationSeconds || 60}
@@ -1396,13 +1398,13 @@ export default function ShowsPage() {
               </div>
 
               <div className="space-y-3">
-                <Label>Описание слотов (что генерировать для каждого выпуска)</Label>
+                <Label>{t("shows.slotDescription")}</Label>
                 {Array.from({ length: settingsType.dailyCount || 1 }, (_, i) => (
                   <div key={i} className="flex items-start gap-2">
                     <Badge variant="outline" className="mt-2 shrink-0">#{i + 1}</Badge>
                     <div className="flex gap-1 flex-1">
                       <Input
-                        placeholder={`Описание выпуска #${i + 1}...`}
+                        placeholder={t("shows.slotPlaceholder", { num: i + 1 })}
                         value={slotInputs[i] || ""}
                         onChange={(e) => {
                           const arr = [...slotInputs];
@@ -1425,21 +1427,21 @@ export default function ShowsPage() {
               </div>
 
               <div className="space-y-3">
-                <Label>Спонсор</Label>
+                <Label>{t("shows.sponsorLabel")}</Label>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground">Название спонсора</span>
+                    <span className="text-xs text-muted-foreground">{t("shows.sponsorNameLabel")}</span>
                     <Input
-                      placeholder="Компания или бренд"
+                      placeholder={t("shows.sponsorNamePlaceholder")}
                       value={settingsType.sponsorName || ""}
                       onChange={(e) => setSettingsType(prev => prev ? { ...prev, sponsorName: e.target.value } : null)}
                       data-testid="input-sponsor-name"
                     />
                   </div>
                   <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground">Текст спонсора</span>
+                    <span className="text-xs text-muted-foreground">{t("shows.sponsorTextLabel")}</span>
                     <Input
-                      placeholder={`Спонсор передачи "${settingsType.name}"...`}
+                      placeholder={t("shows.sponsorTextPlaceholder", { name: settingsType.name })}
                       value={settingsType.sponsorText || ""}
                       onChange={(e) => setSettingsType(prev => prev ? { ...prev, sponsorText: e.target.value } : null)}
                       data-testid="input-sponsor-text"
@@ -1449,15 +1451,15 @@ export default function ShowsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Шаблон имени файла</Label>
+                <Label>{t("shows.fileNameTemplate")}</Label>
                 <Input
-                  placeholder="Например: {название}_{дата}_{номер}"
+                  placeholder={t("shows.fileNamePlaceholder")}
                   value={settingsType.fileNameTemplate || ""}
                   onChange={(e) => setSettingsType(prev => prev ? { ...prev, fileNameTemplate: e.target.value } : null)}
                   data-testid="input-file-name-template"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Переменные: <code>{"{название}"}</code> — имя передачи, <code>{"{дата}"}</code> — дата выпуска, <code>{"{номер}"}</code> — номер слота. Пример: <code>{settingsType.name}_{"{дата}"}_{"{номер}"}</code> → <code>{settingsType.name}_2026-03-24_1.mp3</code>
+                  {t("shows.fileNameVars")}
                 </p>
               </div>
 
@@ -1465,7 +1467,7 @@ export default function ShowsPage() {
                 const assignedVoices = voices.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(settingsType.id));
                 return assignedVoices.length > 0 ? (
                   <div className="space-y-2">
-                    <Label>Назначенные голоса</Label>
+                    <Label>{t("shows.assignedVoices")}</Label>
                     <div className="flex flex-wrap gap-2">
                       {assignedVoices.map(voice => (
                         <Badge key={voice.id} variant="secondary" className="text-sm py-1 px-3" data-testid={`badge-voice-${voice.id}`}>
@@ -1473,20 +1475,20 @@ export default function ShowsPage() {
                         </Badge>
                       ))}
                     </div>
-                    <p className="text-xs text-muted-foreground">Назначение голосов — на странице «Голоса»</p>
+                    <p className="text-xs text-muted-foreground">{t("shows.voiceAssignmentHint")}</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <Label>Назначенные голоса</Label>
-                    <p className="text-sm text-muted-foreground">Нет назначенных голосов. Назначьте на странице «Голоса».</p>
+                    <Label>{t("shows.assignedVoices")}</Label>
+                    <p className="text-sm text-muted-foreground">{t("shows.noAssignedVoices")}</p>
                   </div>
                 );
               })()}
 
               <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
-                <Label className="text-base font-semibold">Firecrawl — поиск контента</Label>
+                <Label className="text-base font-semibold">{t("shows.firecrawlTitle")}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Автоматический поиск актуальной информации из интернета для подготовки передач
+                  {t("shows.firecrawlDesc")}
                 </p>
                 <div className="flex items-center gap-3">
                   <Button
@@ -1495,13 +1497,13 @@ export default function ShowsPage() {
                     onClick={() => setSettingsType(prev => prev ? { ...prev, useFirecrawl: !prev.useFirecrawl } : null)}
                     data-testid="button-toggle-firecrawl"
                   >
-                    {settingsType.useFirecrawl ? "Включен" : "Выключен"}
+                    {settingsType.useFirecrawl ? t("shows.enabled") : t("shows.disabled")}
                   </Button>
                 </div>
                 {settingsType.useFirecrawl && (
                   <div className="space-y-3 mt-2">
                     <div className="space-y-2">
-                      <span className="text-xs text-muted-foreground">Темы для поиска (каждая тема — отдельный поисковый запрос)</span>
+                      <span className="text-xs text-muted-foreground">{t("shows.topicsHint")}</span>
                       <div className="flex flex-wrap gap-2 mb-2">
                         {(settingsType.firecrawlTopics || []).map((topic: string, idx: number) => (
                           <Badge key={idx} variant="secondary" className="text-sm py-1 px-3 cursor-pointer" data-testid={`badge-topic-${idx}`}
@@ -1520,7 +1522,7 @@ export default function ShowsPage() {
                       </div>
                       <div className="flex gap-2">
                         <Input
-                          placeholder="Новая тема: психология стресс 2025..."
+                          placeholder={t("shows.newTopicPlaceholder")}
                           value={firecrawlTopicInput}
                           onChange={(e) => setFirecrawlTopicInput(e.target.value)}
                           onKeyDown={(e) => {
@@ -1563,16 +1565,16 @@ export default function ShowsPage() {
                           const topic = settingsType.firecrawlTopics?.[0] || "";
                           const res = await apiRequest("POST", "/api/firecrawl/search", { query: topic, limit: 2 });
                           const data = await res.json();
-                          setFirecrawlTestResult(`Найдено ${data.count} результатов для "${topic}":\n${data.results?.map((r: string) => r.substring(0, 200)).join("\n---\n") || "Пусто"}`);
+                          setFirecrawlTestResult(`${t("shows.firecrawlFound", { count: data.count, topic })}:\n${data.results?.map((r: string) => r.substring(0, 200)).join("\n---\n") || t("shows.firecrawlEmpty")}`);
                         } catch (err: any) {
-                          setFirecrawlTestResult(`Ошибка: ${err.message}`);
+                          setFirecrawlTestResult(t("shows.firecrawlError", { message: err.message }));
                         }
                         setFirecrawlTesting(false);
                       }}
                       data-testid="button-test-firecrawl"
                     >
                       {firecrawlTesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Тест поиска
+                      {t("shows.testSearch")}
                     </Button>
                     {firecrawlTestResult && (
                       <pre className="text-xs bg-muted p-3 rounded max-h-40 overflow-y-auto whitespace-pre-wrap" data-testid="text-firecrawl-result">
@@ -1584,9 +1586,9 @@ export default function ShowsPage() {
               </div>
 
               <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
-                <Label className="text-base font-semibold">Авто-генерация</Label>
+                <Label className="text-base font-semibold">{t("shows.autoGenTitle")}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Система будет автоматически создавать скрипты, озвучивать и выгружать в облако
+                  {t("shows.autoGenDesc")}
                 </p>
                 <div className="flex items-center gap-3">
                   <Button
@@ -1595,14 +1597,14 @@ export default function ShowsPage() {
                     onClick={() => setSettingsType(prev => prev ? { ...prev, autoGenerate: !prev.autoGenerate } : null)}
                     data-testid="button-toggle-auto-generate"
                   >
-                    {settingsType.autoGenerate ? "Включена" : "Выключена"}
+                    {settingsType.autoGenerate ? t("shows.autoGenEnabled") : t("shows.autoGenDisabled")}
                   </Button>
                 </div>
                 {settingsType.autoGenerate && (
                   <div className="space-y-3 mt-2">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="space-y-1">
-                        <span className="text-xs text-muted-foreground">Выпусков в неделю</span>
+                        <span className="text-xs text-muted-foreground">{t("shows.episodesPerWeek")}</span>
                         <Input
                           type="number"
                           min={1}
@@ -1620,7 +1622,7 @@ export default function ShowsPage() {
                           className="w-full"
                           data-testid="button-toggle-auto-voice"
                         >
-                          {settingsType.autoVoice !== false ? "Авто-озвучка" : "Без озвучки"}
+                          {settingsType.autoVoice !== false ? t("shows.autoVoiceOn") : t("shows.autoVoiceOff")}
                         </Button>
                       </div>
                       <div className="space-y-1 flex flex-col justify-end">
@@ -1631,7 +1633,7 @@ export default function ShowsPage() {
                           className="w-full"
                           data-testid="button-toggle-auto-isolate"
                         >
-                          {settingsType.autoIsolate ? "Голосоизолятор" : "Без шумодава"}
+                          {settingsType.autoIsolate ? t("shows.denoiserOn") : t("shows.denoiserOff")}
                         </Button>
                       </div>
                       <div className="space-y-1 flex flex-col justify-end">
@@ -1642,22 +1644,22 @@ export default function ShowsPage() {
                           className="w-full"
                           data-testid="button-toggle-auto-upload"
                         >
-                          {settingsType.autoUpload !== false ? "Авто-выгрузка" : "Без выгрузки"}
+                          {settingsType.autoUpload !== false ? t("shows.autoUploadOn") : t("shows.autoUploadOff")}
                         </Button>
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-xs font-medium">Расписание</Label>
+                      <Label className="text-xs font-medium">{t("shows.schedule")}</Label>
                       <div className="flex flex-wrap gap-1.5">
                         {[
-                          { day: 1, label: "Пн" },
-                          { day: 2, label: "Вт" },
-                          { day: 3, label: "Ср" },
-                          { day: 4, label: "Чт" },
-                          { day: 5, label: "Пт" },
-                          { day: 6, label: "Сб" },
-                          { day: 0, label: "Вс" },
+                          { day: 1, label: t("shows.dayMon") },
+                          { day: 2, label: t("shows.dayTue") },
+                          { day: 3, label: t("shows.dayWed") },
+                          { day: 4, label: t("shows.dayThu") },
+                          { day: 5, label: t("shows.dayFri") },
+                          { day: 6, label: t("shows.daySat") },
+                          { day: 0, label: t("shows.daySun") },
                         ].map(({ day, label }) => {
                           const days = settingsType.scheduleDays || [];
                           const isSelected = days.includes(day);
@@ -1681,7 +1683,7 @@ export default function ShowsPage() {
                         })}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Label className="text-xs whitespace-nowrap">Время запуска</Label>
+                        <Label className="text-xs whitespace-nowrap">{t("shows.launchTime")}</Label>
                         <Input
                           type="time"
                           className="w-28 h-8 text-sm"
@@ -1692,15 +1694,15 @@ export default function ShowsPage() {
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {(!settingsType.scheduleDays || settingsType.scheduleDays.length === 0)
-                          ? "Дни не выбраны — генерация каждый день"
-                          : `Генерация: ${(settingsType.scheduleDays || []).map((d: number) => ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"][d]).join(", ")} в ${settingsType.scheduleTime || "09:00"}`
+                          ? t("shows.noDaysSelected")
+                          : t("shows.generationSchedule", { days: (settingsType.scheduleDays || []).map((d: number) => [t("shows.daySun"),t("shows.dayMon"),t("shows.dayTue"),t("shows.dayWed"),t("shows.dayThu"),t("shows.dayFri"),t("shows.daySat")][d]).join(", "), time: settingsType.scheduleTime || "09:00" })
                         }
                       </p>
                     </div>
 
                     {settingsType.autoUpload !== false && (
                       <div className="space-y-1">
-                        <Label className="text-xs">Папка на облачном диске</Label>
+                        <Label className="text-xs">{t("shows.cloudFolder")}</Label>
                         <Input
                           placeholder={`/radio/${settingsType.slug || 'program'}`}
                           value={settingsType.uploadFolder || ""}
@@ -1708,7 +1710,7 @@ export default function ShowsPage() {
                           data-testid="input-upload-folder"
                         />
                         <p className="text-xs text-muted-foreground">
-                          Путь на Яндекс Диске. По умолчанию: /radio/{settingsType.slug || 'program'}
+                          {t("shows.cloudFolderHint", { slug: settingsType.slug || 'program' })}
                         </p>
                       </div>
                     )}
@@ -1720,23 +1722,23 @@ export default function ShowsPage() {
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" size="sm" className="w-full" data-testid="button-delete-type">
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Удалить тип передачи
+                    {t("shows.deleteTypeBtn")}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Удалить "{settingsType.name}"?</AlertDialogTitle>
+                    <AlertDialogTitle>{t("shows.deleteTypeTitle", { name: settingsType.name })}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Это удалит тип передачи и все связанные данные.
+                      {t("shows.deleteTypeMsg")}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Отмена</AlertDialogCancel>
+                    <AlertDialogCancel>{t("shows.cancel")}</AlertDialogCancel>
                     <AlertDialogAction onClick={() => {
                       deleteTypeMutation.mutate(settingsType.id);
                       setIsSettingsDialogOpen(false);
                     }}>
-                      Удалить
+                      {t("shows.delete")}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -1745,10 +1747,10 @@ export default function ShowsPage() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsSettingsDialogOpen(false)}>
-              Отмена
+              {t("shows.cancel")}
             </Button>
             <Button onClick={saveSettings} disabled={updateTypeMutation.isPending}>
-              {updateTypeMutation.isPending ? "Сохранение..." : "Сохранить"}
+              {updateTypeMutation.isPending ? t("shows.saving") : t("shows.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1764,10 +1766,10 @@ export default function ShowsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <PackagePlus className="h-5 w-5" />
-              Пакетная генерация: {currentType?.name}
+              {t("shows.batchTitle", { name: currentType?.name })}
             </DialogTitle>
             <DialogDescription>
-              Выберите количество и создайте несколько выпусков за один раз
+              {t("shows.batchDesc")}
             </DialogDescription>
           </DialogHeader>
 
@@ -1781,13 +1783,13 @@ export default function ShowsPage() {
                 )}
                 <div>
                   <p className="font-medium text-lg">
-                    Создано {batchResult.created} из {batchResult.total} передач
+                    {t("shows.batchCreated", { created: batchResult.created, total: batchResult.total })}
                   </p>
                 </div>
               </div>
               {batchResult.errors.length > 0 && (
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-destructive">Ошибки:</p>
+                  <p className="text-sm font-medium text-destructive">{t("shows.batchErrors")}</p>
                   {batchResult.errors.map((err, i) => (
                     <p key={i} className="text-sm text-muted-foreground">{err}</p>
                   ))}
@@ -1798,14 +1800,14 @@ export default function ShowsPage() {
                   setIsBatchDialogOpen(false);
                   resetBatchDialog();
                 }}>
-                  Закрыть
+                  {t("shows.close")}
                 </Button>
               </DialogFooter>
             </div>
           ) : (
             <div className="space-y-5 py-4">
               <div className="space-y-2">
-                <Label>Сколько выпусков создать</Label>
+                <Label>{t("shows.batchHowMany")}</Label>
                 <Input
                   type="number"
                   min={1}
@@ -1816,7 +1818,7 @@ export default function ShowsPage() {
                   data-testid="input-batch-count"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Каждый выпуск создаётся по промпту типа передачи{currentType?.useFirecrawl ? " + свежие данные из Firecrawl" : ""}
+                  {t("shows.batchPromptHint")}{currentType?.useFirecrawl ? t("shows.batchFirecrawlHint") : ""}
                 </p>
               </div>
 
@@ -1824,7 +1826,7 @@ export default function ShowsPage() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm">Создаю {batchProgress} из {batchCount}...</span>
+                    <span className="text-sm">{t("shows.batchCreating", { progress: batchProgress, count: batchCount })}</span>
                   </div>
                   <Progress value={(batchProgress / batchCount) * 100} className="h-2" />
                 </div>
@@ -1832,7 +1834,7 @@ export default function ShowsPage() {
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsBatchDialogOpen(false)} disabled={batchGenerating}>
-                  Отмена
+                  {t("shows.cancel")}
                 </Button>
                 <Button
                   onClick={startBatchGeneration}
@@ -1847,7 +1849,7 @@ export default function ShowsPage() {
                   ) : (
                     <>
                       <PackagePlus className="mr-2 h-4 w-4" />
-                      Создать {batchCount} выпусков
+                      {t("shows.batchCreateBtn", { count: batchCount })}
                     </>
                   )}
                 </Button>
@@ -1867,14 +1869,14 @@ export default function ShowsPage() {
               {viewScriptProgram?.title}
             </DialogTitle>
             <DialogDescription>
-              {viewScriptProgram?.scheduledDate && `Дата: ${viewScriptProgram.scheduledDate}`}
-              {viewScriptProgram?.slotNumber && ` • Слот #${viewScriptProgram.slotNumber}`}
+              {viewScriptProgram?.scheduledDate && t("shows.scriptDate", { date: viewScriptProgram.scheduledDate })}
+              {viewScriptProgram?.slotNumber && ` • ${t("shows.scriptSlot", { num: viewScriptProgram.slotNumber })}`}
             </DialogDescription>
           </DialogHeader>
 
           {editingBlocks ? (
             <div className="mt-2 space-y-3">
-              <p className="text-sm text-muted-foreground">Назначьте диктора для каждого блока:</p>
+              <p className="text-sm text-muted-foreground">{t("shows.assignSpeakerHint")}</p>
               {editingBlocks.map((block, idx) => {
                 const typeVoices = viewScriptProgram?.programTypeId
                   ? getAssignedVoicesForType(viewScriptProgram.programTypeId)
@@ -1893,10 +1895,10 @@ export default function ShowsPage() {
                       }}
                     >
                       <SelectTrigger className="w-full" data-testid={`select-speaker-${idx}`}>
-                        <SelectValue placeholder="Выберите диктора" />
+                        <SelectValue placeholder={t("shows.selectSpeaker")} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__none__">Без диктора</SelectItem>
+                        <SelectItem value="__none__">{t("shows.noSpeaker")}</SelectItem>
                         {typeVoices.map(v => (
                           <SelectItem key={v.id} value={v.personaName || v.name}>
                             {v.personaName || v.name}
@@ -1912,10 +1914,10 @@ export default function ShowsPage() {
               })}
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setEditingBlocks(null)} data-testid="button-cancel-edit-script">
-                  Отмена
+                  {t("shows.cancel")}
                 </Button>
                 <Button onClick={saveEditedScript} disabled={savingScript} data-testid="button-save-script">
-                  {savingScript ? "Сохранение..." : "Сохранить"}
+                  {savingScript ? t("shows.saving") : t("shows.save")}
                 </Button>
               </div>
             </div>
@@ -1932,7 +1934,7 @@ export default function ShowsPage() {
                 {viewScriptProgram?.programTypeId && getAssignedVoicesForType(viewScriptProgram.programTypeId).length >= 1 && (
                   <Button variant="outline" onClick={startEditingScript} data-testid="button-assign-speakers">
                     <Users className="mr-2 h-4 w-4" />
-                    {viewScriptProgram?.scriptText && isMultiSpeaker(viewScriptProgram.scriptText) ? "Переназначить дикторов" : "Назначить дикторов"}
+                    {viewScriptProgram?.scriptText && isMultiSpeaker(viewScriptProgram.scriptText) ? t("shows.reassignSpeakers") : t("shows.assignSpeakers")}
                   </Button>
                 )}
                 {viewScriptProgram && (viewScriptProgram.status === "script_ready" || viewScriptProgram.audioUrl) && (
@@ -1945,13 +1947,13 @@ export default function ShowsPage() {
                     data-testid="button-generate-audio-viewer"
                   >
                     {generatingAudioId === viewScriptProgram.id ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Озвучивается...</>
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("shows.voicing")}</>
                     ) : audioQueue.includes(viewScriptProgram.id) ? (
-                      <>В очереди ({audioQueue.indexOf(viewScriptProgram.id) + 1})</>
+                      <>{t("shows.inQueue", { pos: audioQueue.indexOf(viewScriptProgram.id) + 1 })}</>
                     ) : viewScriptProgram.audioUrl ? (
-                      <><Volume2 className="mr-2 h-4 w-4" /> Переозвучить</>
+                      <><Volume2 className="mr-2 h-4 w-4" /> {t("shows.revoice")}</>
                     ) : (
-                      <><Volume2 className="mr-2 h-4 w-4" /> Озвучить</>
+                      <><Volume2 className="mr-2 h-4 w-4" /> {t("shows.voiceBtn")}</>
                     )}
                   </Button>
                 )}

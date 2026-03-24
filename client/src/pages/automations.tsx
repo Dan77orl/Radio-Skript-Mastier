@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +21,6 @@ import { z } from "zod";
 import { Plus, Play, Trash2, Clock, CheckCircle, XCircle, Loader2, Zap, Settings2, Mic, MicOff } from "lucide-react";
 import type { Automation, AutomationRun, Voice, ProgramType } from "@shared/schema";
 import { format } from "date-fns";
-import { ru } from "date-fns/locale";
 
 declare global {
   interface Window {
@@ -42,6 +42,7 @@ const automationFormSchema = z.object({
 type AutomationFormValues = z.infer<typeof automationFormSchema>;
 
 export default function AutomationsPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedAutomation, setSelectedAutomation] = useState<Automation | null>(null);
@@ -110,12 +111,12 @@ export default function AutomationsPage() {
       apiRequest("POST", "/api/automations", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/automations"] });
-      toast({ title: "Автоматизация создана" });
+      toast({ title: t("automations.createAutomation") });
       setIsCreateOpen(false);
       form.reset();
     },
     onError: () => {
-      toast({ title: "Ошибка создания", variant: "destructive" });
+      toast({ title: t("common.error"), variant: "destructive" });
     },
   });
 
@@ -124,11 +125,11 @@ export default function AutomationsPage() {
       apiRequest("PATCH", `/api/automations/${selectedAutomation?.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/automations"] });
-      toast({ title: "Автоматизация обновлена" });
+      toast({ title: t("common.saved") });
       setSelectedAutomation(null);
     },
     onError: () => {
-      toast({ title: "Ошибка обновления", variant: "destructive" });
+      toast({ title: t("common.error"), variant: "destructive" });
     },
   });
 
@@ -137,11 +138,11 @@ export default function AutomationsPage() {
       apiRequest("DELETE", `/api/automations/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/automations"] });
-      toast({ title: "Автоматизация удалена" });
+      toast({ title: t("common.deleted") });
       setSelectedAutomation(null);
     },
     onError: () => {
-      toast({ title: "Ошибка удаления", variant: "destructive" });
+      toast({ title: t("common.error"), variant: "destructive" });
     },
   });
 
@@ -150,10 +151,10 @@ export default function AutomationsPage() {
       apiRequest("POST", `/api/automations/${id}/run`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/automations"] });
-      toast({ title: "Автоматизация запущена" });
+      toast({ title: t("automations.run") });
     },
     onError: () => {
-      toast({ title: "Ошибка запуска", variant: "destructive" });
+      toast({ title: t("common.error"), variant: "destructive" });
     },
   });
 
@@ -168,11 +169,11 @@ export default function AutomationsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "running":
-        return <Badge variant="secondary"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Выполняется</Badge>;
+        return <Badge variant="secondary"><Loader2 className="h-3 w-3 mr-1 animate-spin" />{t("common.loading")}</Badge>;
       case "completed":
-        return <Badge variant="default"><CheckCircle className="h-3 w-3 mr-1" />Завершено</Badge>;
+        return <Badge variant="default"><CheckCircle className="h-3 w-3 mr-1" />{t("common.success")}</Badge>;
       case "error":
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Ошибка</Badge>;
+        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />{t("common.error")}</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -181,9 +182,9 @@ export default function AutomationsPage() {
   const getTypeName = (type: string) => {
     switch (type) {
       case "dialog":
-        return "Диалоги/Подводки";
+        return t("automations.dialogType");
       case "program":
-        return "Программы";
+        return t("automations.programType");
       default:
         return type;
     }
@@ -193,8 +194,8 @@ export default function AutomationsPage() {
     const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognitionClass) {
       toast({
-        title: "Не поддерживается",
-        description: "Голосовой ввод не поддерживается вашим браузером",
+        title: t("common.error"),
+        description: t("common.error"),
         variant: "destructive",
       });
       return;
@@ -224,8 +225,8 @@ export default function AutomationsPage() {
       console.error("Speech recognition error:", event.error);
       setIsListening(false);
       toast({
-        title: "Ошибка записи",
-        description: "Не удалось распознать речь",
+        title: t("common.error"),
+        description: t("common.error"),
         variant: "destructive",
       });
     };
@@ -266,23 +267,23 @@ export default function AutomationsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">Автоматизация</h1>
+          <h1 className="text-2xl font-bold">{t("automations.title")}</h1>
           <p className="text-muted-foreground">
-            Создавайте правила для автоматической генерации контента
+            {t("automations.subtitle")}
           </p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button data-testid="button-create-automation">
               <Plus className="h-4 w-4 mr-2" />
-              Создать автоматизацию
+              {t("automations.createAutomation")}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>Новая автоматизация</DialogTitle>
+              <DialogTitle>{t("automations.newAutomation")}</DialogTitle>
               <DialogDescription>
-                Настройте правило для автоматического создания контента
+                {t("automations.newAutomationDesc")}
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -292,9 +293,9 @@ export default function AutomationsPage() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Название</FormLabel>
+                      <FormLabel>{t("automations.automationName")}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Утренние подводки" {...field} data-testid="input-automation-name" />
+                        <Input placeholder={t("automations.automationName")} {...field} data-testid="input-automation-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -306,16 +307,16 @@ export default function AutomationsPage() {
                   name="automationType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Тип контента</FormLabel>
+                      <FormLabel>{t("automations.contentType")}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-automation-type">
-                            <SelectValue placeholder="Выберите тип" />
+                            <SelectValue placeholder={t("automations.selectType")} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="dialog">Диалоги/Подводки</SelectItem>
-                          <SelectItem value="program">Программы (передачи)</SelectItem>
+                          <SelectItem value="dialog">{t("automations.dialogType")}</SelectItem>
+                          <SelectItem value="program">{t("automations.programType")}</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -329,11 +330,11 @@ export default function AutomationsPage() {
                     name="programTypeId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Тип программы</FormLabel>
+                        <FormLabel>{t("automations.programTypeLabel")}</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-program-type">
-                              <SelectValue placeholder="Выберите тип программы" />
+                              <SelectValue placeholder={t("automations.selectProgramType")} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -345,7 +346,7 @@ export default function AutomationsPage() {
                           </SelectContent>
                         </Select>
                         <FormDescription>
-                          Тематика согласно вкладкам в разделе Передачи
+                          {t("automations.programTypeDesc")}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -358,7 +359,7 @@ export default function AutomationsPage() {
                   name="voiceIds"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Голоса (дикторы)</FormLabel>
+                      <FormLabel>{t("automations.voices")}</FormLabel>
                       <div className="space-y-2">
                         {voices.map((voice) => (
                           <div key={voice.id} className="flex items-center space-x-2">
@@ -379,13 +380,13 @@ export default function AutomationsPage() {
                               htmlFor={`voice-${voice.id}`}
                               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                             >
-                              {voice.name} ({voice.gender === "male" ? "М" : "Ж"})
+                              {voice.name} ({voice.gender === "male" ? t("common.maleShort") : t("common.femaleShort")})
                             </label>
                           </div>
                         ))}
                       </div>
                       <FormDescription>
-                        Выберите голоса для генерации аудио
+                        {t("automations.voicesDesc")}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -397,10 +398,10 @@ export default function AutomationsPage() {
                   name="prompt"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Промпт (опционально)</FormLabel>
+                      <FormLabel>{t("automations.promptOptional")}</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Оставьте пустым для использования промпта по умолчанию"
+                          placeholder={t("automations.promptPlaceholder")}
                           className="min-h-[80px]"
                           {...field}
                           data-testid="input-automation-prompt"
@@ -417,12 +418,12 @@ export default function AutomationsPage() {
                         {isListening ? (
                           <>
                             <MicOff className="mr-2 h-4 w-4" />
-                            Остановить
+                            {t("automations.stop")}
                           </>
                         ) : (
                           <>
                             <Mic className="mr-2 h-4 w-4" />
-                            Голосовой ввод
+                            {t("automations.voiceInput")}
                           </>
                         )}
                       </Button>
@@ -436,7 +437,7 @@ export default function AutomationsPage() {
                   name="itemsCount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Количество элементов</FormLabel>
+                      <FormLabel>{t("automations.itemsCountLabel")}</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -448,7 +449,7 @@ export default function AutomationsPage() {
                         />
                       </FormControl>
                       <FormDescription>
-                        Сколько подводок/программ создать за один запуск
+                        {t("automations.itemsCountDesc")}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -461,9 +462,9 @@ export default function AutomationsPage() {
                   render={({ field }) => (
                     <FormItem className="flex items-center justify-between rounded-lg border p-3">
                       <div className="space-y-0.5">
-                        <FormLabel>Активна</FormLabel>
+                        <FormLabel>{t("automations.activeLabel")}</FormLabel>
                         <FormDescription>
-                          Включить эту автоматизацию
+                          {t("automations.activeDesc")}
                         </FormDescription>
                       </div>
                       <FormControl>
@@ -480,7 +481,7 @@ export default function AutomationsPage() {
                 <DialogFooter>
                   <Button type="submit" disabled={createMutation.isPending} data-testid="button-save-automation">
                     {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Создать
+                    {t("common.create")}
                   </Button>
                 </DialogFooter>
               </form>
@@ -493,13 +494,13 @@ export default function AutomationsPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Zap className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Нет автоматизаций</h3>
+            <h3 className="text-lg font-medium mb-2">{t("automations.noAutomations")}</h3>
             <p className="text-muted-foreground text-center mb-4">
-              Создайте первую автоматизацию для генерации контента
+              {t("automations.createFirst")}
             </p>
             <Button onClick={() => setIsCreateOpen(true)} data-testid="button-create-first-automation">
               <Plus className="h-4 w-4 mr-2" />
-              Создать автоматизацию
+              {t("automations.createAutomation")}
             </Button>
           </CardContent>
         </Card>
@@ -516,21 +517,21 @@ export default function AutomationsPage() {
                     </CardDescription>
                   </div>
                   <Badge variant={automation.isActive ? "default" : "secondary"} className="shrink-0">
-                    {automation.isActive ? "Активна" : "Неактивна"}
+                    {automation.isActive ? t("common.active") : t("common.inactive")}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Settings2 className="h-4 w-4" />
-                  <span>{automation.itemsCount || 1} элем. за запуск</span>
+                  <span>{automation.itemsCount || 1} {t("automations.itemsPerRun")}</span>
                 </div>
                 {automation.lastRunAt && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
                     <span>
-                      Последний запуск:{" "}
-                      {format(new Date(automation.lastRunAt), "dd MMM, HH:mm", { locale: ru })}
+                      {t("automations.lastRun")}:{" "}
+                      {format(new Date(automation.lastRunAt), "dd MMM, HH:mm")}
                     </span>
                   </div>
                 )}
@@ -549,7 +550,7 @@ export default function AutomationsPage() {
                     ) : (
                       <Play className="h-4 w-4 mr-1" />
                     )}
-                    Запустить
+                    {t("automations.run")}
                   </Button>
                   <Button
                     size="sm"
@@ -560,7 +561,7 @@ export default function AutomationsPage() {
                     data-testid={`button-runs-${automation.id}`}
                   >
                     <Clock className="h-4 w-4 mr-1" />
-                    История
+                    {t("automations.history")}
                   </Button>
                   <Button
                     size="sm"
@@ -583,13 +584,13 @@ export default function AutomationsPage() {
 
                 {showRuns === automation.id && (
                   <div className="mt-3 pt-3 border-t">
-                    <h4 className="text-sm font-medium mb-2">История запусков</h4>
+                    <h4 className="text-sm font-medium mb-2">{t("automations.runHistory")}</h4>
                     {runsLoading ? (
                       <div className="flex items-center justify-center py-4">
                         <Loader2 className="h-5 w-5 animate-spin" />
                       </div>
                     ) : runs.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Нет запусков</p>
+                      <p className="text-sm text-muted-foreground">{t("automations.noRuns")}</p>
                     ) : (
                       <ScrollArea className="h-[150px]">
                         <div className="space-y-2">
@@ -601,10 +602,10 @@ export default function AutomationsPage() {
                             >
                               <div className="flex flex-col gap-1">
                                 <span className="text-muted-foreground">
-                                  {format(new Date(run.startedAt), "dd.MM HH:mm", { locale: ru })}
+                                  {format(new Date(run.startedAt), "dd.MM HH:mm")}
                                 </span>
                                 {run.itemsCreated !== null && run.itemsCreated > 0 && (
-                                  <span className="text-xs">Создано: {run.itemsCreated}</span>
+                                  <span className="text-xs">{t("automations.created")}: {run.itemsCreated}</span>
                                 )}
                               </div>
                               {getStatusBadge(run.status)}
@@ -624,9 +625,9 @@ export default function AutomationsPage() {
       <Dialog open={!!selectedAutomation} onOpenChange={(open) => !open && setSelectedAutomation(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Редактировать автоматизацию</DialogTitle>
+            <DialogTitle>{t("automations.editAutomation")}</DialogTitle>
             <DialogDescription>
-              Измените настройки автоматизации
+              {t("automations.editAutomationDesc")}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -636,9 +637,9 @@ export default function AutomationsPage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Название</FormLabel>
+                    <FormLabel>{t("automations.automationName")}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Утренние подводки" {...field} data-testid="input-edit-name" />
+                      <Input placeholder={t("automations.automationName")} {...field} data-testid="input-edit-name" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -650,16 +651,16 @@ export default function AutomationsPage() {
                 name="automationType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Тип контента</FormLabel>
+                    <FormLabel>{t("automations.contentType")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-edit-type">
-                          <SelectValue placeholder="Выберите тип" />
+                          <SelectValue placeholder={t("automations.selectType")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="dialog">Диалоги/Подводки</SelectItem>
-                        <SelectItem value="program">Программы (передачи)</SelectItem>
+                        <SelectItem value="dialog">{t("automations.dialogType")}</SelectItem>
+                        <SelectItem value="program">{t("automations.programType")}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -673,11 +674,11 @@ export default function AutomationsPage() {
                   name="programTypeId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Тип программы</FormLabel>
+                      <FormLabel>{t("automations.programTypeLabel")}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-edit-program-type">
-                            <SelectValue placeholder="Выберите тип программы" />
+                            <SelectValue placeholder={t("automations.selectProgramType")} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -699,7 +700,7 @@ export default function AutomationsPage() {
                 name="voiceIds"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Голоса (дикторы)</FormLabel>
+                    <FormLabel>{t("automations.voices")}</FormLabel>
                     <div className="space-y-2">
                       {voices.map((voice) => (
                         <div key={voice.id} className="flex items-center space-x-2">
@@ -720,7 +721,7 @@ export default function AutomationsPage() {
                             htmlFor={`edit-voice-${voice.id}`}
                             className="text-sm font-medium leading-none"
                           >
-                            {voice.name} ({voice.gender === "male" ? "М" : "Ж"})
+                            {voice.name} ({voice.gender === "male" ? t("common.maleShort") : t("common.femaleShort")})
                           </label>
                         </div>
                       ))}
@@ -735,10 +736,10 @@ export default function AutomationsPage() {
                 name="prompt"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Промпт (опционально)</FormLabel>
+                    <FormLabel>{t("automations.promptOptional")}</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Оставьте пустым для использования промпта по умолчанию"
+                        placeholder={t("automations.promptPlaceholder")}
                         className="min-h-[80px]"
                         {...field}
                         data-testid="input-edit-prompt"
@@ -755,12 +756,12 @@ export default function AutomationsPage() {
                       {isListening ? (
                         <>
                           <MicOff className="mr-2 h-4 w-4" />
-                          Остановить
+                          {t("automations.stop")}
                         </>
                       ) : (
                         <>
                           <Mic className="mr-2 h-4 w-4" />
-                          Голосовой ввод
+                          {t("automations.voiceInput")}
                         </>
                       )}
                     </Button>
@@ -774,7 +775,7 @@ export default function AutomationsPage() {
                 name="itemsCount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Количество элементов</FormLabel>
+                    <FormLabel>{t("automations.itemsCountLabel")}</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -796,9 +797,9 @@ export default function AutomationsPage() {
                 render={({ field }) => (
                   <FormItem className="flex items-center justify-between rounded-lg border p-3">
                     <div className="space-y-0.5">
-                      <FormLabel>Активна</FormLabel>
+                      <FormLabel>{t("automations.activeLabel")}</FormLabel>
                       <FormDescription>
-                        Включить эту автоматизацию
+                        {t("automations.activeDesc")}
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -824,11 +825,11 @@ export default function AutomationsPage() {
                   disabled={deleteMutation.isPending}
                   data-testid="button-delete-in-dialog"
                 >
-                  Удалить
+                  {t("common.delete")}
                 </Button>
                 <Button type="submit" disabled={updateMutation.isPending} data-testid="button-update-automation">
                   {updateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Сохранить
+                  {t("common.save")}
                 </Button>
               </DialogFooter>
             </form>

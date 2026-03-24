@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -8,11 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Radio, Loader2 } from "lucide-react";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,8 +32,8 @@ export default function AuthPage() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка входа",
-        description: error.message.includes("401") ? "Неверный email или пароль" : error.message,
+        title: t("auth.loginError"),
+        description: error.message.includes("401") ? t("auth.invalidCredentials") : error.message,
         variant: "destructive",
       });
     },
@@ -47,8 +50,8 @@ export default function AuthPage() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка регистрации",
-        description: error.message.includes("409") ? "Пользователь с таким email уже существует" : error.message,
+        title: t("auth.registerError"),
+        description: error.message.includes("409") ? t("auth.userExists") : error.message,
         variant: "destructive",
       });
     },
@@ -67,6 +70,9 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary shadow-lg">
@@ -74,30 +80,28 @@ export default function AuthPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">RadioFlow AI</h1>
-            <p className="text-sm text-muted-foreground">AI Radio Automation</p>
+            <p className="text-sm text-muted-foreground">{t("auth.subtitle")}</p>
           </div>
         </div>
 
         <Card className="shadow-xl border-border/50">
           <CardHeader className="text-center pb-4">
             <CardTitle className="text-xl">
-              {isLogin ? "Вход в систему" : "Регистрация"}
+              {isLogin ? t("auth.loginTitle") : t("auth.registerTitle")}
             </CardTitle>
             <CardDescription>
-              {isLogin
-                ? "Войдите в свой аккаунт для продолжения"
-                : "Создайте аккаунт для начала работы"}
+              {isLogin ? t("auth.loginDescription") : t("auth.registerDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {!isLogin && (
                 <div className="space-y-2">
-                  <Label htmlFor="name">Имя</Label>
+                  <Label htmlFor="name">{t("auth.nameField")}</Label>
                   <Input
                     id="name"
                     type="text"
-                    placeholder="Ваше имя"
+                    placeholder={t("auth.namePlaceholder")}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required={!isLogin}
@@ -106,7 +110,7 @@ export default function AuthPage() {
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t("auth.email")}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -118,11 +122,11 @@ export default function AuthPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Пароль</Label>
+                <Label htmlFor="password">{t("auth.password")}</Label>
                 <Input
                   id="password"
                   type="password"
-                  placeholder={isLogin ? "••••••••" : "Минимум 6 символов"}
+                  placeholder={isLogin ? t("auth.passwordPlaceholderLogin") : t("auth.passwordPlaceholderRegister")}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -137,12 +141,12 @@ export default function AuthPage() {
                 data-testid="button-auth-submit"
               >
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isLogin ? "Войти" : "Зарегистрироваться"}
+                {isLogin ? t("auth.login") : t("auth.register")}
               </Button>
             </form>
             <div className="mt-6 text-center text-sm">
               <span className="text-muted-foreground">
-                {isLogin ? "Нет аккаунта? " : "Уже есть аккаунт? "}
+                {isLogin ? t("auth.noAccount") : t("auth.hasAccount")}
               </span>
               <button
                 type="button"
@@ -155,7 +159,7 @@ export default function AuthPage() {
                 className="text-primary hover:underline font-medium"
                 data-testid="button-toggle-auth-mode"
               >
-                {isLogin ? "Зарегистрироваться" : "Войти"}
+                {isLogin ? t("auth.register") : t("auth.login")}
               </button>
             </div>
           </CardContent>

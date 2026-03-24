@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -75,24 +76,18 @@ const adFormSchema = z.object({
 
 type AdFormValues = z.infer<typeof adFormSchema>;
 
-const categories = [
-  { value: "general", label: "Общая" },
-  { value: "restaurant", label: "Рестораны" },
-  { value: "real_estate", label: "Недвижимость" },
-  { value: "services", label: "Услуги" },
-  { value: "shop", label: "Магазины" },
-  { value: "events", label: "Мероприятия" },
-];
+const categoryKeys = ["general", "restaurant", "real_estate", "services", "shop", "events"];
 
-const stages = [
-  { key: "prompt", label: "Описание", icon: FileText },
-  { key: "variants", label: "Варианты", icon: Sparkles },
-  { key: "voices", label: "Голоса", icon: Volume2 },
-  { key: "audio", label: "Аудио", icon: Play },
-  { key: "music", label: "С музыкой", icon: Music },
+const stageConfigs = [
+  { key: "prompt", labelKey: "ads.prompt", icon: FileText },
+  { key: "variants", labelKey: "ads.variants", icon: Sparkles },
+  { key: "voices", labelKey: "ads.voicesStage", icon: Volume2 },
+  { key: "audio", labelKey: "ads.audio", icon: Play },
+  { key: "music", labelKey: "ads.withMusic", icon: Music },
 ];
 
 export default function AdsPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [currentAd, setCurrentAd] = useState<Ad | null>(null);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(null);
@@ -196,7 +191,7 @@ export default function AdsPage() {
   const createAdMutation = useMutation({
     mutationFn: async (data: AdFormValues) => {
       const response = await apiRequest("POST", "/api/ads", {
-        title: data.clientName || "Новая реклама",
+        title: data.clientName || t("ads.newAd2"),
         ...data,
         presetId: selectedPresetId || undefined,
         voiceIds: selectedVoiceId ? [selectedVoiceId] : undefined,
@@ -208,10 +203,10 @@ export default function AdsPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
       setCurrentAd(data);
-      toast({ title: "Реклама создана", description: "Теперь сгенерируйте варианты текста" });
+      toast({ title: t("ads.adCreated"), description: t("ads.generateVariantsDesc") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -223,10 +218,10 @@ export default function AdsPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
       setCurrentAd(data);
-      toast({ title: "Варианты созданы", description: "Выберите лучший вариант" });
+      toast({ title: t("ads.variantsCreated"), description: t("ads.variantsDesc") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка генерации", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -238,10 +233,10 @@ export default function AdsPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
       setCurrentAd(data);
-      toast({ title: "Вариант выбран", description: "Теперь выберите голос" });
+      toast({ title: t("ads.variantSelected"), description: t("ads.selectVoiceNow") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -253,10 +248,10 @@ export default function AdsPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
       setCurrentAd(data.ad);
-      toast({ title: "Новый вариант создан" });
+      toast({ title: t("ads.newVariantCreated") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -266,13 +261,13 @@ export default function AdsPage() {
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Синтез запущен", description: "Аудио генерируется..." });
+      toast({ title: t("ads.synthesisStarted"), description: t("ads.audioGenerating") });
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
       }, 3000);
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка синтеза", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -283,10 +278,10 @@ export default function AdsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
       if (currentAd) setCurrentAd(null);
-      toast({ title: "Удалено" });
+      toast({ title: t("common.deleted") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -327,8 +322,8 @@ export default function AdsPage() {
       if (!response.ok) {
         if (data.needsApiKey) {
           toast({
-            title: "Требуется API ключ",
-            description: "Добавьте Freesound API ключ в Настройках",
+            title: t("ads.needsApiKey"),
+            description: t("ads.addFreesoundKey"),
             variant: "destructive",
           });
           return;
@@ -339,8 +334,8 @@ export default function AdsPage() {
     } catch (error) {
       console.error("Music search error:", error);
       toast({
-        title: "Ошибка поиска",
-        description: "Не удалось найти музыку",
+        title: t("ads.searchError"),
+        description: t("ads.musicSearchFailed"),
         variant: "destructive",
       });
     } finally {
@@ -407,8 +402,8 @@ export default function AdsPage() {
       if (!response.ok) {
         if (data.needsApiKey) {
           toast({
-            title: "Требуется API ключ",
-            description: "Добавьте Freesound API ключ в Настройках",
+            title: t("ads.needsApiKey"),
+            description: t("ads.addFreesoundKey"),
             variant: "destructive",
           });
           return;
@@ -423,14 +418,14 @@ export default function AdsPage() {
         setAutoSelectReasoning(data.analysis.reasoning);
       }
       toast({
-        title: "Музыка подобрана",
-        description: data.analysis?.reasoning || "Рекомендуемый трек выбран",
+        title: t("ads.musicSelected"),
+        description: data.analysis?.reasoning || t("ads.musicAutoSelected"),
       });
     } catch (error) {
       console.error("Auto-select error:", error);
       toast({
-        title: "Ошибка",
-        description: "Не удалось подобрать музыку автоматически",
+        title: t("common.error"),
+        description: t("ads.musicAutoFailed"),
         variant: "destructive",
       });
     } finally {
@@ -439,7 +434,7 @@ export default function AdsPage() {
   };
 
   const getCategoryLabel = (value: string) => {
-    return categories.find(c => c.value === value)?.label || value;
+    return t(`ads.categories.${value}`, value);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -460,7 +455,7 @@ export default function AdsPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Не удалось обработать файл");
+        throw new Error(error.error || t("ads.fileError"));
       }
 
       const data = await response.json();
@@ -471,13 +466,13 @@ export default function AdsPage() {
       form.setValue("prompt", currentPrompt + separator + data.text);
       
       toast({ 
-        title: "Файл обработан", 
-        description: `Текст из "${data.filename}" добавлен в описание` 
+        title: t("ads.fileProcessed"), 
+        description: t("ads.textFromFile", { filename: data.filename })
       });
     } catch (error) {
       toast({ 
-        title: "Ошибка", 
-        description: error instanceof Error ? error.message : "Не удалось обработать файл",
+        title: t("common.error"), 
+        description: error instanceof Error ? error.message : t("ads.fileError"),
         variant: "destructive" 
       });
     } finally {
@@ -509,14 +504,14 @@ export default function AdsPage() {
 
   const getCurrentStageIndex = () => {
     if (!currentAd?.stage) return 0;
-    return stages.findIndex(s => s.key === currentAd.stage) || 0;
+    return stageConfigs.findIndex(s => s.key === currentAd.stage) || 0;
   };
 
   const renderStageProgress = () => {
     const currentIndex = getCurrentStageIndex();
     return (
       <div className="flex items-center gap-2 mb-6">
-        {stages.map((stage, index) => {
+        {stageConfigs.map((stage, index) => {
           const Icon = stage.icon;
           const isActive = index === currentIndex;
           const isCompleted = index < currentIndex;
@@ -528,9 +523,9 @@ export default function AdsPage() {
                 "bg-muted text-muted-foreground"
               }`}>
                 {isCompleted ? <Check className="h-3 w-3" /> : <Icon className="h-3 w-3" />}
-                <span className="hidden sm:inline">{stage.label}</span>
+                <span className="hidden sm:inline">{t(stage.labelKey)}</span>
               </div>
-              {index < stages.length - 1 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+              {index < stageConfigs.length - 1 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
             </div>
           );
         })}
@@ -546,14 +541,14 @@ export default function AdsPage() {
         return (
           <Card>
             <CardHeader>
-              <CardTitle>Шаг 1: Генерация вариантов</CardTitle>
+              <CardTitle>{t("ads.step1Title")}</CardTitle>
               <CardDescription>
-                На основе вашего описания ИИ создаст 5 разных вариантов текста
+                {t("ads.step1Desc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg bg-muted p-4">
-                <p className="text-sm font-medium mb-2">Ваше описание:</p>
+                <p className="text-sm font-medium mb-2">{t("ads.yourDescription")}:</p>
                 <p className="text-sm">{currentAd.prompt}</p>
                 {currentAd.websiteUrl && (
                   <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1">
@@ -575,12 +570,12 @@ export default function AdsPage() {
                 {generateVariantsMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Генерация вариантов...
+                    {t("ads.generatingVariants")}
                   </>
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-4 w-4" />
-                    Сгенерировать 5 вариантов
+                    {t("ads.generate5Variants")}
                   </>
                 )}
               </Button>
@@ -592,16 +587,16 @@ export default function AdsPage() {
         return (
           <Card>
             <CardHeader>
-              <CardTitle>Шаг 2: Выберите вариант</CardTitle>
+              <CardTitle>{t("ads.step2Title")}</CardTitle>
               <CardDescription>
-                Выберите вариант для доработки или сразу отправьте на озвучку
+                {t("ads.step2Desc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {selectedVariantForEdit !== null && (
                 <div className="rounded-lg border border-primary bg-primary/5 p-4 space-y-3">
                   <div className="flex items-center justify-between gap-2">
-                    <Badge>Выбран вариант {selectedVariantForEdit + 1}</Badge>
+                    <Badge>{t("ads.selectedVariantN", { n: selectedVariantForEdit + 1 })}</Badge>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -614,13 +609,13 @@ export default function AdsPage() {
                     {currentAd.variants?.[selectedVariantForEdit]}
                   </p>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Что изменить или добавить?</label>
+                    <label className="text-sm font-medium">{t("ads.whatToChange")}</label>
                     <div className="flex gap-2">
                       <div className="flex-1 flex gap-1 items-center">
                         <Textarea
                           value={editInstructions}
                           onChange={(e) => setEditInstructions(e.target.value)}
-                          placeholder="Добавить номер телефона, сделать текст короче, изменить тон..."
+                          placeholder={t("ads.editPlaceholder")}
                           rows={2}
                           className="flex-1"
                           data-testid="textarea-edit-instructions"
@@ -648,7 +643,7 @@ export default function AdsPage() {
                       ) : (
                         <RefreshCw className="mr-2 h-4 w-4" />
                       )}
-                      Доработать (5 новых)
+                      {t("ads.refine5New")}
                     </Button>
                     <Button
                       variant="default"
@@ -662,7 +657,7 @@ export default function AdsPage() {
                       data-testid="button-use-variant"
                     >
                       <Check className="mr-2 h-4 w-4" />
-                      Использовать этот
+                      {t("ads.useThis")}
                     </Button>
                   </div>
                 </div>
@@ -680,9 +675,9 @@ export default function AdsPage() {
                       data-testid={`variant-${index}`}
                     >
                       <div className="flex items-center justify-between gap-2 mb-2">
-                        <Badge variant="outline">Вариант {index + 1}</Badge>
+                        <Badge variant="outline">{t("ads.variantN", { n: index + 1 })}</Badge>
                         {selectedVariantForEdit === index && (
-                          <Badge variant="secondary">Выбран</Badge>
+                          <Badge variant="secondary">{t("ads.selected")}</Badge>
                         )}
                       </div>
                       <p className="text-sm whitespace-pre-wrap">{variant}</p>
@@ -698,14 +693,14 @@ export default function AdsPage() {
         return (
           <Card>
             <CardHeader>
-              <CardTitle>Шаг 3: Выберите голос</CardTitle>
+              <CardTitle>{t("ads.step3Title")}</CardTitle>
               <CardDescription>
-                Рекомендуемое количество ведущих: {currentAd.speakersCount}
+                {t("ads.step3Desc", { count: currentAd.speakersCount })}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg bg-muted p-4 mb-4">
-                <p className="text-sm font-medium mb-2">Выбранный текст:</p>
+                <p className="text-sm font-medium mb-2">{t("ads.selectedText")}:</p>
                 <p className="text-sm">{currentAd.selectedVariantText}</p>
               </div>
 
@@ -729,7 +724,7 @@ export default function AdsPage() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{voice.personaName || voice.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {voice.gender === "male" ? "Мужской" : "Женский"}
+                        {voice.gender === "male" ? t("ads.male") : t("ads.female")}
                       </p>
                     </div>
                     {selectedVoiceId === voice.elevenLabsVoiceId && (
@@ -782,12 +777,12 @@ export default function AdsPage() {
                 {synthesizeAudioMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Синтез...
+                    {t("ads.synthesizing")}
                   </>
                 ) : (
                   <>
                     <Volume2 className="mr-2 h-4 w-4" />
-                    Синтезировать аудио
+                    {t("ads.synthesizeAudio")}
                   </>
                 )}
               </Button>
@@ -799,9 +794,9 @@ export default function AdsPage() {
         return (
           <Card>
             <CardHeader>
-              <CardTitle>Шаг 4: Прослушайте результат</CardTitle>
+              <CardTitle>{t("ads.step4Title")}</CardTitle>
               <CardDescription>
-                Аудио готово! Можете прослушать или добавить музыку
+                {t("ads.step4Desc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -812,9 +807,9 @@ export default function AdsPage() {
                       <Check className="h-6 w-6 text-white" />
                     </div>
                     <div>
-                      <p className="font-medium">Аудио готово</p>
+                      <p className="font-medium">{t("ads.audioReady")}</p>
                       <p className="text-sm text-muted-foreground">
-                        {currentAd.duration ? `${currentAd.duration} сек` : ""}
+                        {currentAd.duration ? `${currentAd.duration} ${t("ads.sec")}` : ""}
                       </p>
                     </div>
                   </div>
@@ -855,7 +850,7 @@ export default function AdsPage() {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <Music className="h-4 w-4" />
-                    <span className="font-medium">Добавить фоновую музыку</span>
+                    <span className="font-medium">{t("ads.addBackgroundMusic")}</span>
                   </div>
                   <Button
                     variant="default"
@@ -869,7 +864,7 @@ export default function AdsPage() {
                     ) : (
                       <Sparkles className="mr-2 h-4 w-4" />
                     )}
-                    Подобрать автоматически
+                    {t("ads.autoSelect")}
                   </Button>
                 </div>
 
@@ -882,7 +877,7 @@ export default function AdsPage() {
                 
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Или поиск вручную (happy, chill, upbeat...)"
+                    placeholder={t("ads.musicSearchPlaceholder")}
                     value={musicSearchQuery}
                     onChange={(e) => setMusicSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && searchMusic()}
@@ -897,7 +892,7 @@ export default function AdsPage() {
                     {isSearchingMusic ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      "Найти"
+                      t("ads.find")
                     )}
                   </Button>
                 </div>
@@ -953,7 +948,7 @@ export default function AdsPage() {
                     data-testid="button-mix-audio"
                   >
                     <Music className="mr-2 h-4 w-4" />
-                    Смикшировать (скоро)
+                    {t("ads.mixComingSoon")}
                   </Button>
                 )}
               </div>
@@ -1002,9 +997,9 @@ export default function AdsPage() {
   });
 
   const contentTypes = [
-    { value: "single", label: "Один голос", icon: User, description: "Простое объявление одним голосом" },
-    { value: "dialog", label: "Диалог", icon: Users, description: "Диалог между двумя ведущими" },
-    { value: "dialog_with_announcer", label: "Диалог + подводка", icon: Mic, description: "Диалог с подводкой ведущего" },
+    { value: "single", label: t("ads.contentTypes.single"), icon: User, description: t("ads.contentTypes.singleDesc") },
+    { value: "dialog", label: t("ads.contentTypes.dialog"), icon: Users, description: t("ads.contentTypes.dialogDesc") },
+    { value: "dialog_with_announcer", label: t("ads.contentTypes.dialogAnnouncer"), icon: Mic, description: t("ads.contentTypes.dialogAnnouncerDesc") },
   ];
 
   const createPresetMutation = useMutation({
@@ -1016,10 +1011,10 @@ export default function AdsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/ad-presets"] });
       setIsPresetDialogOpen(false);
       presetForm.reset();
-      toast({ title: "Пресет создан" });
+      toast({ title: t("ads.presetCreated") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -1033,10 +1028,10 @@ export default function AdsPage() {
       setIsPresetDialogOpen(false);
       setEditingPreset(null);
       presetForm.reset();
-      toast({ title: "Пресет обновлен" });
+      toast({ title: t("ads.presetUpdated") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -1046,10 +1041,10 @@ export default function AdsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ad-presets"] });
-      toast({ title: "Пресет удален" });
+      toast({ title: t("ads.presetDeleted") });
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -1100,13 +1095,13 @@ export default function AdsPage() {
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Реклама</h1>
-          <p className="text-muted-foreground">Создание рекламных роликов с помощью ИИ</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("ads.title")}</h1>
+          <p className="text-muted-foreground">{t("ads.subtitle")}</p>
         </div>
         {currentAd && (
           <Button variant="outline" onClick={() => setCurrentAd(null)}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            К списку
+            {t("ads.backToList")}
           </Button>
         )}
       </div>
@@ -1115,11 +1110,11 @@ export default function AdsPage() {
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="create" data-testid="tab-create">
             <Sparkles className="mr-2 h-4 w-4" />
-            Создание
+            {t("ads.creation")}
           </TabsTrigger>
           <TabsTrigger value="presets" data-testid="tab-presets">
             <FileStack className="mr-2 h-4 w-4" />
-            Пресеты
+            {t("ads.presets")}
           </TabsTrigger>
         </TabsList>
 
@@ -1132,15 +1127,15 @@ export default function AdsPage() {
               <CardContent className="py-12">
                 <div className="flex flex-col items-center justify-center">
                   <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                  <p className="font-medium">Генерация аудио...</p>
-                  <p className="text-sm text-muted-foreground">Это может занять несколько секунд</p>
+                  <p className="font-medium">{t("ads.generatingAudio")}</p>
+                  <p className="text-sm text-muted-foreground">{t("ads.mayTakeFewSeconds")}</p>
                   <Button
                     variant="outline"
                     className="mt-4"
                     onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/ads"] })}
                   >
                     <RefreshCw className="mr-2 h-4 w-4" />
-                    Обновить статус
+                    {t("ads.refreshStatus")}
                   </Button>
                 </div>
               </CardContent>
@@ -1155,25 +1150,25 @@ export default function AdsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5" />
-                Создать рекламу
+                {t("ads.createAd")}
               </CardTitle>
-              <CardDescription>Опишите рекламируемый продукт или услугу</CardDescription>
+              <CardDescription>{t("ads.createAdDesc")}</CardDescription>
             </CardHeader>
             <CardContent>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   {adPresets && adPresets.length > 0 && (
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Пресет</label>
+                      <label className="text-sm font-medium">{t("ads.preset")}</label>
                       <Select 
                         value={selectedPresetId || "none"} 
                         onValueChange={handlePresetSelect}
                       >
                         <SelectTrigger data-testid="select-preset">
-                          <SelectValue placeholder="Выберите пресет" />
+                          <SelectValue placeholder={t("ads.selectPreset")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none" data-testid="select-preset-none">Без пресета</SelectItem>
+                          <SelectItem value="none" data-testid="select-preset-none">{t("ads.noPreset")}</SelectItem>
                           {adPresets.filter(p => p.isActive).map((preset) => (
                             <SelectItem key={preset.id} value={preset.id} data-testid={`select-preset-${preset.id}`}>
                               {preset.name}
@@ -1194,11 +1189,11 @@ export default function AdsPage() {
                     name="clientName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Название клиента</FormLabel>
+                        <FormLabel>{t("ads.clientName")}</FormLabel>
                         <div className="flex gap-1 items-center">
                           <FormControl>
                             <Input
-                              placeholder="Например: Ресторан У Моря"
+                              placeholder={t("ads.clientNamePlaceholder")}
                               {...field}
                               data-testid="input-client-name"
                               className="flex-1"
@@ -1217,7 +1212,7 @@ export default function AdsPage() {
                       name="websiteUrl"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Сайт</FormLabel>
+                          <FormLabel>{t("ads.website")}</FormLabel>
                           <FormControl>
                             <div className="relative">
                               <Link className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1263,17 +1258,17 @@ export default function AdsPage() {
                       name="category"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Категория</FormLabel>
+                          <FormLabel>{t("ads.category")}</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger data-testid="select-category">
-                                <SelectValue placeholder="Выберите категорию" />
+                                <SelectValue placeholder={t("ads.selectCategory")} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {categories.map((cat) => (
-                                <SelectItem key={cat.value} value={cat.value}>
-                                  {cat.label}
+                              {categoryKeys.map((key) => (
+                                <SelectItem key={key} value={key}>
+                                  {t(`ads.categories.${key}`, key)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1288,7 +1283,7 @@ export default function AdsPage() {
                       name="targetDurationSeconds"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Длительность (сек)</FormLabel>
+                          <FormLabel>{t("ads.duration")}</FormLabel>
                           <FormControl>
                             <div className="relative">
                               <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1314,11 +1309,11 @@ export default function AdsPage() {
                     name="prompt"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Описание рекламы</FormLabel>
+                        <FormLabel>{t("ads.adDescription")}</FormLabel>
                         <div className="flex gap-1 items-start">
                           <FormControl>
                             <Textarea
-                              placeholder="Опишите что нужно рекламировать: продукт, услугу, акцию, контактные данные..."
+                              placeholder={t("ads.adDescPlaceholder")}
                               rows={5}
                               {...field}
                               data-testid="textarea-ad-prompt"
@@ -1341,7 +1336,7 @@ export default function AdsPage() {
                               size="icon"
                               onClick={() => fileInputRef.current?.click()}
                               disabled={isUploading}
-                              title="Загрузить файл (PDF, Word, изображение)"
+                              title={t("ads.uploadFile")}
                             >
                               {isUploading ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -1352,7 +1347,7 @@ export default function AdsPage() {
                           </div>
                         </div>
                         <FormDescription>
-                          ИИ создаст 5 вариантов текста на выбор
+                          {t("ads.aiWillCreate5")}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -1361,7 +1356,7 @@ export default function AdsPage() {
 
                   {extractedFiles.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-sm font-medium">Загруженные файлы:</p>
+                      <p className="text-sm font-medium">{t("ads.uploadedFiles")}:</p>
                       <div className="flex flex-wrap gap-2">
                         {extractedFiles.map((file, index) => (
                           <Badge key={index} variant="secondary" className="gap-1 pr-1">
@@ -1391,12 +1386,12 @@ export default function AdsPage() {
                     {createAdMutation.isPending ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Создание...
+                        {t("ads.creating")}
                       </>
                     ) : (
                       <>
                         <Sparkles className="mr-2 h-4 w-4" />
-                        Создать рекламу
+                        {t("ads.createAd")}
                       </>
                     )}
                   </Button>
@@ -1407,8 +1402,8 @@ export default function AdsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Все рекламы</CardTitle>
-              <CardDescription>Нажмите для продолжения работы</CardDescription>
+              <CardTitle>{t("ads.allAds")}</CardTitle>
+              <CardDescription>{t("ads.clickToContinue")}</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -1436,7 +1431,7 @@ export default function AdsPage() {
                             {ad.duration && (
                               <Badge variant="outline" className="text-xs">
                                 <Clock className="h-3 w-3 mr-1" />
-                                {ad.duration} сек
+                                {ad.duration} {t("ads.sec")}
                               </Badge>
                             )}
                           </div>
@@ -1444,19 +1439,19 @@ export default function AdsPage() {
                             <p className="text-sm text-muted-foreground truncate">{ad.clientName}</p>
                           )}
                           <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                            <span>Этап: {stages.find(s => s.key === ad.stage)?.label || ad.stage}</span>
+                            <span>{t("ads.stage")}: {t(`ads.stages.${ad.stage}`, ad.stage)}</span>
                             {ad.createdAt && (
-                              <span>{new Date(ad.createdAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                              <span>{new Date(ad.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                             )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           {ad.status === "ready" ? (
-                            <Badge className="bg-green-500">Готов</Badge>
+                            <Badge className="bg-green-500">{t("ads.statusReady")}</Badge>
                           ) : ad.status === "generating" ? (
-                            <Badge className="bg-yellow-500">Генерация</Badge>
+                            <Badge className="bg-yellow-500">{t("ads.statusGenerating")}</Badge>
                           ) : (
-                            <Badge variant="outline">В работе</Badge>
+                            <Badge variant="outline">{t("ads.statusInProgress")}</Badge>
                           )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -1470,15 +1465,15 @@ export default function AdsPage() {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Удалить рекламу?</AlertDialogTitle>
+                                <AlertDialogTitle>{t("ads.deleteAd")}</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Это действие нельзя отменить.
+                                  {t("ads.deleteConfirm")}
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Отмена</AlertDialogCancel>
+                                <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                                 <AlertDialogAction onClick={() => deleteMutation.mutate(ad.id)}>
-                                  Удалить
+                                  {t("common.delete")}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -1491,7 +1486,7 @@ export default function AdsPage() {
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <Sparkles className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Пока нет рекламных роликов</p>
+                  <p>{t("ads.noAdsYet")}</p>
                 </div>
               )}
             </CardContent>
@@ -1503,21 +1498,21 @@ export default function AdsPage() {
         <TabsContent value="presets" className="mt-6">
           <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
             <div>
-              <h2 className="text-xl font-semibold">Пресеты рекламы</h2>
-              <p className="text-muted-foreground text-sm">Шаблоны для быстрого создания рекламных роликов</p>
+              <h2 className="text-xl font-semibold">{t("ads.adPresets")}</h2>
+              <p className="text-muted-foreground text-sm">{t("ads.presetsSubtitle")}</p>
             </div>
             <Dialog open={isPresetDialogOpen} onOpenChange={setIsPresetDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={openNewPresetDialog} data-testid="button-new-preset">
                   <Plus className="mr-2 h-4 w-4" />
-                  Новый пресет
+                  {t("ads.newPreset")}
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>{editingPreset ? "Редактировать пресет" : "Создать пресет"}</DialogTitle>
+                  <DialogTitle>{editingPreset ? t("ads.editPreset") : t("ads.createPreset")}</DialogTitle>
                   <DialogDescription>
-                    Настройте шаблон для быстрого создания рекламы
+                    {t("ads.presetDialogDesc")}
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...presetForm}>
@@ -1527,9 +1522,9 @@ export default function AdsPage() {
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Название пресета</FormLabel>
+                          <FormLabel>{t("ads.presetName")}</FormLabel>
                           <FormControl>
-                            <Input placeholder="Например: Имиджевая реклама" {...field} data-testid="input-preset-name" />
+                            <Input placeholder={t("ads.presetNamePlaceholder")} {...field} data-testid="input-preset-name" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1541,9 +1536,9 @@ export default function AdsPage() {
                       name="description"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Описание</FormLabel>
+                          <FormLabel>{t("ads.description")}</FormLabel>
                           <FormControl>
-                            <Input placeholder="Краткое описание для чего этот пресет" {...field} data-testid="input-preset-description" />
+                            <Input placeholder={t("ads.presetDescPlaceholder")} {...field} data-testid="input-preset-description" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1555,7 +1550,7 @@ export default function AdsPage() {
                       name="contentType"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Тип контента</FormLabel>
+                          <FormLabel>{t("ads.contentType")}</FormLabel>
                           <Select onValueChange={(val) => {
                             field.onChange(val);
                             if (val === "single") presetForm.setValue("speakersCount", 1);
@@ -1564,7 +1559,7 @@ export default function AdsPage() {
                           }} value={field.value}>
                             <FormControl>
                               <SelectTrigger data-testid="select-content-type">
-                                <SelectValue placeholder="Выберите тип" />
+                                <SelectValue placeholder={t("ads.selectType")} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -1594,14 +1589,14 @@ export default function AdsPage() {
                             name="voiceIds"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Голос</FormLabel>
+                                <FormLabel>{t("ads.voice")}</FormLabel>
                                 <Select 
                                   onValueChange={(val) => field.onChange([val])} 
                                   value={field.value?.[0] || ""}
                                 >
                                   <FormControl>
                                     <SelectTrigger data-testid="select-voice">
-                                      <SelectValue placeholder="Выберите голос" />
+                                      <SelectValue placeholder={t("ads.selectVoice")} />
                                     </SelectTrigger>
                                   </FormControl>
                                   <SelectContent>
@@ -1625,7 +1620,7 @@ export default function AdsPage() {
                               name="voiceIds"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>Голоса диалога</FormLabel>
+                                  <FormLabel>{t("ads.dialogVoices")}</FormLabel>
                                   <div className="grid gap-2 sm:grid-cols-2">
                                     <Select 
                                       onValueChange={(val) => {
@@ -1635,7 +1630,7 @@ export default function AdsPage() {
                                       value={field.value?.[0] || ""}
                                     >
                                       <SelectTrigger data-testid="select-voice-1">
-                                        <SelectValue placeholder="Первый голос" />
+                                        <SelectValue placeholder={t("ads.firstVoice")} />
                                       </SelectTrigger>
                                       <SelectContent>
                                         {voices.filter(v => v.isActive).map((voice) => (
@@ -1653,7 +1648,7 @@ export default function AdsPage() {
                                       value={field.value?.[1] || ""}
                                     >
                                       <SelectTrigger data-testid="select-voice-2">
-                                        <SelectValue placeholder="Второй голос" />
+                                        <SelectValue placeholder={t("ads.secondVoice")} />
                                       </SelectTrigger>
                                       <SelectContent>
                                         {voices.filter(v => v.isActive).map((voice) => (
@@ -1675,11 +1670,11 @@ export default function AdsPage() {
                                 name="announcerVoiceId"
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel>Голос подводки</FormLabel>
+                                    <FormLabel>{t("ads.announcerVoice")}</FormLabel>
                                     <Select onValueChange={field.onChange} value={field.value || ""}>
                                       <FormControl>
                                         <SelectTrigger data-testid="select-announcer-voice">
-                                          <SelectValue placeholder="Выберите голос ведущего" />
+                                          <SelectValue placeholder={t("ads.selectAnnouncerVoice")} />
                                         </SelectTrigger>
                                       </FormControl>
                                       <SelectContent>
@@ -1690,7 +1685,7 @@ export default function AdsPage() {
                                         ))}
                                       </SelectContent>
                                     </Select>
-                                    <FormDescription>Голос для подводки в начале или конце</FormDescription>
+                                    <FormDescription>{t("ads.announcerVoiceDesc")}</FormDescription>
                                     <FormMessage />
                                   </FormItem>
                                 )}
@@ -1707,17 +1702,17 @@ export default function AdsPage() {
                         name="defaultCategory"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Категория</FormLabel>
+                            <FormLabel>{t("ads.category")}</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value}>
                               <FormControl>
                                 <SelectTrigger data-testid="select-category">
-                                  <SelectValue placeholder="Выберите категорию" />
+                                  <SelectValue placeholder={t("ads.selectCategory")} />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {categories.map((cat) => (
-                                  <SelectItem key={cat.value} value={cat.value}>
-                                    {cat.label}
+                                {categoryKeys.map((key) => (
+                                  <SelectItem key={key} value={key}>
+                                    {t(`ads.categories.${key}`, key)}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -1732,7 +1727,7 @@ export default function AdsPage() {
                         name="defaultTargetDurationSeconds"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Длительность (сек)</FormLabel>
+                            <FormLabel>{t("ads.duration")}</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
@@ -1754,17 +1749,17 @@ export default function AdsPage() {
                       name="miniPrompt"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Промпт для генерации</FormLabel>
+                          <FormLabel>{t("ads.generationPrompt")}</FormLabel>
                           <FormControl>
                             <Textarea
-                              placeholder="Инструкции для ИИ как генерировать текст рекламы..."
+                              placeholder={t("ads.promptPlaceholder")}
                               rows={4}
                               {...field}
                               data-testid="textarea-prompt"
                             />
                           </FormControl>
                           <FormDescription>
-                            Базовые инструкции для генерации текста рекламы
+                            {t("ads.promptDescription")}
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -1776,17 +1771,17 @@ export default function AdsPage() {
                       name="elevenLabsTags"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Разметка ElevenLabs (опционально)</FormLabel>
+                          <FormLabel>{t("ads.elevenLabsTags")}</FormLabel>
                           <FormControl>
                             <Textarea
-                              placeholder="<break time='0.5s'/> для паузы, эмоциональные теги..."
+                              placeholder={t("ads.tagsPlaceholder")}
                               rows={3}
                               {...field}
                               data-testid="textarea-elevenlabs-tags"
                             />
                           </FormControl>
                           <FormDescription>
-                            SSML-теги для управления интонацией и паузами
+                            {t("ads.tagsDescription")}
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -1799,9 +1794,9 @@ export default function AdsPage() {
                       render={({ field }) => (
                         <FormItem className="flex items-center justify-between rounded-lg border p-3">
                           <div className="space-y-0.5">
-                            <FormLabel>Активен</FormLabel>
+                            <FormLabel>{t("ads.active")}</FormLabel>
                             <FormDescription>
-                              Отображать пресет при создании рекламы
+                              {t("ads.activeDesc")}
                             </FormDescription>
                           </div>
                           <FormControl>
@@ -1817,14 +1812,14 @@ export default function AdsPage() {
 
                     <div className="flex justify-end gap-2 pt-4">
                       <Button type="button" variant="outline" onClick={() => setIsPresetDialogOpen(false)}>
-                        Отмена
+                        {t("common.cancel")}
                       </Button>
                       <Button 
                         type="submit" 
                         disabled={createPresetMutation.isPending || updatePresetMutation.isPending}
                         data-testid="button-save-preset"
                       >
-                        {editingPreset ? "Сохранить" : "Создать"}
+                        {editingPreset ? t("common.save") : t("ads.create")}
                       </Button>
                     </div>
                   </form>
@@ -1868,15 +1863,15 @@ export default function AdsPage() {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Удалить пресет?</AlertDialogTitle>
+                                <AlertDialogTitle>{t("ads.deletePresetConfirm")}</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Это действие нельзя отменить
+                                  {t("ads.deleteConfirm")}
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Отмена</AlertDialogCancel>
+                                <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                                 <AlertDialogAction onClick={() => deletePresetMutation.mutate(preset.id)}>
-                                  Удалить
+                                  {t("common.delete")}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -1887,17 +1882,17 @@ export default function AdsPage() {
                     <CardContent className="space-y-3">
                       <div className="flex flex-wrap gap-2">
                         <Badge variant="outline">{typeInfo.label}</Badge>
-                        <Badge variant="secondary">{preset.defaultTargetDurationSeconds}с</Badge>
+                        <Badge variant="secondary">{preset.defaultTargetDurationSeconds}{t("ads.sec")}</Badge>
                         {preset.defaultCategory && (
                           <Badge variant="secondary">
-                            {categories.find(c => c.value === preset.defaultCategory)?.label || preset.defaultCategory}
+                                {getCategoryLabel(preset.defaultCategory)}
                           </Badge>
                         )}
                       </div>
                       
                       {preset.voiceIds && preset.voiceIds.length > 0 && (
                         <div className="text-sm text-muted-foreground">
-                          Голоса: {preset.voiceIds.map(id => getVoiceName(id)).join(", ")}
+                          {t("ads.voices")}: {preset.voiceIds.map(id => getVoiceName(id)).join(", ")}
                         </div>
                       )}
 
@@ -1907,7 +1902,7 @@ export default function AdsPage() {
 
                       {!preset.isActive && (
                         <Badge variant="outline" className="text-muted-foreground">
-                          Неактивен
+                          {t("ads.inactive")}
                         </Badge>
                       )}
                     </CardContent>
@@ -1920,13 +1915,13 @@ export default function AdsPage() {
               <CardContent className="py-12">
                 <div className="flex flex-col items-center justify-center text-center">
                   <Settings2 className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Нет пресетов</h3>
+                  <h3 className="text-lg font-medium mb-2">{t("ads.noPresets")}</h3>
                   <p className="text-muted-foreground mb-4">
-                    Создайте первый пресет для быстрого создания рекламы
+                    {t("ads.noPresetsDesc")}
                   </p>
                   <Button onClick={openNewPresetDialog}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Создать пресет
+                    {t("ads.createPreset")}
                   </Button>
                 </div>
               </CardContent>

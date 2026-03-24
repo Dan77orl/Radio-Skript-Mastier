@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,18 +33,19 @@ interface Holiday {
 function getStatusInfo(status: string) {
   switch (status) {
     case "ready":
-      return { icon: CheckCircle, label: "Готов", color: "text-green-600 dark:text-green-400", bg: "bg-green-500/10 border-green-500" };
+      return { icon: CheckCircle, label: "ready", color: "text-green-600 dark:text-green-400", bg: "bg-green-500/10 border-green-500" };
     case "generating":
-      return { icon: Clock, label: "Генерация", color: "text-yellow-600 dark:text-yellow-400", bg: "bg-yellow-500/10 border-yellow-500" };
+      return { icon: Clock, label: "generating", color: "text-yellow-600 dark:text-yellow-400", bg: "bg-yellow-500/10 border-yellow-500" };
     case "error":
-      return { icon: AlertCircle, label: "Ошибка", color: "text-red-600 dark:text-red-400", bg: "bg-red-500/10 border-red-500" };
+      return { icon: AlertCircle, label: "error", color: "text-red-600 dark:text-red-400", bg: "bg-red-500/10 border-red-500" };
     default:
-      return { icon: Clock, label: "Ожидание", color: "text-muted-foreground", bg: "border-dashed border-muted" };
+      return { icon: Clock, label: "pending", color: "text-muted-foreground", bg: "border-dashed border-muted" };
   }
 }
 
 export default function Schedule({ embedded }: { embedded?: boolean }) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [autoGenPrompt, setAutoGenPrompt] = useState("");
@@ -77,7 +79,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
     audioRef.current = audio;
     audio.play().catch((err) => {
       console.error("Error playing audio:", err);
-      toast({ title: "Ошибка воспроизведения", variant: "destructive" });
+      toast({ title: t("schedule.playbackError"), variant: "destructive" });
     });
     setPlayingDialogId(dialogId);
     audio.onended = () => setPlayingDialogId(null);
@@ -131,14 +133,14 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
       setDialogOpen(false);
       setAutoGenPrompt("");
       toast({
-        title: "Подводки созданы",
-        description: `Создано ${data.count} подводок на день`,
+        title: t("schedule.podvodkiCreated"),
+        description: t("schedule.createdCount", { count: data.count }),
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось создать подводки",
+        title: t("common.error"),
+        description: error.message || t("schedule.errorCreating"),
         variant: "destructive",
       });
     },
@@ -191,7 +193,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
   };
 
   const formatMonthYear = () => {
-    return currentDate.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+    return currentDate.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   };
 
   const isToday = (date: Date) => {
@@ -199,15 +201,18 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
     return date.toDateString() === today.toDateString();
   };
 
-  const dayNames = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+  const dayNames = [
+    t("schedule.weekdays.mon"), t("schedule.weekdays.tue"), t("schedule.weekdays.wed"),
+    t("schedule.weekdays.thu"), t("schedule.weekdays.fri"), t("schedule.weekdays.sat"), t("schedule.weekdays.sun")
+  ];
 
   return (
     <div className={`flex-1 space-y-6 ${embedded ? "" : "p-6"}`}>
       <div className="flex items-center justify-between gap-4 flex-wrap">
         {!embedded && (
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Расписание</h1>
-            <p className="text-muted-foreground">Подводки по дням недели</p>
+            <h1 className="text-3xl font-bold tracking-tight">{t("schedule.title")}</h1>
+            <p className="text-muted-foreground">{t("schedule.subtitle")}</p>
           </div>
         )}
         <div className="flex items-center gap-2">
@@ -216,7 +221,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
           </Button>
           <Button variant="outline" onClick={goToToday} data-testid="button-today">
             <CalendarIcon className="mr-2 h-4 w-4" />
-            Сегодня
+            {t("common.today")}
           </Button>
           <Button variant="outline" size="icon" onClick={() => navigateWeek(1)} data-testid="button-next-week">
             <ChevronRight className="h-4 w-4" />
@@ -227,7 +232,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="capitalize">{formatMonthYear()}</CardTitle>
-          <CardDescription>{dailyCount} подводок на выбранный день</CardDescription>
+          <CardDescription>{t("schedule.slotsForDay", { count: dailyCount })}</CardDescription>
         </CardHeader>
         <CardContent>
           {dialogsLoading || settingsLoading ? (
@@ -285,7 +290,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
                           <div
                             key={slotIndex}
                             className={`flex items-center justify-center rounded border-2 p-1 text-xs ${statusInfo.bg}`}
-                            title={slotDialog?.title || `Слот #${slotIndex + 1}`}
+                            title={slotDialog?.title || t("schedule.slotLabel", { number: slotIndex + 1 })}
                           >
                             <StatusIcon className={`h-3 w-3 ${statusInfo.color}`} />
                           </div>
@@ -293,7 +298,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
                       })}
                       {getSlotCountForDate(day) > 6 && (
                         <div className="text-center text-xs text-muted-foreground">
-                          +{getSlotCountForDate(day) - 6} слотов
+                          {t("schedule.moreSlots", { count: getSlotCountForDate(day) - 6 })}
                         </div>
                       )}
                     </div>
@@ -337,14 +342,14 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
           <div>
             <CardTitle>
               {viewingDate 
-                ? `Детали ${new Date(viewingDate).toLocaleDateString("ru-RU", { weekday: "long" })}`
-                : "Детали дня"
+                ? t("schedule.detailsOf", { day: new Date(viewingDate).toLocaleDateString(undefined, { weekday: "long" }) })
+                : t("schedule.dayDetails")
               }
             </CardTitle>
             <CardDescription>
               {viewingDate 
-                ? new Date(viewingDate).toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })
-                : "Выберите день в календаре выше"
+                ? new Date(viewingDate).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })
+                : t("schedule.selectDay")
               }
             </CardDescription>
           </div>
@@ -356,7 +361,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
               data-testid="button-select-today"
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
-              Сегодня
+              {t("common.today")}
             </Button>
           )}
         </CardHeader>
@@ -364,7 +369,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
           {!viewingDate ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <CalendarIcon className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">Нажмите на день в календаре для просмотра слотов</p>
+              <p className="text-muted-foreground">{t("schedule.clickDayToView")}</p>
             </div>
           ) : dialogsLoading ? (
             <div className="space-y-3">
@@ -395,10 +400,10 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">
-                        {slotDialog?.title || `Слот #${i + 1}`}
+                        {slotDialog?.title || t("schedule.slotLabel", { number: i + 1 })}
                       </p>
                       <p className={`text-xs ${statusInfo.color}`}>
-                        {statusInfo.label}
+                        {t(`statuses.${statusInfo.label}`)}
                       </p>
                     </div>
                     {slotDialog?.audioUrl && (
@@ -428,12 +433,12 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
           <div>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Тексты диалогов
+              {t("schedule.dialogTexts")}
             </CardTitle>
             <CardDescription>
               {viewingDate 
-                ? new Date(viewingDate).toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })
-                : "Выберите день для просмотра текстов"
+                ? new Date(viewingDate).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })
+                : t("schedule.selectDayForTexts")
               }
             </CardDescription>
           </div>
@@ -444,7 +449,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
               onClick={() => setViewingDate(new Date().toISOString().split("T")[0])}
               data-testid="button-view-today"
             >
-              Сегодня
+              {t("common.today")}
             </Button>
             {viewingDate && (
               <Button
@@ -468,7 +473,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
                   return (
                     <div className="flex flex-col items-center justify-center py-12 text-center">
                       <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">Нет диалогов на этот день</p>
+                      <p className="text-muted-foreground">{t("schedule.noDialogs")}</p>
                       <Button
                         variant="outline"
                         className="mt-4"
@@ -478,7 +483,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
                         }}
                       >
                         <Sparkles className="mr-2 h-4 w-4" />
-                        Сгенерировать
+                        {t("common.generate")}
                       </Button>
                     </div>
                   );
@@ -512,7 +517,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
                           <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3">
                             <div className="flex items-center gap-2 mb-2">
                               <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                              <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Мужской голос</span>
+                              <span className="text-sm font-medium text-blue-600 dark:text-blue-400">{t("generator.maleVoice")}</span>
                             </div>
                             <p className="text-sm whitespace-pre-wrap">{dialog.maleText}</p>
                           </div>
@@ -522,7 +527,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
                           <div className="rounded-lg bg-pink-50 dark:bg-pink-950/30 p-3">
                             <div className="flex items-center gap-2 mb-2">
                               <User className="h-4 w-4 text-pink-600 dark:text-pink-400" />
-                              <span className="text-sm font-medium text-pink-600 dark:text-pink-400">Женский голос</span>
+                              <span className="text-sm font-medium text-pink-600 dark:text-pink-400">{t("generator.femaleVoice")}</span>
                             </div>
                             <p className="text-sm whitespace-pre-wrap">{dialog.femaleText}</p>
                           </div>
@@ -536,7 +541,7 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <CalendarIcon className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">Нажмите "Сегодня" или выберите день в календаре выше</p>
+              <p className="text-muted-foreground">{t("schedule.selectDayOrToday")}</p>
             </div>
           )}
         </CardContent>
@@ -547,23 +552,23 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
-              Авто-генерация подводок
+              {t("schedule.autoGenTitle")}
             </DialogTitle>
             <DialogDescription>
               {selectedDate && (
                 <>
-                  Создать {dailyCount} подводок на {selectedDate.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })}
+                  {t("schedule.autoGenDescription", { count: dailyCount, date: selectedDate.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }) })}
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="auto-prompt">Промпт для генерации</Label>
+              <Label htmlFor="auto-prompt">{t("schedule.promptLabel")}</Label>
               <div className="flex gap-1 items-start">
                 <Textarea
                   id="auto-prompt"
-                  placeholder="Опишите темы и стиль подводок..."
+                  placeholder={t("schedule.promptPlaceholder")}
                   value={autoGenPrompt}
                   onChange={(e) => setAutoGenPrompt(e.target.value)}
                   rows={6}
@@ -573,13 +578,13 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
                 <VoiceInput onTranscript={(text) => setAutoGenPrompt(prev => prev + " " + text)} />
               </div>
               <p className="text-xs text-muted-foreground">
-                ИИ создаст разнообразные подводки на основе этого промпта
+                {t("schedule.promptHint")}
               </p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Отмена
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={submitAutoGenerate}
@@ -589,12 +594,12 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
               {autoGenerateMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Генерация...
+                  {t("schedule.generatingLabel")}
                 </>
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Создать подводки
+                  {t("schedule.createPodvodki")}
                 </>
               )}
             </Button>
