@@ -1352,7 +1352,7 @@ export default function ShowsPage() {
       </Dialog>
 
       <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>{t("shows.settingsTitle", { name: settingsType?.name })}</DialogTitle>
             <DialogDescription>
@@ -1360,9 +1360,9 @@ export default function ShowsPage() {
             </DialogDescription>
           </DialogHeader>
           {settingsType && (
-            <div className="space-y-6 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+            <div className="space-y-6 py-4 min-w-0 w-full">
+              <div className="grid grid-cols-2 gap-4 min-w-0">
+                <div className="space-y-2 min-w-0">
                   <Label>{t("shows.episodesPerDay")}</Label>
                   <Select
                     value={String(settingsType.dailyCount || 1)}
@@ -1386,7 +1386,7 @@ export default function ShowsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 min-w-0">
                   <Label>{t("shows.durationSec")}</Label>
                   <Input
                     type="number"
@@ -1400,9 +1400,9 @@ export default function ShowsPage() {
               <div className="space-y-3">
                 <Label>{t("shows.slotDescription")}</Label>
                 {Array.from({ length: settingsType.dailyCount || 1 }, (_, i) => (
-                  <div key={i} className="flex items-start gap-2">
+                  <div key={i} className="flex items-start gap-2 min-w-0">
                     <Badge variant="outline" className="mt-2 shrink-0">#{i + 1}</Badge>
-                    <div className="flex gap-1 flex-1">
+                    <div className="flex gap-1 flex-1 min-w-0">
                       <Input
                         placeholder={t("shows.slotPlaceholder", { num: i + 1 })}
                         value={slotInputs[i] || ""}
@@ -1428,8 +1428,8 @@ export default function ShowsPage() {
 
               <div className="space-y-3">
                 <Label>{t("shows.sponsorLabel")}</Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
+                <div className="grid grid-cols-2 gap-4 min-w-0">
+                  <div className="space-y-1 min-w-0">
                     <span className="text-xs text-muted-foreground">{t("shows.sponsorNameLabel")}</span>
                     <Input
                       placeholder={t("shows.sponsorNamePlaceholder")}
@@ -1438,7 +1438,7 @@ export default function ShowsPage() {
                       data-testid="input-sponsor-name"
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 min-w-0">
                     <span className="text-xs text-muted-foreground">{t("shows.sponsorTextLabel")}</span>
                     <Input
                       placeholder={t("shows.sponsorTextPlaceholder", { name: settingsType.name })}
@@ -1461,7 +1461,7 @@ export default function ShowsPage() {
                     className="flex-1"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-2 gap-1.5 min-w-0">
                   {[
                     { label: "{название}_{дата}_{номер}", value: "{название}_{дата}_{номер}" },
                     { label: "{название}_{дата}", value: "{название}_{дата}" },
@@ -1507,7 +1507,7 @@ export default function ShowsPage() {
                 );
               })()}
 
-              <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
+              <div className="space-y-3 border rounded-lg p-3 sm:p-4 bg-muted/20 min-w-0">
                 <Label className="text-base font-semibold">{t("shows.firecrawlTitle")}</Label>
                 <p className="text-xs text-muted-foreground">
                   {t("shows.firecrawlDesc")}
@@ -1543,7 +1543,7 @@ export default function ShowsPage() {
                           </div>
                         ))}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 min-w-0">
                         <Input
                           placeholder={t("shows.newTopicPlaceholder")}
                           value={firecrawlTopicInput}
@@ -1600,7 +1600,7 @@ export default function ShowsPage() {
                       {t("shows.testSearch")}
                     </Button>
                     {firecrawlTestResult && (
-                      <pre className="text-xs bg-muted p-3 rounded max-h-40 overflow-y-auto whitespace-pre-wrap" data-testid="text-firecrawl-result">
+                      <pre className="text-xs bg-muted p-3 rounded max-h-40 overflow-y-auto whitespace-pre-wrap break-words min-w-0" data-testid="text-firecrawl-result">
                         {firecrawlTestResult}
                       </pre>
                     )}
@@ -1608,7 +1608,7 @@ export default function ShowsPage() {
                 )}
               </div>
 
-              <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
+              <div className="space-y-3 border rounded-lg p-3 sm:p-4 bg-muted/20 min-w-0">
                 <Label className="text-base font-semibold">{t("shows.autoGenTitle")}</Label>
                 <p className="text-xs text-muted-foreground">
                   {t("shows.autoGenDesc")}
