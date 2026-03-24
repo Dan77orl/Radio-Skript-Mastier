@@ -912,7 +912,7 @@
       "getStarted": "Get Started",
       "starter": {
         "name": "Starter",
-        "price": "9",
+        "price": "$29",
         "f1": "Up to 50 scripts/month",
         "f2": "2 AI voices",
         "f3": "1 show type",
@@ -920,7 +920,7 @@
       },
       "pro": {
         "name": "Professional",
-        "price": "9",
+        "price": "$79",
         "f1": "Unlimited scripts",
         "f2": "10 AI voices",
         "f3": "Unlimited show types",
@@ -929,7 +929,7 @@
       },
       "enterprise": {
         "name": "Enterprise",
-        "price": "99",
+        "price": "$199",
         "f1": "Everything in Professional",
         "f2": "Custom AI model tuning",
         "f3": "Priority support",
