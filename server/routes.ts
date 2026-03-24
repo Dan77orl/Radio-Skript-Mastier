@@ -891,8 +891,25 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
           ? allVoices.filter(v => slotVoiceIds.includes(v.id)).map(v => `${v.personaName || v.name} (${v.gender === "male" ? "мужчина" : "женщина"})`).join(", ")
           : null;
 
-        const firecrawlSection = firecrawlContent ? `\nАКТУАЛЬНАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА (используй в диалогах как факты):\n${firecrawlContent}\n` : "";
-        
+        let firecrawlSection = "";
+        if (firecrawlContent) {
+          const topicBlocks = firecrawlContent.split(/---\s*[^-]+\s*---/).filter(b => b.trim());
+          const topicHeaders = firecrawlContent.match(/---\s*([^-]+)\s*---/g)?.map(h => h.replace(/---/g, "").trim()) || [];
+          if (topicBlocks.length > 0) {
+            const blockIndex = (slotNumber - 1) % topicBlocks.length;
+            const topicName = topicHeaders[blockIndex] || `Тема ${blockIndex + 1}`;
+            const blockContent = topicBlocks[blockIndex].trim().substring(0, 1500);
+            firecrawlSection = `\n⚡ ОБЯЗАТЕЛЬНЫЙ КОНТЕНТ ИЗ ИНТЕРНЕТА — ты ДОЛЖЕН использовать эти факты в диалоге:
+Тема для этого слота: "${topicName}"
+---
+${blockContent}
+---
+СТРОГОЕ ПРАВИЛО: Включи минимум 2-3 конкретных факта/цифры/названия из текста выше в диалог. Ведущие должны обсуждать именно эту тему, используя реальные данные. НЕ ИГНОРИРУЙ этот контент!\n`;
+          } else {
+            firecrawlSection = `\nАКТУАЛЬНАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА — ОБЯЗАТЕЛЬНО используй конкретные факты из этого текста:\n${firecrawlContent.substring(0, 2000)}\nВключи минимум 2-3 факта из текста выше в диалог!\n`;
+          }
+        }
+
         const hostsLine = slotVoiceNames 
           ? `Ведущие этого слота: ${slotVoiceNames}.`
           : `Ведущие: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).`;
@@ -907,12 +924,12 @@ ${holiday ? `- Праздник: ${holiday}` : ""}
 - Время слота: ${timeLabel} (${timeOfDay})
 - Слот номер: ${slotNumber} из ${totalSlots}
 ${newsContext}
-${firecrawlSection}
 ${dailyPrompt ? `ОБЩИЕ ИНСТРУКЦИИ НА ДЕНЬ:\n${dailyPrompt}\n` : ""}
 ${slotPrompt ? `ИНСТРУКЦИИ ДЛЯ ЭТОГО СЛОТА:\n${slotPrompt}\n` : ""}
 ${learnings ? `НАКОПЛЕННЫЙ ОПЫТ:\n${learnings}\n` : ""}
 
 Создай короткий диалог (30-50 секунд при чтении).
+${firecrawlSection}
 Учитывай время суток и день недели.
 ${hour < 10 ? "Утренний слот: бодрое приветствие, энергичный тон." : ""}
 ${hour >= 18 ? "Вечерний слот: расслабленный тон, итоги дня." : ""}
