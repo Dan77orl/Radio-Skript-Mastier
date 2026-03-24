@@ -1316,7 +1316,7 @@ export default function ShowsPage() {
       {renderAddTypeDialog()}
 
       <Dialog open={isEditPromptDialogOpen} onOpenChange={setIsEditPromptDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="!w-[min(42rem,calc(100vw-2rem))] !max-w-none">
           <DialogHeader>
             <DialogTitle>{t("shows.editPromptTitle", { name: editingType?.name })}</DialogTitle>
             <DialogDescription>
@@ -1352,7 +1352,7 @@ export default function ShowsPage() {
       </Dialog>
 
       <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
+        <DialogContent className="!w-[min(42rem,calc(100vw-2rem))] !max-w-none max-h-[85vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>{t("shows.settingsTitle", { name: settingsType?.name })}</DialogTitle>
             <DialogDescription>
@@ -1780,7 +1780,7 @@ export default function ShowsPage() {
           if (!open) resetBatchDialog();
         }
       }}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="!w-[min(42rem,calc(100vw-2rem))] !max-w-none max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <PackagePlus className="h-5 w-5" />
@@ -1878,7 +1878,7 @@ export default function ShowsPage() {
       </Dialog>
 
       <Dialog open={!!viewScriptProgram} onOpenChange={(open) => { if (!open) { setViewScriptProgram(null); setEditingBlocks(null); } }}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="!w-[min(42rem,calc(100vw-2rem))] !max-w-none max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {viewScriptProgram?.scriptText && isMultiSpeaker(viewScriptProgram.scriptText) && (

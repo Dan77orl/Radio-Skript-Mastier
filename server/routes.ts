@@ -193,6 +193,63 @@ function resolveAssignedVoices(voicesList: any[], programType: any): any[] {
   return voicesList.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(programType.id));
 }
 
+async function fetchAndExpandUrls(promptText: string): Promise<{ prompt: string; fetchedContent: string }> {
+  const urlRegex = /https?:\/\/[^\s]+/g;
+  const urls = promptText.match(urlRegex);
+  if (!urls || urls.length === 0) {
+    return { prompt: promptText, fetchedContent: "" };
+  }
+
+  let fetchedContent = "";
+  let expandedPrompt = promptText;
+
+  for (const url of urls.slice(0, 3)) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; RadioBot/1.0)",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+        redirect: "follow",
+      });
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        $("script, style, nav, footer, header, noscript, iframe, svg, img, link, meta").remove();
+
+        let text = "";
+        const mainSelectors = ["main", "article", "[role='main']", ".content", "#content", ".post-content", ".markdown-body", ".conversation-content"];
+        for (const sel of mainSelectors) {
+          const el = $(sel);
+          if (el.length) {
+            text = el.text().replace(/\s+/g, " ").trim();
+            if (text.length > 100) break;
+          }
+        }
+        if (text.length <= 100) {
+          text = $("body").text().replace(/\s+/g, " ").trim();
+        }
+
+        if (text.length > 20000) text = text.substring(0, 20000) + "...";
+
+        if (text.length > 50) {
+          fetchedContent += `\n\n--- КОНТЕНТ ИЗ ССЫЛКИ ${url} ---\n${text}\n--- КОНЕЦ КОНТЕНТА ---\n`;
+          expandedPrompt = expandedPrompt.replace(url, `[контент загружен из: ${url}]`);
+        }
+      }
+    } catch (err: any) {
+      console.log(`Failed to fetch URL ${url}: ${err.message}`);
+    }
+  }
+
+  return { prompt: expandedPrompt, fetchedContent };
+}
+
 function resolveFileName(template: string | null | undefined, programType: any, program: any, timestamp: number): string {
   if (!template || !template.trim()) {
     return `program_${timestamp}.mp3`;
@@ -2839,7 +2896,13 @@ ${existingList}
       const nextSlot = todayPrograms.length + 1;
 
       const slotDesc = programType.slotDescriptions?.[nextSlot - 1] || "";
-      let prompt = programType.defaultPrompt;
+      
+      const { prompt: expandedPrompt, fetchedContent } = await fetchAndExpandUrls(programType.defaultPrompt || "");
+      let prompt = expandedPrompt;
+      
+      if (fetchedContent) {
+        prompt += `\n\nИспользуй следующий загруженный контент как ЭТАЛОН стиля и формата для создания нового выпуска:${fetchedContent}`;
+      }
 
       if (slotDesc) {
         prompt += `\n\nВременной слот: ${slotDesc}`;
@@ -2948,7 +3011,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         if (anthropic) {
           const message = await anthropic.messages.create({
             model: CLAUDE_MODEL,
-            max_tokens: 1024,
+            max_tokens: 2048,
             system: systemPrompt,
             messages: [{ role: "user", content: prompt }],
           });
@@ -3105,12 +3168,18 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const assignedVoices = resolveAssignedVoices(voicesList, programType);
       const isMultiSpeaker = assignedVoices.length >= 2;
 
+      const { prompt: expandedDefaultPrompt, fetchedContent: urlContent } = await fetchAndExpandUrls(programType.defaultPrompt || "");
+      
       let prompt = `Создай ${totalCount} ГОТОВЫХ сценариев для радиопередачи "${programType.name}" на радио "${ctx.stationName}".
 
 Базовый промпт передачи:
-${programType.defaultPrompt}
+${expandedDefaultPrompt}
 
 `;
+      
+      if (urlContent) {
+        prompt += `\nЗАГРУЖЕННЫЙ КОНТЕНТ ИЗ ССЫЛОК — используй как ЭТАЛОН стиля и формата:${urlContent}\n`;
+      }
 
       if (isMultiSpeaker) {
         const speakerList = assignedVoices.map(v => v.personaName || v.name).join(", ");
