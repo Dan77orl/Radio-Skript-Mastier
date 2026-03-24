@@ -1452,12 +1452,34 @@ export default function ShowsPage() {
 
               <div className="space-y-2">
                 <Label>{t("shows.fileNameTemplate")}</Label>
-                <Input
-                  placeholder={t("shows.fileNamePlaceholder")}
-                  value={settingsType.fileNameTemplate || ""}
-                  onChange={(e) => setSettingsType(prev => prev ? { ...prev, fileNameTemplate: e.target.value } : null)}
-                  data-testid="input-file-name-template"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    placeholder={t("shows.fileNamePlaceholder")}
+                    value={settingsType.fileNameTemplate || ""}
+                    onChange={(e) => setSettingsType(prev => prev ? { ...prev, fileNameTemplate: e.target.value } : null)}
+                    data-testid="input-file-name-template"
+                    className="flex-1"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: "{название}_{дата}_{номер}", value: "{название}_{дата}_{номер}" },
+                    { label: "{название}_{дата}", value: "{название}_{дата}" },
+                    { label: "{name}_{date}_{number}", value: "{name}_{date}_{number}" },
+                    { label: "{name}_{date}", value: "{name}_{date}" },
+                    { label: "{название} выпуск {номер}", value: "{название} выпуск {номер}" },
+                  ].map(preset => (
+                    <Badge
+                      key={preset.value}
+                      variant={settingsType.fileNameTemplate === preset.value ? "default" : "outline"}
+                      className="cursor-pointer text-xs hover:bg-primary/10 transition-colors"
+                      onClick={() => setSettingsType(prev => prev ? { ...prev, fileNameTemplate: preset.value } : null)}
+                      data-testid={`preset-filename-${preset.value}`}
+                    >
+                      {preset.label}
+                    </Badge>
+                  ))}
+                </div>
                 <p className="text-xs text-muted-foreground">
                   {t("shows.fileNameVars")}
                 </p>
