@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog as DialogUI,
   DialogContent,
@@ -16,11 +17,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Clock, Users, Calendar, Settings2, Loader2, Edit3, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, Clock, Users, Calendar, Settings2, Loader2, Edit3, ChevronDown, ChevronUp, PartyPopper, Globe } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Voice, InsertScheduleTemplate, InsertHostShift } from "@shared/schema";
+import type { Voice, InsertScheduleTemplate, InsertHostShift, CustomHoliday, InsertCustomHoliday } from "@shared/schema";
 
 interface ScheduleTemplate {
   id: string;
@@ -55,13 +56,31 @@ interface Holiday {
 const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const WEEKDAY_VALUES = [1, 2, 3, 4, 5, 6, 7];
 
+const VOICE_COLORS = [
+  { bg: "bg-blue-500", bgLight: "bg-blue-500/20", text: "text-blue-700 dark:text-blue-300", border: "border-blue-500" },
+  { bg: "bg-pink-500", bgLight: "bg-pink-500/20", text: "text-pink-700 dark:text-pink-300", border: "border-pink-500" },
+  { bg: "bg-emerald-500", bgLight: "bg-emerald-500/20", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-500" },
+  { bg: "bg-orange-500", bgLight: "bg-orange-500/20", text: "text-orange-700 dark:text-orange-300", border: "border-orange-500" },
+  { bg: "bg-violet-500", bgLight: "bg-violet-500/20", text: "text-violet-700 dark:text-violet-300", border: "border-violet-500" },
+  { bg: "bg-cyan-500", bgLight: "bg-cyan-500/20", text: "text-cyan-700 dark:text-cyan-300", border: "border-cyan-500" },
+];
+
+function getVoiceColor(voiceId: string, allVoices: Voice[]) {
+  const idx = allVoices.findIndex(v => v.id === voiceId);
+  if (idx < 0) return VOICE_COLORS[0];
+  return VOICE_COLORS[idx % VOICE_COLORS.length];
+}
+
 export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const [settingsTab, setSettingsTab] = useState("templates");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
+  const [holidayDialogOpen, setHolidayDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ScheduleTemplate | null>(null);
   const [editingShiftTemplateId, setEditingShiftTemplateId] = useState<string | null>(null);
+  const [editingHoliday, setEditingHoliday] = useState<CustomHoliday | null>(null);
   const [expandedTemplates, setExpandedTemplates] = useState<Set<string>>(new Set());
 
   const [formName, setFormName] = useState("");
@@ -75,6 +94,13 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
   const [shiftEndHour, setShiftEndHour] = useState(14);
   const [shiftVoiceIds, setShiftVoiceIds] = useState<string[]>([]);
   const [shiftLabel, setShiftLabel] = useState("");
+  const [editingShift, setEditingShift] = useState<HostShift | null>(null);
+
+  const [holidayDate, setHolidayDate] = useState("");
+  const [holidayName, setHolidayName] = useState("");
+  const [holidayNameRu, setHolidayNameRu] = useState("");
+  const [holidayCountry, setHolidayCountry] = useState("BOTH");
+  const [holidayIsPublic, setHolidayIsPublic] = useState(false);
 
   const { data: templates, isLoading } = useQuery<ScheduleTemplate[]>({
     queryKey: ["/api/schedule-templates"],
@@ -91,6 +117,10 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
       const res = await fetch(`/api/holidays?year=${year}`);
       return res.json();
     },
+  });
+
+  const { data: customHolidays } = useQuery<CustomHoliday[]>({
+    queryKey: ["/api/custom-holidays"],
   });
 
   const createTemplateMutation = useMutation({
@@ -155,6 +185,46 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
     onError: () => toast({ title: t("common.error"), variant: "destructive" }),
   });
 
+  const createHolidayMutation = useMutation({
+    mutationFn: async (data: InsertCustomHoliday) => {
+      const res = await apiRequest("POST", "/api/custom-holidays", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-holidays"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/holidays"] });
+      setHolidayDialogOpen(false);
+      toast({ title: t("scheduleSettings.holidayCreated") });
+    },
+    onError: () => toast({ title: t("common.error"), variant: "destructive" }),
+  });
+
+  const updateHolidayMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<InsertCustomHoliday> }) => {
+      const res = await apiRequest("PATCH", `/api/custom-holidays/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-holidays"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/holidays"] });
+      setHolidayDialogOpen(false);
+      toast({ title: t("scheduleSettings.holidayUpdated") });
+    },
+    onError: () => toast({ title: t("common.error"), variant: "destructive" }),
+  });
+
+  const deleteHolidayMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/custom-holidays/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-holidays"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/holidays"] });
+      toast({ title: t("scheduleSettings.holidayDeleted") });
+    },
+    onError: () => toast({ title: t("common.error"), variant: "destructive" }),
+  });
+
   const openCreateDialog = () => {
     setEditingTemplate(null);
     setFormName("");
@@ -177,14 +247,40 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
     setDialogOpen(true);
   };
 
-  const openShiftDialog = (templateId: string) => {
+  const openShiftDialog = (templateId: string, shift?: HostShift) => {
     setEditingShiftTemplateId(templateId);
-    const tpl = templates?.find(t => t.id === templateId);
-    setShiftStartHour(tpl?.startHour || 7);
-    setShiftEndHour(tpl ? Math.min(tpl.startHour + 7, tpl.endHour) : 14);
-    setShiftVoiceIds([]);
-    setShiftLabel("");
+    setEditingShift(shift || null);
+    if (shift) {
+      setShiftStartHour(shift.startHour);
+      setShiftEndHour(shift.endHour);
+      setShiftVoiceIds(shift.voiceIds);
+      setShiftLabel(shift.label || "");
+    } else {
+      const tpl = templates?.find(t => t.id === templateId);
+      setShiftStartHour(tpl?.startHour || 7);
+      setShiftEndHour(tpl ? Math.min(tpl.startHour + 7, tpl.endHour) : 14);
+      setShiftVoiceIds([]);
+      setShiftLabel("");
+    }
     setShiftDialogOpen(true);
+  };
+
+  const openHolidayDialog = (holiday?: CustomHoliday) => {
+    setEditingHoliday(holiday || null);
+    if (holiday) {
+      setHolidayDate(holiday.date);
+      setHolidayName(holiday.name);
+      setHolidayNameRu(holiday.nameRu);
+      setHolidayCountry(holiday.country);
+      setHolidayIsPublic(holiday.isPublic ?? false);
+    } else {
+      setHolidayDate("");
+      setHolidayName("");
+      setHolidayNameRu("");
+      setHolidayCountry("BOTH");
+      setHolidayIsPublic(false);
+    }
+    setHolidayDialogOpen(true);
   };
 
   const submitTemplate = () => {
@@ -206,6 +302,9 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
 
   const submitShift = () => {
     if (!editingShiftTemplateId || shiftVoiceIds.length === 0) return;
+    if (editingShift) {
+      deleteShiftMutation.mutate({ id: editingShift.id, templateId: editingShiftTemplateId });
+    }
     createShiftMutation.mutate({
       templateId: editingShiftTemplateId,
       startHour: shiftStartHour,
@@ -213,6 +312,22 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
       voiceIds: shiftVoiceIds,
       label: shiftLabel || null,
     });
+  };
+
+  const submitHoliday = () => {
+    if (!holidayDate || !holidayName || !holidayNameRu) return;
+    const data = {
+      date: holidayDate,
+      name: holidayName,
+      nameRu: holidayNameRu,
+      country: holidayCountry,
+      isPublic: holidayIsPublic,
+    };
+    if (editingHoliday) {
+      updateHolidayMutation.mutate({ id: editingHoliday.id, data });
+    } else {
+      createHolidayMutation.mutate(data);
+    }
   };
 
   const toggleWeekday = (day: number) => {
@@ -258,109 +373,232 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings2 className="h-5 w-5" />
-                  {t("scheduleSettings.title")}
-                </CardTitle>
-                <CardDescription>
-                  {t("scheduleSettings.subtitle")}
-                </CardDescription>
-              </div>
-              <Button onClick={openCreateDialog} data-testid="button-create-template">
-                <Plus className="mr-2 h-4 w-4" />
-                {t("common.add")}
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : !templates?.length ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>{t("scheduleSettings.noTemplates")}</p>
-                  <p className="text-sm mt-1">{t("scheduleSettings.createTemplate")}</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {templates.map(tpl => (
-                    <TemplateCard
-                      key={tpl.id}
-                      template={tpl}
-                      voices={activeVoices}
-                      expanded={expandedTemplates.has(tpl.id)}
-                      onToggle={() => toggleExpanded(tpl.id)}
-                      onEdit={() => openEditDialog(tpl)}
-                      onDelete={() => deleteTemplateMutation.mutate(tpl.id)}
-                      onAddShift={() => openShiftDialog(tpl.id)}
-                      onDeleteShift={(shiftId) => deleteShiftMutation.mutate({ id: shiftId, templateId: tpl.id })}
-                      totalSlots={totalSlots(tpl)}
-                    />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      <Tabs value={settingsTab} onValueChange={setSettingsTab}>
+        <TabsList>
+          <TabsTrigger value="templates" className="gap-2" data-testid="tab-templates">
+            <Settings2 className="h-4 w-4" />
+            {t("scheduleSettings.title")}
+          </TabsTrigger>
+          <TabsTrigger value="holidays" className="gap-2" data-testid="tab-holidays">
+            <PartyPopper className="h-4 w-4" />
+            {t("scheduleSettings.holidays")}
+          </TabsTrigger>
+        </TabsList>
 
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Calendar className="h-4 w-4" />
-                {t("schedule.title")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {upcomingHolidays.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("common.noData")}</p>
-              ) : (
-                <div className="space-y-2">
-                  {upcomingHolidays.map((h, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm">
-                      <Badge variant={h.isPublic ? "default" : "outline"} className="shrink-0 text-xs">
-                        {h.date.slice(5)}
-                      </Badge>
-                      <span className="truncate">{h.nameRu}</span>
-                      <Badge variant="secondary" className="text-xs shrink-0">
-                        {h.country === "TR" ? "🇹🇷" : h.country === "RU" ? "🇷🇺" : "🌍"}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="h-4 w-4" />
-                {t("scheduleSettings.voices")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {activeVoices.map(v => (
-                  <div key={v.id} className="flex items-center gap-2 text-sm">
-                    <div className={`w-2 h-2 rounded-full ${v.gender === "male" ? "bg-blue-500" : "bg-pink-500"}`} />
-                    <span>{v.personaName || v.name}</span>
-                    <span className="text-muted-foreground text-xs">
-                      {v.gender === "male" ? t("common.maleShort") : t("common.femaleShort")}
-                    </span>
+        <TabsContent value="templates" className="mt-4">
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2 space-y-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Settings2 className="h-5 w-5" />
+                      {t("scheduleSettings.title")}
+                    </CardTitle>
+                    <CardDescription>
+                      {t("scheduleSettings.subtitle")}
+                    </CardDescription>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                  <Button onClick={openCreateDialog} data-testid="button-create-template">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t("common.add")}
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : !templates?.length ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>{t("scheduleSettings.noTemplates")}</p>
+                      <p className="text-sm mt-1">{t("scheduleSettings.createTemplate")}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {templates.map(tpl => (
+                        <TemplateCard
+                          key={tpl.id}
+                          template={tpl}
+                          voices={activeVoices}
+                          expanded={expandedTemplates.has(tpl.id)}
+                          onToggle={() => toggleExpanded(tpl.id)}
+                          onEdit={() => openEditDialog(tpl)}
+                          onDelete={() => deleteTemplateMutation.mutate(tpl.id)}
+                          onAddShift={() => openShiftDialog(tpl.id)}
+                          onEditShift={(shift) => openShiftDialog(tpl.id, shift)}
+                          onDeleteShift={(shiftId) => deleteShiftMutation.mutate({ id: shiftId, templateId: tpl.id })}
+                          totalSlots={totalSlots(tpl)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Calendar className="h-4 w-4" />
+                    {t("scheduleSettings.holidays")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {upcomingHolidays.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{t("common.noData")}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {upcomingHolidays.map((h, i) => (
+                        <div key={i} className="flex items-center gap-2 text-sm">
+                          <Badge variant={h.isPublic ? "default" : "outline"} className="shrink-0 text-xs">
+                            {h.date.slice(5)}
+                          </Badge>
+                          <span className="truncate">{h.nameRu}</span>
+                          <Badge variant="secondary" className="text-xs shrink-0">
+                            {h.country === "TR" ? "🇹🇷" : h.country === "RU" ? "🇷🇺" : "🌍"}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Users className="h-4 w-4" />
+                    {t("scheduleSettings.voices")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {activeVoices.map(v => {
+                      const color = getVoiceColor(v.id, activeVoices);
+                      return (
+                        <div key={v.id} className="flex items-center gap-2 text-sm">
+                          <div className={`w-3 h-3 rounded-full ${color.bg}`} />
+                          <span className="font-medium">{v.personaName || v.name}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {v.gender === "male" ? t("common.maleShort") : t("common.femaleShort")}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="holidays" className="mt-4">
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2 space-y-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <PartyPopper className="h-5 w-5" />
+                      {t("scheduleSettings.customHolidays")}
+                    </CardTitle>
+                    <CardDescription>
+                      {t("scheduleSettings.holidaysSubtitle")}
+                    </CardDescription>
+                  </div>
+                  <Button onClick={() => openHolidayDialog()} data-testid="button-add-holiday">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t("scheduleSettings.addHoliday")}
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {!customHolidays?.length ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <PartyPopper className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>{t("scheduleSettings.noCustomHolidays")}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {customHolidays.map(h => (
+                        <div
+                          key={h.id}
+                          className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                          data-testid={`custom-holiday-${h.id}`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Badge variant={h.isPublic ? "default" : "outline"} className="shrink-0 font-mono text-xs">
+                              {h.date}
+                            </Badge>
+                            <div className="min-w-0">
+                              <div className="font-medium truncate">{h.nameRu}</div>
+                              <div className="text-xs text-muted-foreground truncate">{h.name}</div>
+                            </div>
+                            <Badge variant="secondary" className="text-xs shrink-0">
+                              {h.country === "TR" ? "🇹🇷" : h.country === "RU" ? "🇷🇺" : "🌍"}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openHolidayDialog(h)}
+                              data-testid={`button-edit-holiday-${h.id}`}
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => deleteHolidayMutation.mutate(h.id)}
+                              data-testid={`button-delete-holiday-${h.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Globe className="h-4 w-4" />
+                    {t("scheduleSettings.builtInHolidays")}
+                  </CardTitle>
+                  <CardDescription>
+                    {holidays?.length || 0} {t("scheduleSettings.staticHolidaysCount")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                    {holidays?.map((h, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm">
+                        <Badge variant={h.isPublic ? "default" : "outline"} className="shrink-0 text-xs font-mono">
+                          {h.date.slice(5)}
+                        </Badge>
+                        <span className="truncate text-sm">{h.nameRu}</span>
+                        <Badge variant="secondary" className="text-xs shrink-0">
+                          {h.country === "TR" ? "🇹🇷" : h.country === "RU" ? "🇷🇺" : "🌍"}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <DialogUI open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[520px]">
@@ -452,23 +690,25 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
             <div className="space-y-2">
               <Label>{t("scheduleSettings.voices")}</Label>
               <div className="flex gap-2 flex-wrap">
-                {activeVoices.map(v => (
-                  <Button
-                    key={v.id}
-                    type="button"
-                    size="sm"
-                    variant={formVoiceIds.includes(v.id) ? "default" : "outline"}
-                    onClick={() => toggleVoice(v.id, setFormVoiceIds)}
-                    data-testid={`button-voice-${v.id}`}
-                  >
-                    <div className={`w-2 h-2 rounded-full mr-1 ${v.gender === "male" ? "bg-blue-400" : "bg-pink-400"}`} />
-                    {v.personaName || v.name}
-                  </Button>
-                ))}
+                {activeVoices.map(v => {
+                  const color = getVoiceColor(v.id, activeVoices);
+                  const selected = formVoiceIds.includes(v.id);
+                  return (
+                    <Button
+                      key={v.id}
+                      type="button"
+                      size="sm"
+                      variant={selected ? "default" : "outline"}
+                      className={selected ? `${color.bgLight} ${color.text} border ${color.border} hover:opacity-80` : ""}
+                      onClick={() => toggleVoice(v.id, setFormVoiceIds)}
+                      data-testid={`button-voice-${v.id}`}
+                    >
+                      <div className={`w-2.5 h-2.5 rounded-full mr-1.5 ${color.bg}`} />
+                      {v.personaName || v.name}
+                    </Button>
+                  );
+                })}
               </div>
-              <p className="text-xs text-muted-foreground">
-                {t("scheduleSettings.subtitle")}
-              </p>
             </div>
           </div>
           <DialogFooter>
@@ -490,7 +730,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
       <DialogUI open={shiftDialogOpen} onOpenChange={setShiftDialogOpen}>
         <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
-            <DialogTitle>{t("scheduleSettings.addShift")}</DialogTitle>
+            <DialogTitle>{editingShift ? t("scheduleSettings.editShift") : t("scheduleSettings.addShift")}</DialogTitle>
             <DialogDescription>
               {t("scheduleSettings.hostShifts")}
             </DialogDescription>
@@ -536,21 +776,26 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
             </div>
 
             <div className="space-y-2">
-              <Label>{t("scheduleSettings.hostShifts")}</Label>
+              <Label>{t("scheduleSettings.voices")}</Label>
               <div className="flex gap-2 flex-wrap">
-                {activeVoices.map(v => (
-                  <Button
-                    key={v.id}
-                    type="button"
-                    size="sm"
-                    variant={shiftVoiceIds.includes(v.id) ? "default" : "outline"}
-                    onClick={() => toggleVoice(v.id, setShiftVoiceIds)}
-                    data-testid={`button-shift-voice-${v.id}`}
-                  >
-                    <div className={`w-2 h-2 rounded-full mr-1 ${v.gender === "male" ? "bg-blue-400" : "bg-pink-400"}`} />
-                    {v.personaName || v.name}
-                  </Button>
-                ))}
+                {activeVoices.map(v => {
+                  const color = getVoiceColor(v.id, activeVoices);
+                  const selected = shiftVoiceIds.includes(v.id);
+                  return (
+                    <Button
+                      key={v.id}
+                      type="button"
+                      size="sm"
+                      variant={selected ? "default" : "outline"}
+                      className={selected ? `${color.bgLight} ${color.text} border ${color.border} hover:opacity-80` : ""}
+                      onClick={() => toggleVoice(v.id, setShiftVoiceIds)}
+                      data-testid={`button-shift-voice-${v.id}`}
+                    >
+                      <div className={`w-2.5 h-2.5 rounded-full mr-1.5 ${color.bg}`} />
+                      {v.personaName || v.name}
+                    </Button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -562,7 +807,94 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
               data-testid="button-submit-shift"
             >
               {createShiftMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {t("common.add")}
+              {editingShift ? t("common.save") : t("common.add")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </DialogUI>
+
+      <DialogUI open={holidayDialogOpen} onOpenChange={setHolidayDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingHoliday ? t("scheduleSettings.editHoliday") : t("scheduleSettings.addHoliday")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("scheduleSettings.holidaysSubtitle")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>{t("scheduleSettings.holidayDate")}</Label>
+              <Input
+                value={holidayDate}
+                onChange={e => setHolidayDate(e.target.value)}
+                placeholder={t("scheduleSettings.holidayDatePlaceholder")}
+                data-testid="input-holiday-date"
+              />
+              <p className="text-xs text-muted-foreground">MM-DD</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t("scheduleSettings.holidayNameRu")}</Label>
+              <Input
+                value={holidayNameRu}
+                onChange={e => setHolidayNameRu(e.target.value)}
+                placeholder="День Радио"
+                data-testid="input-holiday-name-ru"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t("scheduleSettings.holidayName")}</Label>
+              <Input
+                value={holidayName}
+                onChange={e => setHolidayName(e.target.value)}
+                placeholder="Radio Day"
+                data-testid="input-holiday-name"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{t("scheduleSettings.holidayCountry")}</Label>
+                <Select value={holidayCountry} onValueChange={setHolidayCountry}>
+                  <SelectTrigger data-testid="select-holiday-country">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BOTH">🌍 BOTH</SelectItem>
+                    <SelectItem value="RU">🇷🇺 RU</SelectItem>
+                    <SelectItem value="TR">🇹🇷 TR</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("scheduleSettings.holidayPublic")}</Label>
+                <div className="flex items-center gap-2 pt-2">
+                  <Switch
+                    checked={holidayIsPublic}
+                    onCheckedChange={setHolidayIsPublic}
+                    data-testid="switch-holiday-public"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {holidayIsPublic ? "✓" : "—"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHolidayDialogOpen(false)}>{t("common.cancel")}</Button>
+            <Button
+              onClick={submitHoliday}
+              disabled={!holidayDate.trim() || !holidayName.trim() || !holidayNameRu.trim() || createHolidayMutation.isPending || updateHolidayMutation.isPending}
+              data-testid="button-submit-holiday"
+            >
+              {(createHolidayMutation.isPending || updateHolidayMutation.isPending) && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              {editingHoliday ? t("common.save") : t("common.add")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -579,6 +911,7 @@ function TemplateCard({
   onEdit,
   onDelete,
   onAddShift,
+  onEditShift,
   onDeleteShift,
   totalSlots,
 }: {
@@ -589,6 +922,7 @@ function TemplateCard({
   onEdit: () => void;
   onDelete: () => void;
   onAddShift: () => void;
+  onEditShift: (shift: HostShift) => void;
   onDeleteShift: (id: string) => void;
   totalSlots: number;
 }) {
@@ -636,7 +970,12 @@ function TemplateCard({
                   {voiceNames.length > 0 && (
                     <>
                       <span>•</span>
-                      <Users className="h-3 w-3" />
+                      <div className="flex items-center gap-1">
+                        {template.voiceIds?.map(vid => {
+                          const color = getVoiceColor(vid, voices);
+                          return <div key={vid} className={`w-2 h-2 rounded-full ${color.bg}`} />;
+                        })}
+                      </div>
                       {voiceNames.join(", ")}
                     </>
                   )}
@@ -691,17 +1030,34 @@ function TemplateCard({
                           {shift.startHour}:00—{shift.endHour}:00
                         </Badge>
                         {shift.label && <span className="font-medium">{shift.label}</span>}
+                        <div className="flex items-center gap-1">
+                          {shift.voiceIds.map(vid => {
+                            const color = getVoiceColor(vid, voices);
+                            return <div key={vid} className={`w-2 h-2 rounded-full ${color.bg}`} />;
+                          })}
+                        </div>
                         <span className="text-muted-foreground">{shiftVoiceNames.join(", ")}</span>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => onDeleteShift(shift.id)}
-                        data-testid={`button-delete-shift-${shift.id}`}
-                      >
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => onEditShift(shift)}
+                          data-testid={`button-edit-shift-${shift.id}`}
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => onDeleteShift(shift.id)}
+                          data-testid={`button-delete-shift-${shift.id}`}
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   );
                 })}
@@ -710,21 +1066,28 @@ function TemplateCard({
 
             <div className="pt-2">
               <h4 className="text-sm font-medium mb-2">{t("schedule.title")}</h4>
-              <div className="relative h-8 rounded-md overflow-hidden bg-muted">
-                {shifts?.map(shift => {
+              <div className="relative h-10 rounded-md overflow-hidden bg-muted">
+                {shifts?.map((shift, shiftIdx) => {
                   const left = ((shift.startHour - template.startHour) / (template.endHour - template.startHour)) * 100;
                   const width = ((shift.endHour - shift.startHour) / (template.endHour - template.startHour)) * 100;
-                  const colors = ["bg-blue-500/40", "bg-pink-500/40", "bg-green-500/40", "bg-orange-500/40"];
-                  const idx = shifts.indexOf(shift) % colors.length;
+                  const firstVoiceColor = shift.voiceIds[0] ? getVoiceColor(shift.voiceIds[0], voices) : VOICE_COLORS[shiftIdx % VOICE_COLORS.length];
 
                   return (
                     <div
                       key={shift.id}
-                      className={`absolute top-0 h-full ${colors[idx]} border-x border-background flex items-center justify-center text-xs text-foreground font-medium`}
+                      className={`absolute top-0 h-full ${firstVoiceColor.bgLight} border-x border-background flex items-center justify-center gap-1`}
                       style={{ left: `${left}%`, width: `${width}%` }}
                       title={`${shift.startHour}:00—${shift.endHour}:00 ${shift.label || ""}`}
                     >
-                      {width > 15 && (shift.label || `${shift.startHour}-${shift.endHour}`)}
+                      {shift.voiceIds.map(vid => {
+                        const c = getVoiceColor(vid, voices);
+                        return <div key={vid} className={`w-2.5 h-2.5 rounded-full ${c.bg}`} />;
+                      })}
+                      {width > 15 && (
+                        <span className="text-xs font-medium text-foreground/80 ml-1">
+                          {shift.label || `${shift.startHour}-${shift.endHour}`}
+                        </span>
+                      )}
                     </div>
                   );
                 })}

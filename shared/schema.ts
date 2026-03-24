@@ -387,6 +387,24 @@ export const insertHostShiftSchema = createInsertSchema(hostShifts).omit({
 export type InsertHostShift = z.infer<typeof insertHostShiftSchema>;
 export type HostShift = typeof hostShifts.$inferSelect;
 
+export const customHolidays = pgTable("custom_holidays", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull(),
+  name: text("name").notNull(),
+  nameRu: text("name_ru").notNull(),
+  country: text("country").notNull().default("BOTH"),
+  isPublic: boolean("is_public").default(false),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertCustomHolidaySchema = createInsertSchema(customHolidays).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCustomHoliday = z.infer<typeof insertCustomHolidaySchema>;
+export type CustomHoliday = typeof customHolidays.$inferSelect;
+
 export const newsItems = pgTable("news_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   sourceId: varchar("source_id").notNull(),

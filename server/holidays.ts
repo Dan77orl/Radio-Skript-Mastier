@@ -55,6 +55,18 @@ const islamicHolidaysByYear: Record<number, Holiday[]> = {
   2026: islamicHolidays2026,
 };
 
+let cachedCustomHolidays: Holiday[] = [];
+
+export function setCustomHolidays(holidays: { date: string; name: string; nameRu: string; country: string; isPublic: boolean | null }[]) {
+  cachedCustomHolidays = holidays.map(h => ({
+    date: h.date,
+    name: h.name,
+    nameRu: h.nameRu,
+    country: h.country as "TR" | "RU" | "BOTH",
+    isPublic: h.isPublic ?? false,
+  }));
+}
+
 export function getHolidaysForDate(dateString: string): Holiday[] {
   const date = new Date(dateString);
   const month = (date.getMonth() + 1).toString().padStart(2, "0");
@@ -76,6 +88,12 @@ export function getHolidaysForDate(dateString: string): Holiday[] {
       if (h.date === key) {
         results.push(h);
       }
+    }
+  }
+
+  for (const h of cachedCustomHolidays) {
+    if (h.date === key) {
+      results.push(h);
     }
   }
 
@@ -101,6 +119,12 @@ export function getHolidaysForMonth(year: number, month: number): Holiday[] {
     }
   }
 
+  for (const h of cachedCustomHolidays) {
+    if (h.date.startsWith(monthStr + "-")) {
+      results.push({ ...h, date: `${year}-${h.date}` });
+    }
+  }
+
   return results;
 }
 
@@ -116,6 +140,10 @@ export function getHolidaysForYear(year: number): Holiday[] {
     for (const h of islamicForYear) {
       results.push({ ...h, date: `${year}-${h.date}` });
     }
+  }
+
+  for (const h of cachedCustomHolidays) {
+    results.push({ ...h, date: `${year}-${h.date}` });
   }
 
   return results;

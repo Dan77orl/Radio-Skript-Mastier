@@ -1,4 +1,4 @@
-import { users, settings, dialogs, newsSources, newsItems, ads, adPresets, voices, programTypes, programs, automations, automationRuns, scheduleTemplates, hostShifts, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdPreset, type InsertAdPreset, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun, type ScheduleTemplate, type InsertScheduleTemplate, type HostShift, type InsertHostShift } from "@shared/schema";
+import { users, settings, dialogs, newsSources, newsItems, ads, adPresets, voices, programTypes, programs, automations, automationRuns, scheduleTemplates, hostShifts, customHolidays, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdPreset, type InsertAdPreset, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun, type ScheduleTemplate, type InsertScheduleTemplate, type HostShift, type InsertHostShift, type CustomHoliday, type InsertCustomHoliday } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql } from "drizzle-orm";
 
@@ -85,6 +85,11 @@ export interface IStorage {
   updateHostShift(id: string, shift: Partial<InsertHostShift>): Promise<HostShift | undefined>;
   deleteHostShift(id: string): Promise<boolean>;
   deleteHostShiftsByTemplate(templateId: string): Promise<void>;
+
+  getCustomHolidays(): Promise<CustomHoliday[]>;
+  createCustomHoliday(holiday: InsertCustomHoliday): Promise<CustomHoliday>;
+  updateCustomHoliday(id: string, holiday: Partial<InsertCustomHoliday>): Promise<CustomHoliday | undefined>;
+  deleteCustomHoliday(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -506,6 +511,25 @@ export class DatabaseStorage implements IStorage {
 
   async deleteHostShiftsByTemplate(templateId: string): Promise<void> {
     await db.delete(hostShifts).where(eq(hostShifts.templateId, templateId));
+  }
+
+  async getCustomHolidays(): Promise<CustomHoliday[]> {
+    return db.select().from(customHolidays).orderBy(asc(customHolidays.date));
+  }
+
+  async createCustomHoliday(holiday: InsertCustomHoliday): Promise<CustomHoliday> {
+    const [created] = await db.insert(customHolidays).values(holiday).returning();
+    return created;
+  }
+
+  async updateCustomHoliday(id: string, holiday: Partial<InsertCustomHoliday>): Promise<CustomHoliday | undefined> {
+    const [updated] = await db.update(customHolidays).set(holiday).where(eq(customHolidays.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCustomHoliday(id: string): Promise<boolean> {
+    const result = await db.delete(customHolidays).where(eq(customHolidays.id, id)).returning();
+    return result.length > 0;
   }
 }
 

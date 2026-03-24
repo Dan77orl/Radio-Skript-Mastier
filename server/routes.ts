@@ -5,8 +5,8 @@ import { registerUser, loginUser, logoutUser, getCurrentUser, updateUserLanguage
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
-import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertAdPresetSchema, insertVoiceSchema, insertScheduleTemplateSchema, insertHostShiftSchema } from "@shared/schema";
-import { getHolidaysForDate, getHolidaysForYear, getHolidaysForMonth, getHolidayInfo } from "./holidays";
+import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertAdPresetSchema, insertVoiceSchema, insertScheduleTemplateSchema, insertHostShiftSchema, insertCustomHolidaySchema } from "@shared/schema";
+import { getHolidaysForDate, getHolidaysForYear, getHolidaysForMonth, getHolidayInfo, setCustomHolidays } from "./holidays";
 import { handleSupportChat } from "./support-chat";
 import { z } from "zod";
 import { promises as fs } from "fs";
@@ -3882,6 +3882,62 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       return res.json(filterByCountry(getHolidaysForYear(new Date().getFullYear())));
     } catch (error) {
       res.status(500).json({ error: "Failed to get holidays" });
+    }
+  });
+
+  async function refreshCustomHolidays() {
+    const custom = await storage.getCustomHolidays();
+    setCustomHolidays(custom);
+  }
+  refreshCustomHolidays();
+
+  app.get("/api/custom-holidays", async (_req, res) => {
+    try {
+      const holidays = await storage.getCustomHolidays();
+      res.json(holidays);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get custom holidays" });
+    }
+  });
+
+  const MMDD_REGEX = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+  app.post("/api/custom-holidays", async (req, res) => {
+    try {
+      const data = insertCustomHolidaySchema.parse(req.body);
+      if (!MMDD_REGEX.test(data.date)) {
+        return res.status(400).json({ error: "Date must be in MM-DD format" });
+      }
+      const holiday = await storage.createCustomHoliday(data);
+      await refreshCustomHolidays();
+      res.json(holiday);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to create custom holiday" });
+    }
+  });
+
+  app.patch("/api/custom-holidays/:id", async (req, res) => {
+    try {
+      if (req.body.date && !MMDD_REGEX.test(req.body.date)) {
+        return res.status(400).json({ error: "Date must be in MM-DD format" });
+      }
+      const holiday = await storage.updateCustomHoliday(req.params.id, req.body);
+      if (!holiday) return res.status(404).json({ error: "Holiday not found" });
+      await refreshCustomHolidays();
+      res.json(holiday);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update custom holiday" });
+    }
+  });
+
+  app.delete("/api/custom-holidays/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteCustomHoliday(req.params.id);
+      if (!deleted) return res.status(404).json({ error: "Holiday not found" });
+      await refreshCustomHolidays();
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete custom holiday" });
     }
   });
 
