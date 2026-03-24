@@ -25,6 +25,7 @@ import ShowsPage from "@/pages/shows";
 import AutomationsPage from "@/pages/automations";
 import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
+import { SupportChat } from "@/components/support-chat";
 
 function AdminRouter() {
   return (
@@ -114,6 +115,7 @@ function App() {
       <ThemeProvider defaultTheme="light" storageKey="radio-dialog-theme">
         <TooltipProvider>
           <AppContent />
+          <SupportChat />
           <Toaster />
         </TooltipProvider>
       </ThemeProvider>

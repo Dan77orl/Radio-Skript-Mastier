@@ -7,6 +7,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertAdPresetSchema, insertVoiceSchema, insertScheduleTemplateSchema, insertHostShiftSchema } from "@shared/schema";
 import { getHolidaysForDate, getHolidaysForYear, getHolidaysForMonth, getHolidayInfo } from "./holidays";
+import { handleSupportChat } from "./support-chat";
 import { z } from "zod";
 import { promises as fs } from "fs";
 import path from "path";
@@ -302,8 +303,11 @@ export async function registerRoutes(
   app.get("/api/auth/me", getCurrentUser);
   app.patch("/api/auth/language", updateUserLanguage);
 
+  app.post("/api/support-chat", handleSupportChat);
+
   app.use("/api", (req, res, next) => {
     if (req.path.startsWith("/auth/")) return next();
+    if (req.path === "/support-chat") return next();
     return requireAuth(req, res, next);
   });
   

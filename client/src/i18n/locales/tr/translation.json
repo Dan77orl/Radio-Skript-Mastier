@@ -953,5 +953,16 @@
       "copyright": "© {{year}} RadioFlow AI. Tüm hakları saklıdır."
     },
     "productName": "RadioFlow AI"
+  },
+  "supportChat": {
+    "title": "Destek Asistanı",
+    "openChat": "Destek sohbetini aç",
+    "closeChat": "Sohbeti kapat",
+    "placeholder": "RadioFlow AI hakkında bir soru sorun...",
+    "send": "Mesaj gönder",
+    "startVoice": "Sesli girişi başlat",
+    "stopVoice": "Sesli girişi durdur",
+    "welcome": "Merhaba! RadioFlow AI asistanınızım. Platform hakkında her şeyi sorabilirsiniz — ses ayarları, senaryo oluşturma, zamanlama ve daha fazlası.",
+    "error": "Üzgünüz, bir hata oluştu. Lütfen tekrar deneyin."
   }
 }

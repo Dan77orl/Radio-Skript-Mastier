@@ -43,6 +43,15 @@ Preferred communication style: Simple, everyday language.
 - **Landing page**: `client/src/pages/landing.tsx` — hero, features, pricing, how-it-works, CTA, footer; fully i18n'd (en/ru/tr); SEO meta tags set via useEffect
 - **Auth files**: `server/auth.ts` (backend logic), `client/src/hooks/use-auth.ts` (frontend hook), `client/src/pages/auth.tsx` (login/register page at /auth route)
 
+### AI Support Chat
+- **Endpoint**: `POST /api/support-chat` — accessible without authentication (placed before auth middleware)
+- **Backend**: `server/support-chat.ts` — uses Claude (if API key configured) or OpenAI fallback; in-memory conversation history per session
+- **System prompt**: Comprehensive knowledge of all platform features, setup steps, troubleshooting tips
+- **Frontend widget**: `client/src/components/support-chat.tsx` — floating button (bottom-right), expandable chat panel
+- **Voice input**: Web Speech API (SpeechRecognition) for voice-to-text, language-aware (ru-RU, en-US, tr-TR)
+- **i18n**: All widget labels/placeholders translated in en/ru/tr; AI auto-responds in user's current language
+- **Session management**: Conversation history kept in memory, cleared hourly; max 40 messages per session
+
 ### Core Entities
 1. **Users** - Authentication with email, password (hashed), name
 2. **Settings** - Application configuration (API keys, voice IDs, default prompts)

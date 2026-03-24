@@ -953,5 +953,16 @@
       "copyright": "© {{year}} RadioFlow AI. All rights reserved."
     },
     "productName": "RadioFlow AI"
+  },
+  "supportChat": {
+    "title": "Support Assistant",
+    "openChat": "Open support chat",
+    "closeChat": "Close chat",
+    "placeholder": "Ask a question about RadioFlow AI...",
+    "send": "Send message",
+    "startVoice": "Start voice input",
+    "stopVoice": "Stop voice input",
+    "welcome": "Hi! I'm your RadioFlow AI assistant. Ask me anything about the platform — how to set up voices, generate scripts, configure schedules, and more.",
+    "error": "Sorry, something went wrong. Please try again."
   }
 }
