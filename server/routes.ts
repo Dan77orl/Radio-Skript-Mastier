@@ -3498,7 +3498,8 @@ ${existingList}
       const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 Активные ведущие: ${ctx.personaList}.
-Создавай контент на русском языке в стиле радиостанции.`;
+Создавай контент на русском языке в стиле радиостанции.
+Твой стиль — живое повествование, как рассказ друга: плавные переходы между мыслями, логические связки, путеводная нить через весь выпуск. Никогда не перечисляй факты тезисами.`;
 
       let scriptText = "";
       const anthropic = await getAnthropicClient(req.session.userId);
