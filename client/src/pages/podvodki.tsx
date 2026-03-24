@@ -7,7 +7,7 @@ import Schedule from "./schedule";
 import ScheduleSettings from "./schedule-settings";
 
 export default function Podvodki() {
-  const [tab, setTab] = useState("generator");
+  const [tab, setTab] = useState("settings");
   const { t } = useTranslation();
 
   return (
@@ -21,6 +21,10 @@ export default function Podvodki() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
+          <TabsTrigger value="settings" className="gap-2" data-testid="tab-schedule-settings">
+            <Settings2 className="h-4 w-4" />
+            {t("podvodki.settings")}
+          </TabsTrigger>
           <TabsTrigger value="generator" className="gap-2" data-testid="tab-generator">
             <Wand2 className="h-4 w-4" />
             {t("podvodki.generator")}
@@ -28,10 +32,6 @@ export default function Podvodki() {
           <TabsTrigger value="schedule" className="gap-2" data-testid="tab-schedule">
             <Calendar className="h-4 w-4" />
             {t("podvodki.schedule")}
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="gap-2" data-testid="tab-schedule-settings">
-            <Settings2 className="h-4 w-4" />
-            {t("podvodki.settings")}
           </TabsTrigger>
         </TabsList>
 
