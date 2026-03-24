@@ -212,7 +212,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
 
   const saveDailyPromptMutation = useMutation({
     mutationFn: async (dailyPrompt: string) => {
-      const response = await apiRequest("PATCH", "/api/settings", { dailyPrompt });
+      const response = await apiRequest("POST", "/api/settings", { dailyPrompt });
       return response.json();
     },
     onSuccess: () => {
