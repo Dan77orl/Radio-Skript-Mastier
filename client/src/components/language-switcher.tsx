@@ -8,19 +8,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
-const languages = [
-  { code: "ru", label: "Русский", flag: "🇷🇺" },
-  { code: "en", label: "English", flag: "🇬🇧" },
-  { code: "tr", label: "Türkçe", flag: "🇹🇷" },
-];
+const languageCodes = ["ru", "en", "tr"] as const;
+const flags: Record<string, string> = { ru: "🇷🇺", en: "🇬🇧", tr: "🇹🇷" };
 
 export function LanguageSwitcher() {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const { isAuthenticated } = useAuth();
-
-  const currentLang = languages.find((l) => l.code === i18n.language) || languages[0];
+  const { toast } = useToast();
 
   const changeLanguage = async (code: string) => {
     i18n.changeLanguage(code);
@@ -28,6 +25,11 @@ export function LanguageSwitcher() {
       try {
         await apiRequest("PATCH", "/api/auth/language", { language: code });
       } catch (e) {
+        toast({
+          title: t("common.error"),
+          description: t("languages.saveError"),
+          variant: "destructive",
+        });
       }
     }
   };
@@ -40,15 +42,15 @@ export function LanguageSwitcher() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {languages.map((lang) => (
+        {languageCodes.map((code) => (
           <DropdownMenuItem
-            key={lang.code}
-            onClick={() => changeLanguage(lang.code)}
-            className={i18n.language === lang.code ? "bg-accent" : ""}
-            data-testid={`lang-${lang.code}`}
+            key={code}
+            onClick={() => changeLanguage(code)}
+            className={i18n.language === code ? "bg-accent" : ""}
+            data-testid={`lang-${code}`}
           >
-            <span className="mr-2">{lang.flag}</span>
-            {lang.label}
+            <span className="mr-2">{flags[code]}</span>
+            {t(`languages.${code}`)}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

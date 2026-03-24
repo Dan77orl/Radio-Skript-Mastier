@@ -811,7 +811,8 @@
   "languages": {
     "ru": "Русский",
     "en": "English",
-    "tr": "Türkçe"
+    "tr": "Türkçe",
+    "saveError": "Не удалось сохранить языковое предпочтение"
   },
   "validation": {
     "required": "Обязательное поле",

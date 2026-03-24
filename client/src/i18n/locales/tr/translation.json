@@ -809,9 +809,10 @@
     "description": "İstenen sayfa mevcut değil"
   },
   "languages": {
-    "ru": "Русский",
-    "en": "English",
-    "tr": "Türkçe"
+    "ru": "Rusça",
+    "en": "İngilizce",
+    "tr": "Türkçe",
+    "saveError": "Dil tercihi kaydedilemedi"
   },
   "validation": {
     "required": "Bu alan zorunludur",

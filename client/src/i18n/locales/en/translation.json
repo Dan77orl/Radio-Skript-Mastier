@@ -809,9 +809,10 @@
     "description": "The requested page does not exist"
   },
   "languages": {
-    "ru": "Русский",
+    "ru": "Russian",
     "en": "English",
-    "tr": "Türkçe"
+    "tr": "Turkish",
+    "saveError": "Failed to save language preference"
   },
   "validation": {
     "required": "This field is required",
