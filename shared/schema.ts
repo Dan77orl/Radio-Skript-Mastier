@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
@@ -279,6 +279,9 @@ export const programs = pgTable("programs", {
   moderationStatus: text("moderation_status").default("pending"),
   moderationNotes: text("moderation_notes"),
   moderatedAt: timestamp("moderated_at"),
+  audioDurationSeconds: real("audio_duration_seconds"),
+  scriptGeneratedAt: timestamp("script_generated_at"),
+  audioGeneratedAt: timestamp("audio_generated_at"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 

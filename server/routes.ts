@@ -3651,6 +3651,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         slotNumber: nextSlot,
         status: "script_ready",
         scriptText,
+        scriptGeneratedAt: new Date(),
       });
 
       res.json(program);
@@ -3997,6 +3998,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
             slotNumber,
             status: "script_ready",
             scriptText: item.script,
+            scriptGeneratedAt: new Date(),
           });
           results.push(program);
         } catch (saveError) {
@@ -4122,6 +4124,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const updated = await storage.updateProgram(program.id, {
         scriptText,
         status: "script_ready",
+        scriptGeneratedAt: new Date(),
       });
 
       res.json(updated);
@@ -4238,6 +4241,8 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         const filename = resolveFileName(programType?.fileNameTemplate, programType, program, timestamp);
         await fs.writeFile(path.join(audioDir, filename), combined);
 
+        const estimatedDuration = Math.round(combined.length / (192000 / 8));
+
         const totalExpected = segments.filter(s => stripEmotionTags(s.text).length > 0).length;
         const hasErrors = segmentErrors.length > 0;
         const status = hasErrors ? (audioBuffers.length < totalExpected ? "error" : "ready") : "ready";
@@ -4245,6 +4250,8 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         const updated = await storage.updateProgram(program.id, {
           audioUrl: `/audio/${filename}`,
           status,
+          audioDurationSeconds: estimatedDuration,
+          audioGeneratedAt: new Date(),
         });
 
         res.json({ ...updated, segmentCount: audioBuffers.length, totalSegments: totalExpected, errors: segmentErrors });
@@ -4260,9 +4267,13 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         const filename = resolveFileName(programType?.fileNameTemplate, programType, program, timestamp);
         await fs.writeFile(path.join(audioDir, filename), buffer);
 
+        const estimatedDurationSingle = Math.round(buffer.length / (192000 / 8));
+
         const updated = await storage.updateProgram(program.id, {
           audioUrl: `/audio/${filename}`,
           status: "ready",
+          audioDurationSeconds: estimatedDurationSingle,
+          audioGeneratedAt: new Date(),
         });
 
         res.json(updated);

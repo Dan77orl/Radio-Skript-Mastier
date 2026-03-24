@@ -1243,6 +1243,25 @@ export default function ShowsPage() {
                                 )}
                               </div>
                             )}
+                            {(program.audioDurationSeconds || program.scriptGeneratedAt || program.audioGeneratedAt) && (
+                              <div className="flex items-center gap-2 flex-wrap mt-1 text-xs text-muted-foreground">
+                                {program.audioDurationSeconds != null && (
+                                  <span className="inline-flex items-center gap-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded font-medium" data-testid={`text-duration-${program.id}`}>
+                                    🔊 {Math.floor(program.audioDurationSeconds / 60)}:{String(Math.round(program.audioDurationSeconds % 60)).padStart(2, "0")}
+                                  </span>
+                                )}
+                                {program.scriptGeneratedAt && (
+                                  <span data-testid={`text-script-time-${program.id}`}>
+                                    📝 {new Date(program.scriptGeneratedAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                                  </span>
+                                )}
+                                {program.audioGeneratedAt && (
+                                  <span data-testid={`text-audio-time-${program.id}`}>
+                                    🎙 {new Date(program.audioGeneratedAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
