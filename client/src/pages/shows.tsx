@@ -1624,46 +1624,41 @@ export default function ShowsPage() {
                 </div>
                 {settingsType.autoGenerate && (
                   <div className="space-y-3 mt-2">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="space-y-1">
-                        <span className="text-xs text-muted-foreground">{t("shows.episodesPerWeek")}</span>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={50}
-                          value={settingsType.weeklyCount || 7}
-                          onChange={(e) => setSettingsType(prev => prev ? { ...prev, weeklyCount: Number(e.target.value) } : null)}
-                          data-testid="input-weekly-count"
-                        />
+                    <div className="space-y-2">
+                      <div className="flex items-end gap-3">
+                        <div className="space-y-1 w-24 shrink-0">
+                          <span className="text-xs text-muted-foreground">{t("shows.episodesPerWeek")}</span>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={50}
+                            value={settingsType.weeklyCount || 7}
+                            onChange={(e) => setSettingsType(prev => prev ? { ...prev, weeklyCount: Number(e.target.value) } : null)}
+                            data-testid="input-weekly-count"
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-1 flex flex-col justify-end">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           size="sm"
                           variant={settingsType.autoVoice !== false ? "default" : "outline"}
                           onClick={() => setSettingsType(prev => prev ? { ...prev, autoVoice: !(prev.autoVoice !== false) } : null)}
-                          className="w-full"
                           data-testid="button-toggle-auto-voice"
                         >
                           {settingsType.autoVoice !== false ? t("shows.autoVoiceOn") : t("shows.autoVoiceOff")}
                         </Button>
-                      </div>
-                      <div className="space-y-1 flex flex-col justify-end">
                         <Button
                           size="sm"
                           variant={settingsType.autoIsolate ? "default" : "outline"}
                           onClick={() => setSettingsType(prev => prev ? { ...prev, autoIsolate: !prev.autoIsolate } : null)}
-                          className="w-full"
                           data-testid="button-toggle-auto-isolate"
                         >
                           {settingsType.autoIsolate ? t("shows.denoiserOn") : t("shows.denoiserOff")}
                         </Button>
-                      </div>
-                      <div className="space-y-1 flex flex-col justify-end">
                         <Button
                           size="sm"
                           variant={settingsType.autoUpload !== false ? "default" : "outline"}
                           onClick={() => setSettingsType(prev => prev ? { ...prev, autoUpload: !(prev.autoUpload !== false) } : null)}
-                          className="w-full"
                           data-testid="button-toggle-auto-upload"
                         >
                           {settingsType.autoUpload !== false ? t("shows.autoUploadOn") : t("shows.autoUploadOff")}
