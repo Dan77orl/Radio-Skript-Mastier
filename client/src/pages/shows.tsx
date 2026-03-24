@@ -671,6 +671,8 @@ export default function ShowsPage() {
     updateTypeMutation.mutate({
       id: settingsType.id,
       data: {
+        name: settingsType.name,
+        description: settingsType.description || "",
         dailyCount: settingsType.dailyCount,
         slotDescriptions: slotInputs.filter(s => s.trim()),
         sponsorName: settingsType.sponsorName,
@@ -1505,6 +1507,26 @@ export default function ShowsPage() {
           </DialogHeader>
           {settingsType && (
             <div className="space-y-6 py-4 min-w-0 w-full overflow-hidden">
+              <div className="grid gap-4 min-w-0">
+                <div className="space-y-2 min-w-0">
+                  <Label>{t("shows.programName")}</Label>
+                  <Input
+                    value={settingsType.name}
+                    onChange={(e) => setSettingsType(prev => prev ? { ...prev, name: e.target.value } : null)}
+                    data-testid="input-program-name"
+                  />
+                </div>
+                <div className="space-y-2 min-w-0">
+                  <Label>{t("shows.programDescription")}</Label>
+                  <Input
+                    value={settingsType.description || ""}
+                    onChange={(e) => setSettingsType(prev => prev ? { ...prev, description: e.target.value } : null)}
+                    placeholder={t("shows.programDescriptionPlaceholder")}
+                    data-testid="input-program-description"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4 min-w-0">
                 <div className="space-y-2 min-w-0">
                   <Label>{t("shows.episodesPerDay")}</Label>
@@ -1627,6 +1649,11 @@ export default function ShowsPage() {
                 <p className="text-xs text-muted-foreground">
                   {t("shows.fileNameVars")}
                 </p>
+                {settingsType.fileNameTemplate && (
+                  <p className="text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1">
+                    {t("shows.fileNameExample")}: <span className="font-mono font-medium">{settingsType.fileNameTemplate.replace(/\{название\}/g, settingsType.name).replace(/\{name\}/g, settingsType.name).replace(/\{дата\}/g, new Date().toISOString().split("T")[0]).replace(/\{date\}/g, new Date().toISOString().split("T")[0]).replace(/\{номер\}/g, "1").replace(/\{number\}/g, "1")}</span>
+                  </p>
+                )}
               </div>
 
               {voices && voices.length > 0 && (() => {
