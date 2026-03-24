@@ -193,6 +193,53 @@ function resolveAssignedVoices(voicesList: any[], programType: any): any[] {
   return voicesList.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(programType.id));
 }
 
+function isGarbageContent(text: string): boolean {
+  const garbagePatterns = [
+    /^skip to content/i,
+    /^new chat/i,
+    /by messaging chatgpt/i,
+    /you agree to our terms/i,
+    /privacy policy/i,
+    /chat history/i,
+    /search chats/i,
+    /sign up.*log in/i,
+    /create.*free account/i,
+  ];
+  const lowerText = text.toLowerCase().substring(0, 500);
+  const matchCount = garbagePatterns.filter(p => p.test(lowerText)).length;
+  if (matchCount >= 3) return true;
+  return false;
+}
+
+function extractSpeakerFromPrompt(promptText: string): string | null {
+  const patterns = [
+    /[Сс] вами\s+([А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+)/,
+    /[Вв]едущ(?:ая|ий|ая программы)[:\s]+([А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+)/,
+    /\*\*([А-ЯЁ][а-яё]+(?:\s+[А-ЯЁ][а-яё]+)?):\*\*/,
+    /^([А-ЯЁ][а-яё]+(?:\s+[А-ЯЁ][а-яё]+)?):[\s]/m,
+  ];
+  for (const p of patterns) {
+    const m = promptText.match(p);
+    if (m && m[1] && m[1].length > 3 && m[1].length < 40) {
+      return m[1].trim();
+    }
+  }
+  return null;
+}
+
+function extractFirecrawlKeywords(topics: string[]): string[] {
+  return topics.map(t => {
+    if (t.startsWith("http")) {
+      const qMatch = t.match(/[?&]q=([^&]+)/);
+      if (qMatch) {
+        return decodeURIComponent(qMatch[1]).replace(/\+/g, " ").replace(/%s\s*/g, "").trim();
+      }
+      return "";
+    }
+    return t;
+  }).filter(t => t.length > 0);
+}
+
 async function fetchAndExpandUrls(promptText: string): Promise<{ prompt: string; fetchedContent: string }> {
   const urlRegex = /https?:\/\/[^\s]+/g;
   const urls = promptText.match(urlRegex);
@@ -210,8 +257,9 @@ async function fetchAndExpandUrls(promptText: string): Promise<{ prompt: string;
       const response = await fetch(url, {
         signal: controller.signal,
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; RadioBot/1.0)",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
         },
         redirect: "follow",
       });
@@ -237,13 +285,17 @@ async function fetchAndExpandUrls(promptText: string): Promise<{ prompt: string;
 
         if (text.length > 20000) text = text.substring(0, 20000) + "...";
 
-        if (text.length > 50) {
+        if (text.length > 50 && !isGarbageContent(text)) {
           fetchedContent += `\n\n--- КОНТЕНТ ИЗ ССЫЛКИ ${url} ---\n${text}\n--- КОНЕЦ КОНТЕНТА ---\n`;
           expandedPrompt = expandedPrompt.replace(url, `[контент загружен из: ${url}]`);
+        } else {
+          console.log(`URL ${url}: fetched content is garbage or too short (${text.length} chars), removing URL from prompt`);
+          expandedPrompt = expandedPrompt.replace(url, "").trim();
         }
       }
     } catch (err: any) {
       console.log(`Failed to fetch URL ${url}: ${err.message}`);
+      expandedPrompt = expandedPrompt.replace(url, "").trim();
     }
   }
 
@@ -2897,27 +2949,41 @@ ${existingList}
 
       const slotDesc = programType.slotDescriptions?.[nextSlot - 1] || "";
       
-      const { prompt: expandedPrompt, fetchedContent } = await fetchAndExpandUrls(programType.defaultPrompt || "");
+      const rawPrompt = programType.defaultPrompt || "";
+      const { prompt: expandedPrompt, fetchedContent } = await fetchAndExpandUrls(rawPrompt);
       let prompt = expandedPrompt;
       const hasUrlContent = !!fetchedContent;
 
       const voicesList = await storage.getVoices();
       const assignedVoices = resolveAssignedVoices(voicesList, programType);
       const isMultiSpeaker = assignedVoices.length >= 2;
-      const speakerNames = assignedVoices.length > 0
+
+      const promptSpeaker = extractSpeakerFromPrompt(rawPrompt);
+      const voicePersonaNames = assignedVoices.length > 0
         ? assignedVoices.map((v: any) => v.personaName || v.name)
         : [programType.name];
+      const speakerNames = (promptSpeaker && !isMultiSpeaker) ? [promptSpeaker] : voicePersonaNames;
+
+      const hasEpisodeContent = rawPrompt.length > 300 
+        && /(?:выпуск|[Сс] вами|[Пп]ривет.*программа|[Пп]рограмма.*[«"])/m.test(rawPrompt)
+        && /\n.{50,}\n/m.test(rawPrompt);
+
+      const fcKeywords = programType.firecrawlTopics?.length
+        ? extractFirecrawlKeywords(programType.firecrawlTopics)
+        : [];
 
       if (hasUrlContent) {
-        prompt += `\n\nЭТАЛОННЫЕ ВЫПУСКИ — изучи стиль, формат, тон, тематику и структуру:${fetchedContent}
+        prompt += `\n\nЭТАЛОННЫЕ ВЫПУСКИ ИЗ ССЫЛКИ — изучи стиль, формат, тон, тематику:${fetchedContent}`;
+      }
 
-КРИТИЧЕСКИ ВАЖНО:
-- Создай НОВЫЙ выпуск ТОЧНО В ТАКОМ ЖЕ стиле, формате и тематической области
-- Тематика должна оставаться В ТОЙ ЖЕ ПРЕДМЕТНОЙ ОБЛАСТИ что и в эталонах (например, если эталоны про недвижимость — пиши про недвижимость, если про психологию — про психологию)
-- Выбери НОВЫЙ конкретный аспект/угол внутри этой же предметной области
-- Ведущий(ая) передачи: ${speakerNames.join(", ")}. Используй ТОЛЬКО ${speakerNames.length === 1 ? "это имя" : "эти имена"} — НЕ копируй имена из эталонов
-- Сохраняй структуру выпуска: приветствие, основная часть, заключение — как в эталонах
-- Название передачи: "${programType.name}"`;
+      if (hasEpisodeContent || hasUrlContent) {
+        prompt += `\n\nКРИТИЧЕСКИ ВАЖНО:
+- Текст выше — это ЭТАЛОННЫЕ ВЫПУСКИ передачи "${programType.name}". Создай НОВЫЙ выпуск ТОЧНО В ТАКОМ ЖЕ стиле, формате и тематической области
+- Тематика: оставайся В ТОЙ ЖЕ ПРЕДМЕТНОЙ ОБЛАСТИ (${fcKeywords.length > 0 ? fcKeywords.join(", ") : "как в эталонах выше"})
+- Выбери НОВЫЙ конкретный аспект/угол внутри этой предметной области
+- Ведущий(ая): ${speakerNames.join(", ")}. Используй ТОЧНО ${speakerNames.length === 1 ? "это имя" : "эти имена"} ведущих
+- Сохраняй структуру: приветствие, основная часть, заключение — как в эталонах
+- Пиши ПРОСТЫМ ТЕКСТОМ как в эталонах (без markdown-разметки, без звёздочек, без форматирования)`;
       }
 
       if (slotDesc) {
@@ -2949,9 +3015,9 @@ ${existingList}
 
       prompt += `\nЦелевой хронометраж: ~${durationStr} минут. Рассчитывай объём текста под эту длительность.`;
 
-      if (programType.useFirecrawl && programType.firecrawlTopics?.length) {
+      if (programType.useFirecrawl && fcKeywords.length > 0) {
         try {
-          const research = await researchForProgram(programType.firecrawlTopics);
+          const research = await researchForProgram(fcKeywords);
           if (research) {
             prompt += research;
           }
@@ -2960,31 +3026,29 @@ ${existingList}
         }
       }
 
-      if (programType.firecrawlTopics?.length && !hasUrlContent) {
-        prompt += `\n\nТематика передачи "${programType.name}": ${programType.firecrawlTopics.join(", ")}. Создавай контент СТРОГО в рамках этой тематики.`;
-      } else if (programType.firecrawlTopics?.length && hasUrlContent) {
-        prompt += `\n\nКлючевые темы передачи: ${programType.firecrawlTopics.join(", ")}. Выбирай новые аспекты в рамках этих тем.`;
+      if (fcKeywords.length > 0) {
+        prompt += `\n\nТематика передачи "${programType.name}": ${fcKeywords.join(", ")}. Создавай контент СТРОГО в рамках этой тематики.`;
       }
 
       const title = `${programType.name} ${dateStr} #${nextSlot}`;
 
-      if (isMultiSpeaker) {
-        const speakerList = speakerNames.join(", ");
-        prompt += `\n\nФОРМАТ: мульти-спикерный скрипт. Спикеры: ${speakerList}
+      if (!hasEpisodeContent && !hasUrlContent) {
+        if (isMultiSpeaker) {
+          const speakerList = speakerNames.join(", ");
+          prompt += `\n\nФОРМАТ: мульти-спикерный скрипт. Спикеры: ${speakerList}
 Каждая реплика начинается с [Имя]: и содержит теги эмоций.
 Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
 Пример:
 [${speakerNames[0]}]: [energetic] [fast] Текст...
 [${speakerNames[1] || speakerNames[0]}]: [announcer] ЗАГОЛОВОК`;
-      } else if (speakerNames.length === 1) {
-        prompt += `\n\nФОРМАТ: скрипт с одним ведущим. Ведущий(ая): ${speakerNames[0]}
+        } else if (speakerNames.length === 1) {
+          prompt += `\n\nФОРМАТ: скрипт с одним ведущим. Ведущий(ая): ${speakerNames[0]}
 Каждая реплика начинается с [${speakerNames[0]}]: и содержит теги эмоций.
 Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
 Пример:
 [${speakerNames[0]}]: [energetic] Текст ведущего...`;
-      }
+        }
 
-      if (!hasUrlContent) {
         const scriptsWithFormat = existingPrograms
           .filter(p => p.scriptText && p.scriptText.includes("]:"))
           .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
@@ -3006,15 +3070,15 @@ ${existingList}
       }
 
       prompt += `\n\nСТРОГИЕ ПРАВИЛА:
-- Выбери НОВЫЙ аспект/угол${hasUrlContent ? " в рамках той же предметной области что и в эталонах" : ""}, которого НЕТ в списке выше
+- Выбери НОВЫЙ аспект/угол${hasEpisodeContent || hasUrlContent ? " в рамках той же предметной области" : ""}, которого НЕТ в списке выше
 - НЕ выдумывай названия институтов, университетов и исследований
 - Если есть данные из интернета — используй ТОЛЬКО их как источник фактов
 - Если нет данных — давай практические советы без выдуманных ссылок на исследования
 - НЕ повторяй темы, которые уже были в списке выше
-- Используй ТОЛЬКО назначенных ведущих: ${speakerNames.join(", ")}
+- Ведущий(ая): ${speakerNames.join(", ")}
 
 В САМОЙ ПЕРВОЙ СТРОКЕ ответа напиши ТЕМА: и краткое название темы выпуска (2-5 слов). Например:
-ТЕМА: ${hasUrlContent ? programType.name + " — новый аспект" : "Интересная тема выпуска"}
+ТЕМА: ${fcKeywords.length > 0 ? fcKeywords[0].split(" ").slice(0, 3).join(" ") : "Новый аспект темы"}
 После этого начинай сценарий.`;
 
       const ctx = await buildStationContext(req.session.userId);
@@ -3187,11 +3251,23 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const assignedVoices = resolveAssignedVoices(voicesList, programType);
       const isMultiSpeaker = assignedVoices.length >= 2;
 
-      const { prompt: expandedDefaultPrompt, fetchedContent: urlContent } = await fetchAndExpandUrls(programType.defaultPrompt || "");
+      const rawPrompt = programType.defaultPrompt || "";
+      const { prompt: expandedDefaultPrompt, fetchedContent: urlContent } = await fetchAndExpandUrls(rawPrompt);
       const hasUrlContent = !!urlContent;
-      const speakerNames = assignedVoices.length > 0
+
+      const promptSpeaker = extractSpeakerFromPrompt(rawPrompt);
+      const voicePersonaNames = assignedVoices.length > 0
         ? assignedVoices.map((v: any) => v.personaName || v.name)
         : [programType.name];
+      const speakerNames = (promptSpeaker && !isMultiSpeaker) ? [promptSpeaker] : voicePersonaNames;
+
+      const hasEpisodeContent = rawPrompt.length > 300
+        && /(?:выпуск|[Сс] вами|[Пп]ривет.*программа|[Пп]рограмма.*[«"])/m.test(rawPrompt)
+        && /\n.{50,}\n/m.test(rawPrompt);
+
+      const fcKeywords = programType.firecrawlTopics?.length
+        ? extractFirecrawlKeywords(programType.firecrawlTopics)
+        : [];
       
       let prompt = `Создай ${totalCount} ГОТОВЫХ сценариев для радиопередачи "${programType.name}" на радио "${ctx.stationName}".
 
@@ -3201,43 +3277,46 @@ ${expandedDefaultPrompt}
 `;
       
       if (hasUrlContent) {
-        prompt += `\nЭТАЛОННЫЕ ВЫПУСКИ ИЗ ССЫЛОК — изучи стиль, формат, тон, тематику и структуру:${urlContent}
+        prompt += `\nЭТАЛОННЫЕ ВЫПУСКИ ИЗ ССЫЛОК — изучи стиль, формат, тон, тематику:${urlContent}\n`;
+      }
 
-КРИТИЧЕСКИ ВАЖНО:
-- Создай новые выпуски ТОЧНО В ТАКОМ ЖЕ стиле, формате и тематической области
-- Тематика должна оставаться В ТОЙ ЖЕ ПРЕДМЕТНОЙ ОБЛАСТИ что и в эталонах
-- Каждый выпуск — НОВЫЙ аспект/угол внутри этой же предметной области
-- Ведущий(ая) передачи: ${speakerNames.join(", ")}. Используй ТОЛЬКО ${speakerNames.length === 1 ? "это имя" : "эти имена"} — НЕ копируй имена из эталонов
+      if (hasEpisodeContent || hasUrlContent) {
+        prompt += `\nКРИТИЧЕСКИ ВАЖНО:
+- Текст выше — ЭТАЛОННЫЕ ВЫПУСКИ. Создай новые ТОЧНО В ТАКОМ ЖЕ стиле, формате и тематической области
+- Тематика: оставайся В ТОЙ ЖЕ ПРЕДМЕТНОЙ ОБЛАСТИ (${fcKeywords.length > 0 ? fcKeywords.join(", ") : "как в эталонах"})
+- Каждый выпуск — НОВЫЙ аспект/угол внутри этой предметной области
+- Ведущий(ая): ${speakerNames.join(", ")}. Используй ТОЧНО ${speakerNames.length === 1 ? "это имя" : "эти имена"} ведущих
 - Сохраняй структуру: приветствие, основная часть, заключение — как в эталонах
+- Пиши ПРОСТЫМ ТЕКСТОМ как в эталонах (без markdown-разметки, без звёздочек)
 `;
       }
 
-      if (isMultiSpeaker) {
-        const speakerList = speakerNames.join(", ");
-        prompt += `\nФОРМАТ: мульти-спикерный скрипт. Спикеры: ${speakerList}
+      if (!hasEpisodeContent && !hasUrlContent) {
+        if (isMultiSpeaker) {
+          const speakerList = speakerNames.join(", ");
+          prompt += `\nФОРМАТ: мульти-спикерный скрипт. Спикеры: ${speakerList}
 Каждая реплика начинается с [Имя]: и содержит теги эмоций.
 Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
 Пример:
 [${speakerNames[0]}]: [energetic] [fast] Текст...
 [${speakerNames[1] || speakerNames[0]}]: [announcer] ЗАГОЛОВОК
 \n`;
-      } else if (speakerNames.length === 1) {
-        prompt += `\nФОРМАТ: скрипт с одним ведущим. Ведущий(ая): ${speakerNames[0]}
+        } else if (speakerNames.length === 1) {
+          prompt += `\nФОРМАТ: скрипт с одним ведущим. Ведущий(ая): ${speakerNames[0]}
 Каждая реплика начинается с [${speakerNames[0]}]: и содержит теги эмоций.
 Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
 Пример:
 [${speakerNames[0]}]: [energetic] Текст ведущего...
 \n`;
-      }
+        }
 
-      if (!hasUrlContent) {
         const latestRef = existingPrograms
           .filter(p => p.scriptText && p.scriptText.includes("]:"))
           .sort((a, b) => (b.id > a.id ? 1 : -1))
           .slice(0, 1)[0];
 
         if (latestRef?.scriptText) {
-          prompt += `\nОБРАЗЕЦ — последний выпуск с назначенными дикторами. Следуй ТОЧНО такому же формату и стилю:\n---\n${latestRef.scriptText.substring(0, 5000)}\n---\n`;
+          prompt += `\nОБРАЗЕЦ — последний выпуск. Следуй ТОЧНО такому же формату и стилю:\n---\n${latestRef.scriptText.substring(0, 5000)}\n---\n`;
         }
       }
 
@@ -3245,8 +3324,8 @@ ${expandedDefaultPrompt}
         prompt += `\nЭТАЛОНЫЙ КОНТЕНТ — изучи стиль, формат, тон. Создай новые выпуски ТОЧНО В ТАКОМ ЖЕ стиле:\n${referenceContent.substring(0, 30000)}\n`;
       }
 
-      if (programType.firecrawlTopics?.length) {
-        prompt += `\nКлючевые темы передачи: ${programType.firecrawlTopics.join(", ")}. Все выпуски должны быть в рамках этих тем.\n`;
+      if (fcKeywords.length > 0) {
+        prompt += `\nТематика передачи: ${fcKeywords.join(", ")}. Все выпуски должны быть в рамках этих тем.\n`;
       }
 
       if (existingTitles) {
@@ -3264,20 +3343,22 @@ ${expandedDefaultPrompt}
         prompt += `\nДополнительные инструкции: ${instructions}\n`;
       }
 
-      const speakerFormatNote = isMultiSpeaker 
-        ? ", в мульти-спикерном формате [Имя]: [теги] текст" 
-        : speakerNames.length === 1 
-          ? `, от лица ${speakerNames[0]} в формате [${speakerNames[0]}]: [теги] текст`
-          : ", с репликами ведущих";
+      const formatNote = hasEpisodeContent || hasUrlContent
+        ? `, в точно таком же стиле как эталоны, от лица ${speakerNames.join(", ")}`
+        : isMultiSpeaker
+          ? ", в мульти-спикерном формате [Имя]: [теги] текст"
+          : speakerNames.length === 1
+            ? `, от лица ${speakerNames[0]}`
+            : ", с репликами ведущих";
 
       prompt += `
 Ответь ТОЛЬКО JSON массивом из ${totalCount} объектов. Каждый объект:
 - "title": уникальное короткое название выпуска
-- "script": ПОЛНЫЙ ГОТОВЫЙ сценарий выпуска (текст для озвучки${speakerFormatNote})
+- "script": ПОЛНЫЙ ГОТОВЫЙ сценарий выпуска (текст для озвучки${formatNote})
 
-ВАЖНО: Используй ТОЛЬКО ведущих: ${speakerNames.join(", ")}. НЕ используй другие имена.
+ВАЖНО: Ведущий(ая): ${speakerNames.join(", ")}.
 Формат: [{"title":"...","script":"..."},...]
-Все ${totalCount} выпусков должны быть разными.${referenceContent || hasUrlContent ? " Стиль и формат — как в эталоне." : ""}
+Все ${totalCount} выпусков должны быть разными.${referenceContent || hasEpisodeContent || hasUrlContent ? " Стиль и формат — как в эталоне." : ""}
 Ответь ТОЛЬКО JSON массивом, без пояснений.`;
 
       const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
