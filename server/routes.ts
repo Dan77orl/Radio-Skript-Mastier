@@ -418,11 +418,16 @@ export async function registerRoutes(
       const dialog = await storage.getDialog(req.params.id);
       if (!dialog) return res.status(404).json({ error: "Dialog not found" });
 
-      const text = dialog.maleText && dialog.femaleText 
+      const hasBothTexts = dialog.maleText && dialog.femaleText;
+      const text = hasBothTexts
         ? `Мужская реплика:\n${dialog.maleText}\n\nЖенская реплика:\n${dialog.femaleText}`
         : dialog.scriptText || "";
 
       if (!text) return res.status(400).json({ error: "No text to tag" });
+
+      const responseFormat = hasBothTexts
+        ? '{"maleText": "текст с тегами", "femaleText": "текст с тегами"}'
+        : '{"scriptText": "текст с тегами"}';
 
       const systemPrompt = `Ты — разметчик эмоций для радио-диалогов. Добавь метатеги эмоций в начало каждого абзаца текста.
 
@@ -432,36 +437,50 @@ export async function registerRoutes(
 - Ставь 1-2 тега в начало каждого абзаца/реплики
 - Выбирай тег по настроению и содержанию текста
 - НЕ меняй сам текст, только добавляй теги
-- Верни JSON: {"maleText": "...", "femaleText": "..."} если есть оба текста, или {"scriptText": "..."} если один`;
+- Ответ строго в формате JSON без markdown обёртки: ${responseFormat}`;
 
-      const settingsData = await storage.getSettings(req.session.userId);
-      let result: Record<string, string>;
+      const settingsData = await storage.getSettings(req.session?.userId);
+      let respText: string;
 
       if (settingsData?.anthropicApiKey) {
         const anthropic = new Anthropic({ apiKey: settingsData.anthropicApiKey });
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 2000,
+          max_tokens: 4000,
           system: systemPrompt,
           messages: [{ role: "user", content: text }],
         });
-        const respText = response.content[0].type === "text" ? response.content[0].text : "{}";
-        result = JSON.parse(respText);
+        respText = response.content[0].type === "text" ? response.content[0].text : "{}";
       } else {
         const openai = new OpenAI();
         const response = await openai.chat.completions.create({
           model: "gpt-4o-mini",
-          max_tokens: 2000,
+          max_tokens: 4000,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: text },
           ],
         });
-        const respText = response.choices[0]?.message?.content || "{}";
-        result = JSON.parse(respText);
+        respText = response.choices[0]?.message?.content || "{}";
       }
 
-      const updated = await storage.updateDialog(req.params.id, result);
+      const jsonMatch = respText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const cleanJson = jsonMatch ? jsonMatch[1].trim() : respText.trim();
+      const result = JSON.parse(cleanJson) as Record<string, string>;
+
+      const updateData: Record<string, string> = {};
+      if (hasBothTexts) {
+        if (result.maleText) updateData.maleText = result.maleText;
+        if (result.femaleText) updateData.femaleText = result.femaleText;
+      } else {
+        if (result.scriptText) updateData.scriptText = result.scriptText;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "AI did not return tagged text" });
+      }
+
+      const updated = await storage.updateDialog(req.params.id, updateData);
       res.json(updated);
     } catch (error) {
       console.error("Error auto-tagging dialog:", error);
