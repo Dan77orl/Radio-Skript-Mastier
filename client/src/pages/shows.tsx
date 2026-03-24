@@ -1461,7 +1461,7 @@ export default function ShowsPage() {
                     className="flex-1"
                   />
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1.5 max-w-full overflow-hidden">
                   {[
                     { label: "{название}_{дата}_{номер}", value: "{название}_{дата}_{номер}" },
                     { label: "{название}_{дата}", value: "{название}_{дата}" },
@@ -1472,7 +1472,7 @@ export default function ShowsPage() {
                     <Badge
                       key={preset.value}
                       variant={settingsType.fileNameTemplate === preset.value ? "default" : "outline"}
-                      className="cursor-pointer text-xs hover:bg-primary/10 transition-colors"
+                      className="cursor-pointer text-xs hover:bg-primary/10 transition-colors shrink-0"
                       onClick={() => setSettingsType(prev => prev ? { ...prev, fileNameTemplate: preset.value } : null)}
                       data-testid={`preset-filename-${preset.value}`}
                     >
