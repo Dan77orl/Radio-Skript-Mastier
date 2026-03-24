@@ -20,6 +20,7 @@ import { Plus, Trash2, Clock, Users, Calendar, Settings2, Loader2, Edit3, Chevro
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getCleanVoiceName } from "@/lib/utils";
 import type { Voice, InsertScheduleTemplate, InsertHostShift, CustomHoliday, InsertCustomHoliday } from "@shared/schema";
 
 interface ScheduleTemplate {
@@ -524,7 +525,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
                   return (
                     <div key={v.id} className="flex items-center gap-2 text-sm">
                       <div className={`w-3 h-3 rounded-full ${color.bg}`} />
-                      <span className="font-medium">{v.personaName || v.name}</span>
+                      <span className="font-medium">{getCleanVoiceName(v)}</span>
                       <span className="text-muted-foreground text-xs">
                         {v.gender === "male" ? t("common.maleShort") : t("common.femaleShort")}
                       </span>
@@ -644,7 +645,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
                       data-testid={`button-voice-${v.id}`}
                     >
                       <div className={`w-2.5 h-2.5 rounded-full mr-1.5 ${color.bg}`} />
-                      {v.personaName || v.name}
+                      {getCleanVoiceName(v)}
                     </Button>
                   );
                 })}
@@ -732,7 +733,7 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
                       data-testid={`button-shift-voice-${v.id}`}
                     >
                       <div className={`w-2.5 h-2.5 rounded-full mr-1.5 ${color.bg}`} />
-                      {v.personaName || v.name}
+                      {getCleanVoiceName(v)}
                     </Button>
                   );
                 })}
@@ -878,7 +879,7 @@ function TemplateCard({
   const voiceNames = template.voiceIds
     ?.map(id => voices.find(v => v.id === id))
     .filter(Boolean)
-    .map(v => v!.personaName || v!.name) || [];
+    .map(v => getCleanVoiceName(v!)) || [];
 
   return (
     <Collapsible open={expanded} onOpenChange={onToggle}>
@@ -957,7 +958,7 @@ function TemplateCard({
                   const shiftVoiceNames = shift.voiceIds
                     .map(id => voices.find(v => v.id === id))
                     .filter(Boolean)
-                    .map(v => v!.personaName || v!.name);
+                    .map(v => getCleanVoiceName(v!));
 
                   return (
                     <div

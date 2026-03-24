@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getCleanVoiceName } from "@/lib/utils";
 import { 
   Plus, 
   Play, 
@@ -1622,7 +1623,7 @@ export default function ShowsPage() {
                     <div className="flex flex-wrap gap-2">
                       {assignedVoices.map(voice => (
                         <Badge key={voice.id} variant="secondary" className="text-sm py-1 px-3" data-testid={`badge-voice-${voice.id}`}>
-                          {voice.personaName || voice.name}
+                          {getCleanVoiceName(voice)}
                         </Badge>
                       ))}
                     </div>
@@ -2047,8 +2048,8 @@ export default function ShowsPage() {
                       <SelectContent>
                         <SelectItem value="__none__">{t("shows.noSpeaker")}</SelectItem>
                         {typeVoices.map(v => (
-                          <SelectItem key={v.id} value={v.personaName || v.name}>
-                            {v.personaName || v.name}
+                          <SelectItem key={v.id} value={getCleanVoiceName(v)}>
+                            {getCleanVoiceName(v)}
                           </SelectItem>
                         ))}
                       </SelectContent>

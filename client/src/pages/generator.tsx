@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getCleanVoiceName } from "@/lib/utils";
 import { Wand2, Loader2, Calendar, Clock, User, Users, CheckCircle, Edit3, Send, RefreshCw, ChevronDown, ChevronUp, Play, FileText, Save, Search, Globe, X, Trash2, Plus, MessageSquare } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -588,7 +589,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                       const slotVoiceNames = slotInfo?.voiceIds
                         ?.map(id => activeVoices.find(v => v.id === id))
                         .filter(Boolean)
-                        .map(v => v!.personaName || v!.name) || [];
+                        .map(v => getCleanVoiceName(v!)) || [];
 
                       return (
                         <Collapsible
@@ -785,8 +786,8 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                     {(() => {
                                       const maleVoice = slotInfo?.voiceIds?.[0] ? activeVoices.find(v => v.id === slotInfo.voiceIds[0]) : null;
                                       const femaleVoice = slotInfo?.voiceIds?.[1] ? activeVoices.find(v => v.id === slotInfo.voiceIds[1]) : null;
-                                      const maleName = maleVoice?.personaName || maleVoice?.name || t("generator.maleVoice");
-                                      const femaleName = femaleVoice?.personaName || femaleVoice?.name || t("generator.femaleVoice");
+                                      const maleName = maleVoice ? getCleanVoiceName(maleVoice) : t("generator.maleVoice");
+                                      const femaleName = femaleVoice ? getCleanVoiceName(femaleVoice) : t("generator.femaleVoice");
                                       
                                       if (dialog.scriptText && dialog.scriptText.includes(":")) {
                                         const lines = parseScriptLines(dialog.scriptText);

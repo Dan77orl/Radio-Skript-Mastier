@@ -137,14 +137,14 @@ async function buildStationContext(userId?: string): Promise<StationContext> {
   const femaleVoices = activeVoices.filter(v => v.gender === "female");
   
   const malePersona = maleVoices.length > 0 
-    ? maleVoices.map(v => v.personaName || v.name).join(", ")
+    ? maleVoices.map(v => getCleanVoiceName(v)).join(", ")
     : "ведущий";
   const femalePersona = femaleVoices.length > 0 
-    ? femaleVoices.map(v => v.personaName || v.name).join(", ")
+    ? femaleVoices.map(v => getCleanVoiceName(v)).join(", ")
     : "ведущая";
   
   const personaList = activeVoices.length > 0 
-    ? activeVoices.map(v => `${v.personaName || v.name} (${v.gender === "male" ? "мужчина" : "женщина"})`).join(", ")
+    ? activeVoices.map(v => `${getCleanVoiceName(v)} (${v.gender === "male" ? "мужчина" : "женщина"})`).join(", ")
     : "ведущий (мужчина), ведущая (женщина)";
 
   let knowledgeBase = "";
@@ -225,6 +225,14 @@ function extractSpeakerFromPrompt(promptText: string): string | null {
     }
   }
   return null;
+}
+
+function getCleanVoiceName(voice: { personaName?: string | null; name: string }): string {
+  if (voice.personaName) return voice.personaName;
+  const name = voice.name;
+  const dashIdx = name.indexOf(" - ");
+  if (dashIdx > 0) return name.substring(0, dashIdx).trim();
+  return name;
 }
 
 function extractFirecrawlKeywords(topics: string[]): string[] {
@@ -1284,7 +1292,7 @@ ${styleInstructions}
         });
         const slotVoiceIds = matchingShift?.voiceIds || template?.voiceIds || null;
         const slotVoiceNames = slotVoiceIds 
-          ? allVoices.filter(v => slotVoiceIds.includes(v.id)).map(v => `${v.personaName || v.name} (${v.gender === "male" ? "мужчина" : "женщина"})`).join(", ")
+          ? allVoices.filter(v => slotVoiceIds.includes(v.id)).map(v => `${getCleanVoiceName(v)} (${v.gender === "male" ? "мужчина" : "женщина"})`).join(", ")
           : null;
 
         let firecrawlSection = "";
@@ -1540,8 +1548,8 @@ ${dialogStyle === "lively" ? `СТИЛЬ ДИАЛОГА — ЖИВАЯ СТУД�
         const voicesList = await storage.getVoices();
         for (const vid of dialog.hostVoiceIds) {
           const voice = voicesList.find(v => v.id === vid);
-          if (voice?.gender === "male") maleHost = voice.personaName || voice.name;
-          if (voice?.gender === "female") femaleHost = voice.personaName || voice.name;
+          if (voice?.gender === "male") maleHost = getCleanVoiceName(voice);
+          if (voice?.gender === "female") femaleHost = getCleanVoiceName(voice);
         }
       }
       
@@ -3271,15 +3279,19 @@ ${existingList}
       const assignedVoices = resolveAssignedVoices(voicesList, programType);
       const isMultiSpeaker = assignedVoices.length >= 2;
 
-      const promptSpeaker = extractSpeakerFromPrompt(rawPrompt);
+      let promptSpeaker = extractSpeakerFromPrompt(rawPrompt);
+      if (!promptSpeaker && fetchedContent) {
+        promptSpeaker = extractSpeakerFromPrompt(fetchedContent);
+      }
       const voicePersonaNames = assignedVoices.length > 0
-        ? assignedVoices.map((v: any) => v.personaName || v.name)
+        ? assignedVoices.map((v: any) => getCleanVoiceName(v))
         : [programType.name];
       const speakerNames = (promptSpeaker && !isMultiSpeaker) ? [promptSpeaker] : voicePersonaNames;
 
-      const hasEpisodeContent = rawPrompt.length > 300 
-        && /(?:выпуск|[Сс] вами|[Пп]ривет.*программа|[Пп]рограмма.*[«"])/m.test(rawPrompt)
-        && /\n.{50,}\n/m.test(rawPrompt);
+      const fullText = rawPrompt + (fetchedContent || "");
+      const hasEpisodeContent = fullText.length > 300 
+        && /(?:выпуск|[Сс] вами|[Пп]ривет.*программа|[Пп]рограмма.*[«"])/m.test(fullText)
+        && /\n.{50,}\n/m.test(fullText);
 
       const fcKeywords = programType.firecrawlTopics?.length
         ? extractFirecrawlKeywords(programType.firecrawlTopics)
@@ -3568,15 +3580,19 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const { prompt: expandedDefaultPrompt, fetchedContent: urlContent } = await fetchAndExpandUrls(rawPrompt);
       const hasUrlContent = !!urlContent;
 
-      const promptSpeaker = extractSpeakerFromPrompt(rawPrompt);
+      let promptSpeaker = extractSpeakerFromPrompt(rawPrompt);
+      if (!promptSpeaker && urlContent) {
+        promptSpeaker = extractSpeakerFromPrompt(urlContent);
+      }
       const voicePersonaNames = assignedVoices.length > 0
-        ? assignedVoices.map((v: any) => v.personaName || v.name)
+        ? assignedVoices.map((v: any) => getCleanVoiceName(v))
         : [programType.name];
       const speakerNames = (promptSpeaker && !isMultiSpeaker) ? [promptSpeaker] : voicePersonaNames;
 
-      const hasEpisodeContent = rawPrompt.length > 300
-        && /(?:выпуск|[Сс] вами|[Пп]ривет.*программа|[Пп]рограмма.*[«"])/m.test(rawPrompt)
-        && /\n.{50,}\n/m.test(rawPrompt);
+      const fullText = rawPrompt + (urlContent || "");
+      const hasEpisodeContent = fullText.length > 300
+        && /(?:выпуск|[Сс] вами|[Пп]ривет.*программа|[Пп]рограмма.*[«"])/m.test(fullText)
+        && /\n.{50,}\n/m.test(fullText);
 
       const fcKeywords = programType.firecrawlTopics?.length
         ? extractFirecrawlKeywords(programType.firecrawlTopics)
@@ -3783,7 +3799,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
       let systemPrompt: string;
       if (isMultiSpeaker) {
-        const speakerList = assignedVoices.map(v => `${v.personaName || v.name}`).join(", ");
+        const speakerList = assignedVoices.map(v => getCleanVoiceName(v)).join(", ");
         systemPrompt = `Ты - сценарист для радио "${ctx.stationName}".
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
@@ -3794,9 +3810,9 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
 
 Пример формата:
-[${assignedVoices[0]?.personaName || assignedVoices[0]?.name}]: [energetic] [fast] Привет! Текст первого спикера...
-[${assignedVoices[1]?.personaName || assignedVoices[1]?.name}]: [announcer] ЗАГОЛОВОК РУБРИКИ
-[${assignedVoices[0]?.personaName || assignedVoices[0]?.name}]: [surprised] Интересный факт! [thoughtful] Пояснение...
+[${getCleanVoiceName(assignedVoices[0])}]: [energetic] [fast] Привет! Текст первого спикера...
+[${assignedVoices[1] ? getCleanVoiceName(assignedVoices[1]) : getCleanVoiceName(assignedVoices[0])}]: [announcer] ЗАГОЛОВОК РУБРИКИ
+[${getCleanVoiceName(assignedVoices[0])}]: [surprised] Интересный факт! [thoughtful] Пояснение...
 
 Создавай контент на русском языке. Используй теги для придания выразительности.
 Обязательно чередуй спикеров, создавая динамичную передачу.`;
@@ -3903,7 +3919,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
         const speakerVoiceMap = new Map<string, string>();
         for (const voice of assignedVoices) {
-          const speakerName = voice.personaName || voice.name;
+          const speakerName = getCleanVoiceName(voice);
           speakerVoiceMap.set(speakerName.toLowerCase(), voice.elevenLabsVoiceId);
         }
 
@@ -4211,7 +4227,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
             }
 
             const ctx = await buildStationContext(req.session.userId);
-            const personaContext = `\nВЕДУЩИЕ: ${maleVoice.personaName || maleVoice.name} (мужчина) и ${femaleVoice.personaName || femaleVoice.name} (женщина). Используй их имена в диалоге естественно.\n`;
+            const personaContext = `\nВЕДУЩИЕ: ${getCleanVoiceName(maleVoice)} (мужчина) и ${getCleanVoiceName(femaleVoice)} (женщина). Используй их имена в диалоге естественно.\n`;
             const stationContext = `Радиостанция: ${ctx.stationName}. ${ctx.stationDescription ? ctx.stationDescription : ""}\n`;
 
             for (let i = 0; i < itemsCount; i++) {

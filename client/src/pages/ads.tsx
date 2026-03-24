@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getCleanVoiceName } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -722,7 +723,7 @@ export default function AdsPage() {
                       }`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{voice.personaName || voice.name}</p>
+                      <p className="font-medium truncate">{getCleanVoiceName(voice)}</p>
                       <p className="text-xs text-muted-foreground">
                         {voice.gender === "male" ? t("ads.male") : t("ads.female")}
                       </p>
