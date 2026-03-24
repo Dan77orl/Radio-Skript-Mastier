@@ -3121,7 +3121,6 @@ ${instructions || "Создай альтернативный вариант с �
           body: JSON.stringify({
             query,
             limit,
-            lang: "ru",
             scrapeOptions: { formats: ["markdown"] },
           }),
           signal: controller.signal,
@@ -3154,11 +3153,62 @@ ${instructions || "Создай альтернативный вариант с �
     return fallbackWebSearch(query, limit);
   }
 
+  function generateEnglishVariants(topics: string[]): string[] {
+    const ruToEnMap: Record<string, string> = {
+      "новости ии": "AI news latest",
+      "искусственный интеллект": "artificial intelligence news",
+      "нейросети": "neural networks AI",
+      "технологии": "technology news",
+      "шоу-бизнес": "entertainment celebrity news",
+      "звёзды": "celebrity news world",
+      "музыка": "music news latest",
+      "кино": "movies cinema news",
+      "здоровье": "health wellness news",
+      "спорт": "sports news world",
+      "наука": "science discoveries",
+      "космос": "space news",
+      "бизнес": "business news world",
+      "финансы": "finance news global",
+      "путешествия": "travel news",
+      "мода": "fashion trends",
+      "еда": "food trends world",
+      "авто": "automotive news",
+      "игры": "gaming news",
+      "экология": "environment climate news",
+      "образование": "education news",
+      "психология": "psychology wellness",
+      "турция": "Turkey news",
+      "аланья": "Alanya Turkey",
+    };
+
+    const englishTopics: string[] = [];
+    for (const topic of topics) {
+      const lower = topic.toLowerCase().trim();
+      if (/^[a-zA-Z\s]+$/.test(topic)) continue;
+      for (const [ru, en] of Object.entries(ruToEnMap)) {
+        if (lower.includes(ru)) {
+          englishTopics.push(en);
+          break;
+        }
+      }
+      if (englishTopics.length === 0 || englishTopics[englishTopics.length - 1] !== topic) {
+        const words = lower.split(/\s+/).filter(w => w.length > 3);
+        if (words.length > 0) {
+          englishTopics.push(`${words.join(" ")} news latest`);
+        }
+      }
+    }
+    return englishTopics.slice(0, 3);
+  }
+
   async function researchForProgram(topics: string[]): Promise<string> {
     if (!topics || topics.length === 0) return "";
 
     const allResults: string[] = [];
-    for (const topic of topics.slice(0, 3)) {
+    const englishVariants = generateEnglishVariants(topics);
+    const allTopics = [...topics.slice(0, 2), ...englishVariants.slice(0, 2)];
+
+    for (const topic of allTopics.slice(0, 4)) {
       const results = await firecrawlSearch(topic, 3);
       allResults.push(...results);
     }
@@ -3501,11 +3551,19 @@ ${existingList}
 После этого начинай сценарий.`;
 
       const ctx = await buildStationContext(req.session.userId);
-      const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
+      const settingsForPrompt = await storage.getSettings(req.session.userId);
+      const stationDefaultPrompt = settingsForPrompt?.defaultPrompt || "";
+      let systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 Активные ведущие: ${ctx.personaList}.
 Создавай контент на русском языке в стиле радиостанции.
 Твой стиль — живое повествование, как рассказ друга: плавные переходы между мыслями, логические связки, путеводная нить через весь выпуск. Никогда не перечисляй факты тезисами.`;
+      if (stationDefaultPrompt) {
+        systemPrompt += `\n\nОБЩИЕ ИНСТРУКЦИИ СТАНЦИИ (ВСЕГДА СОБЛЮДАЙ):\n${stationDefaultPrompt}`;
+      }
+      if (ctx.knowledgeBase) {
+        systemPrompt += `\n\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeBase}`;
+      }
 
       let scriptText = "";
       const anthropic = await getAnthropicClient(req.session.userId);
@@ -3809,10 +3867,18 @@ ${expandedDefaultPrompt}
 Все ${totalCount} выпусков должны быть разными.${referenceContent || hasEpisodeContent || hasUrlContent ? " Стиль и формат — как в эталоне." : ""}
 Ответь ТОЛЬКО JSON массивом, без пояснений.`;
 
-      const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
+      const settingsForBatch = await storage.getSettings(req.session.userId);
+      const stationDefaultPromptBatch = settingsForBatch?.defaultPrompt || "";
+      let systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 Активные ведущие: ${ctx.personaList}.
 Генерируй контент на русском языке. Отвечай ТОЛЬКО валидным JSON.`;
+      if (stationDefaultPromptBatch) {
+        systemPrompt += `\n\nОБЩИЕ ИНСТРУКЦИИ СТАНЦИИ (ВСЕГДА СОБЛЮДАЙ):\n${stationDefaultPromptBatch}`;
+      }
+      if (ctx.knowledgeBase) {
+        systemPrompt += `\n\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeBase}`;
+      }
 
       let batchScripts: Array<{ title: string; script: string }> = [];
 
@@ -3954,6 +4020,15 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
 НЕ пиши текст без префикса [${singleSpeakerName}]:! Каждый блок должен начинаться с имени ведущего.
 Создавай контент на русском языке.`;
+      }
+
+      const settingsForGen = await storage.getSettings(req.session.userId);
+      const stationDefaultPromptGen = settingsForGen?.defaultPrompt || "";
+      if (stationDefaultPromptGen) {
+        systemPrompt += `\n\nОБЩИЕ ИНСТРУКЦИИ СТАНЦИИ (ВСЕГДА СОБЛЮДАЙ):\n${stationDefaultPromptGen}`;
+      }
+      if (ctx.knowledgeBase) {
+        systemPrompt += `\n\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeBase}`;
       }
 
       const anthropic = await getAnthropicClient(req.session.userId);
