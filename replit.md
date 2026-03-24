@@ -1,10 +1,10 @@
-# Radio Dialog Automation System
+# RadioFlow AI — Radio Content Automation Platform
 
 ## Overview
 
-This is a Radio Dialog Automation System for "Alanya FM" - a Russian-language radio station serving expats in Alanya, Turkey. The application enables radio hosts to generate AI-powered dialog scripts, convert them to audio using text-to-speech, and manage a daily broadcast schedule.
+RadioFlow AI is a SaaS platform for radio stations that automates content creation — dialog scripts, multi-speaker programs, ads, and more — using AI. Originally built for "RuWave 94FM Alanya" (a Russian-language station in Turkey), it is now being expanded into a multi-tenant service.
 
-The system automates the creation of short conversational dialogs between male and female radio hosts, covering topics like expat life, local tips, weather, and Turkish culture.
+The system automates the creation of short conversational dialogs between radio hosts, covering various topics, with AI-powered script generation, text-to-speech audio, and broadcast scheduling.
 
 ## User Preferences
 
@@ -34,8 +34,16 @@ Preferred communication style: Simple, everyday language.
 - **Type Sharing**: Database schemas and types defined in `/shared/schema.ts` are used by both frontend and backend
 - **Storage Interface**: Abstract `IStorage` interface allowing for different storage implementations
 
+### Authentication System
+- **Session-based auth**: express-session with connect-pg-simple for PostgreSQL session storage
+- **Password hashing**: bcryptjs for secure password storage
+- **Auth endpoints**: POST `/api/auth/register`, POST `/api/auth/login`, POST `/api/auth/logout`, GET `/api/auth/me`
+- **Auth middleware**: All `/api/*` routes (except `/api/auth/*`) require authentication, returning 401 for unauthenticated requests
+- **Frontend auth flow**: `useAuth()` hook checks `/api/auth/me`; unauthenticated users see login/register page; authenticated users see admin dashboard
+- **Auth files**: `server/auth.ts` (backend logic), `client/src/hooks/use-auth.ts` (frontend hook), `client/src/pages/auth.tsx` (login/register page)
+
 ### Core Entities
-1. **Users** - Basic authentication support
+1. **Users** - Authentication with email, password (hashed), name
 2. **Settings** - Application configuration (API keys, voice IDs, default prompts)
 3. **Dialogs** - Generated radio scripts with status tracking (pending, generating, ready, error)
 4. **Schedule Templates** - Per-weekday broadcast templates (name, weekdays, startHour, endHour, slotsPerHour, voiceIds)

@@ -1,6 +1,6 @@
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { LayoutDashboard, Mic, Settings, Radio, Megaphone, Users, Podcast } from "lucide-react";
+import { LayoutDashboard, Mic, Settings, Radio, Megaphone, Users, Podcast, LogOut } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +13,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import { useAuth } from "@/hooks/use-auth";
 import type { Settings as SettingsType } from "@shared/schema";
 
 const menuItems = [
@@ -50,6 +51,7 @@ const menuItems = [
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { user, logout, isLoggingOut } = useAuth();
   
   const { data: settings } = useQuery<SettingsType>({
     queryKey: ["/api/settings"],
@@ -76,7 +78,7 @@ export function AppSidebar() {
           )}
           <div className="flex flex-col">
             <span className="text-lg font-semibold">{stationName}</span>
-            <span className="text-xs text-muted-foreground">Генератор подводок</span>
+            <span className="text-xs text-muted-foreground">RadioFlow AI</span>
           </div>
         </div>
       </SidebarHeader>
@@ -103,7 +105,24 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4">
+      <SidebarFooter className="p-4 space-y-3">
+        {user && (
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-medium truncate">{user.name || user.email}</span>
+              <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+            </div>
+            <button
+              onClick={logout}
+              disabled={isLoggingOut}
+              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title="Выйти"
+              data-testid="button-logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         <div className="text-xs text-muted-foreground text-center">
           {stationLocation}
         </div>
