@@ -2471,15 +2471,13 @@ ${instructions || "Создай альтернативный вариант с �
         return res.status(400).json({ error: "Missing required fields: public_owner_id, voice_id, name" });
       }
 
-      const response = await fetch("https://api.elevenlabs.io/v1/voices/add", {
+      const response = await fetch(`https://api.elevenlabs.io/v1/voices/add/${public_owner_id}/${voice_id}`, {
         method: "POST",
         headers: {
           "xi-api-key": settings.elevenLabsApiKey,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          public_user_id: public_owner_id,
-          voice_id: voice_id,
           new_name: name,
         }),
       });
