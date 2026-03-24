@@ -2478,7 +2478,7 @@ ${instructions || "Создай альтернативный вариант с �
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          new_name: name,
+          name: name,
         }),
       });
 
