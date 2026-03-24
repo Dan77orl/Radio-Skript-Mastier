@@ -40,7 +40,8 @@ Preferred communication style: Simple, everyday language.
 - **Auth endpoints**: POST `/api/auth/register`, POST `/api/auth/login`, POST `/api/auth/logout`, GET `/api/auth/me`
 - **Auth middleware**: All `/api/*` routes (except `/api/auth/*`) require authentication, returning 401 for unauthenticated requests
 - **Frontend auth flow**: `useAuth()` hook checks `/api/auth/me`; unauthenticated users see landing page at "/"; auth page at "/auth"; authenticated users see admin dashboard
-- **Landing page**: `client/src/pages/landing.tsx` — hero, features, pricing, how-it-works, CTA, footer; fully i18n'd (en/ru/tr); SEO meta tags set via useEffect
+- **Landing page**: `client/src/pages/landing.tsx` — hero with AI-generated images, features with interactive selector, animated counters, scroll animations (IntersectionObserver), floating particles, gradient text, pricing with hover effects, CTA, footer; fully i18n'd (52 languages); SEO meta tags set via useEffect
+- **i18n**: 52 languages supported — ru, en, tr, de, es, fr, pt, it, uk, pl, nl, sv, da, no, fi, cs, sk, hu, ro, bg, el, hr, sr, sl, bs, mk, sq, lt, lv, et, kk, uz, ky, tg, mn, az, ka, hy, ar, he, fa, zh, ja, ko, hi, bn, ta, th, vi, id, ms, sw; fallback: en; detection: localStorage → navigator → htmlTag; key: `radioflow-language`; searchable language switcher with grouped dropdown
 - **Auth files**: `server/auth.ts` (backend logic), `client/src/hooks/use-auth.ts` (frontend hook), `client/src/pages/auth.tsx` (login/register page at /auth route)
 
 ### AI Support Chat
