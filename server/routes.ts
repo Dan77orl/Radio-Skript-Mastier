@@ -272,18 +272,198 @@ async function firecrawlScrapeUrl(url: string): Promise<string> {
   }
 }
 
-function isJsRenderedUrl(url: string): boolean {
-  return /chatgpt\.com|chat\.openai\.com|claude\.ai|gemini\.google\.com/i.test(url);
+async function fetchChatGptShare(url: string): Promise<string> {
+  const shareMatch = url.match(/chatgpt\.com\/share\/([a-f0-9-]+)/i) 
+    || url.match(/chat\.openai\.com\/share\/([a-f0-9-]+)/i);
+  if (!shareMatch) return "";
+  const shareId = shareMatch[1];
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      redirect: "follow",
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) return "";
+
+    const html = await response.text();
+
+    const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (nextDataMatch) {
+      try {
+        const nextData = JSON.parse(nextDataMatch[1]);
+        const messages = nextData?.props?.pageProps?.serverResponse?.data?.mapping 
+          || nextData?.props?.pageProps?.data?.mapping;
+        if (messages) {
+          const texts: string[] = [];
+          for (const key of Object.keys(messages)) {
+            const msg = messages[key]?.message;
+            if (msg?.content?.parts) {
+              const role = msg.author?.role;
+              if (role === "assistant") {
+                texts.push(msg.content.parts.join("\n"));
+              }
+            }
+          }
+          if (texts.length > 0) {
+            const result = texts.join("\n\n---\n\n");
+            console.log(`ChatGPT share ${shareId}: extracted ${result.length} chars from __NEXT_DATA__ (${texts.length} assistant messages)`);
+            return result.substring(0, 20000);
+          }
+        }
+      } catch (e) {
+        console.log(`ChatGPT share: failed to parse __NEXT_DATA__ JSON`);
+      }
+    }
+
+    const jsonScriptMatches = html.match(/<script[^>]*>(\{[\s\S]*?"mapping"[\s\S]*?\})<\/script>/g);
+    if (jsonScriptMatches) {
+      for (const scriptBlock of jsonScriptMatches) {
+        const jsonContent = scriptBlock.replace(/<script[^>]*>/, "").replace(/<\/script>/, "");
+        try {
+          const data = JSON.parse(jsonContent);
+          if (data.mapping) {
+            const texts: string[] = [];
+            for (const key of Object.keys(data.mapping)) {
+              const msg = data.mapping[key]?.message;
+              if (msg?.content?.parts && msg.author?.role === "assistant") {
+                texts.push(msg.content.parts.join("\n"));
+              }
+            }
+            if (texts.length > 0) {
+              const result = texts.join("\n\n---\n\n");
+              console.log(`ChatGPT share ${shareId}: extracted ${result.length} chars from embedded JSON`);
+              return result.substring(0, 20000);
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    const $ = cheerio.load(html);
+    const conversationParts: string[] = [];
+    $("[data-message-author-role='assistant']").each((_, el) => {
+      const text = $(el).text().trim();
+      if (text.length > 10) conversationParts.push(text);
+    });
+    if (conversationParts.length > 0) {
+      const result = conversationParts.join("\n\n---\n\n");
+      console.log(`ChatGPT share ${shareId}: extracted ${result.length} chars from DOM data-attributes`);
+      return result.substring(0, 20000);
+    }
+
+    $(".markdown, .whitespace-pre-wrap, [class*='message']").each((_, el) => {
+      const text = $(el).text().trim();
+      if (text.length > 50) conversationParts.push(text);
+    });
+    if (conversationParts.length > 0) {
+      const result = conversationParts.join("\n\n---\n\n");
+      console.log(`ChatGPT share ${shareId}: extracted ${result.length} chars from CSS class selectors`);
+      return result.substring(0, 20000);
+    }
+
+    console.log(`ChatGPT share ${shareId}: could not extract content from HTML (${html.length} chars total)`);
+    return "";
+  } catch (err: any) {
+    console.log(`ChatGPT share fetch error: ${err.message}`);
+    return "";
+  }
+}
+
+async function fetchClaudeShare(url: string): Promise<string> {
+  const shareMatch = url.match(/claude\.ai\/share\/([a-f0-9-]+)/i);
+  if (!shareMatch) return "";
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      redirect: "follow",
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) return "";
+
+    const html = await response.text();
+
+    const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (nextDataMatch) {
+      try {
+        const data = JSON.parse(nextDataMatch[1]);
+        const messages = data?.props?.pageProps?.chatMessages || data?.props?.pageProps?.messages;
+        if (messages && Array.isArray(messages)) {
+          const texts = messages
+            .filter((m: any) => m.sender === "assistant" || m.role === "assistant")
+            .map((m: any) => m.text || m.content || (m.content_parts || []).map((p: any) => typeof p === "string" ? p : p.text || "").join("\n"))
+            .filter((t: string) => t.length > 10);
+          if (texts.length > 0) {
+            const result = texts.join("\n\n---\n\n");
+            console.log(`Claude share: extracted ${result.length} chars from __NEXT_DATA__`);
+            return result.substring(0, 20000);
+          }
+        }
+      } catch (e) {}
+    }
+
+    const jsonMatches = html.match(/<script[^>]*>\s*(\{[\s\S]*?"chatMessages"[\s\S]*?\})\s*<\/script>/g)
+      || html.match(/<script[^>]*>\s*(\[[\s\S]*?"sender"[\s\S]*?\])\s*<\/script>/g);
+    if (jsonMatches) {
+      for (const block of jsonMatches) {
+        const json = block.replace(/<script[^>]*>/, "").replace(/<\/script>/, "").trim();
+        try {
+          const data = JSON.parse(json);
+          const msgs = data.chatMessages || data;
+          if (Array.isArray(msgs)) {
+            const texts = msgs
+              .filter((m: any) => m.sender === "assistant")
+              .map((m: any) => m.text || "")
+              .filter((t: string) => t.length > 10);
+            if (texts.length > 0) {
+              return texts.join("\n\n---\n\n").substring(0, 20000);
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    return "";
+  } catch (err: any) {
+    console.log(`Claude share fetch error: ${err.message}`);
+    return "";
+  }
 }
 
 async function fetchUrlContent(url: string): Promise<{ text: string; method: string }> {
-  if (isJsRenderedUrl(url)) {
-    console.log(`URL ${url}: known JS-rendered site, using Firecrawl directly`);
+  if (/chatgpt\.com\/share|chat\.openai\.com\/share/i.test(url)) {
+    const text = await fetchChatGptShare(url);
+    if (text.length > 50) return { text, method: "chatgpt_share" };
+    
     const markdown = await firecrawlScrapeUrl(url);
-    if (markdown.length > 50) {
-      return { text: markdown, method: "firecrawl" };
-    }
-    return { text: "", method: "firecrawl_empty" };
+    if (markdown.length > 50) return { text: markdown, method: "firecrawl" };
+    
+    return { text: "", method: "chatgpt_empty" };
+  }
+
+  if (/claude\.ai\/share/i.test(url)) {
+    const text = await fetchClaudeShare(url);
+    if (text.length > 50) return { text, method: "claude_share" };
+    
+    const markdown = await firecrawlScrapeUrl(url);
+    if (markdown.length > 50) return { text: markdown, method: "firecrawl" };
+    
+    return { text: "", method: "claude_empty" };
   }
 
   try {

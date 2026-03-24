@@ -1446,6 +1446,12 @@ export default function ShowsPage() {
                   </div>
                 )}
 
+                {promptAnalysis.urls.some(u => u.status !== "ok") && (
+                  <div className="text-xs text-muted-foreground bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded p-2">
+                    Если ссылка не читается — вставьте текст выпусков напрямую в промпт вместо ссылки. Скопируйте содержимое из ChatGPT/Claude и вставьте как текст.
+                  </div>
+                )}
+
                 <details className="mt-2">
                   <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
                     Развёрнутый промпт (как видит система)
