@@ -1461,7 +1461,7 @@ export default function ShowsPage() {
                     className="flex-1"
                   />
                 </div>
-                <div className="flex flex-wrap gap-1.5 max-w-full overflow-hidden">
+                <div className="grid grid-cols-2 gap-1.5">
                   {[
                     { label: "{название}_{дата}_{номер}", value: "{название}_{дата}_{номер}" },
                     { label: "{название}_{дата}", value: "{название}_{дата}" },
@@ -1472,7 +1472,7 @@ export default function ShowsPage() {
                     <Badge
                       key={preset.value}
                       variant={settingsType.fileNameTemplate === preset.value ? "default" : "outline"}
-                      className="cursor-pointer text-xs hover:bg-primary/10 transition-colors shrink-0"
+                      className="cursor-pointer text-xs hover:bg-primary/10 transition-colors justify-center truncate"
                       onClick={() => setSettingsType(prev => prev ? { ...prev, fileNameTemplate: preset.value } : null)}
                       data-testid={`preset-filename-${preset.value}`}
                     >
@@ -1526,9 +1526,9 @@ export default function ShowsPage() {
                   <div className="space-y-3 mt-2">
                     <div className="space-y-2">
                       <span className="text-xs text-muted-foreground">{t("shows.topicsHint")}</span>
-                      <div className="flex flex-wrap gap-2 mb-2">
+                      <div className="space-y-1.5 mb-2">
                         {(settingsType.firecrawlTopics || []).map((topic: string, idx: number) => (
-                          <Badge key={idx} variant="secondary" className="text-sm py-1 px-3 cursor-pointer" data-testid={`badge-topic-${idx}`}
+                          <div key={idx} className="flex items-center gap-2 bg-secondary rounded-md px-3 py-1.5 cursor-pointer group" data-testid={`badge-topic-${idx}`}
                             onClick={() => {
                               setSettingsType(prev => {
                                 if (!prev) return null;
@@ -1538,8 +1538,9 @@ export default function ShowsPage() {
                               });
                             }}
                           >
-                            {topic} ✕
-                          </Badge>
+                            <span className="text-sm truncate flex-1 min-w-0">{topic}</span>
+                            <span className="text-muted-foreground group-hover:text-destructive shrink-0">✕</span>
+                          </div>
                         ))}
                       </div>
                       <div className="flex gap-2">
