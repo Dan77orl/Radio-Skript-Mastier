@@ -1415,13 +1415,9 @@ export default function ShowsPage() {
                             <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
                               {u.contentLength.toLocaleString()} симв.
                             </span>
-                          ) : u.status === "garbage" ? (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
-                              Мусор (JS-страница)
-                            </span>
-                          ) : u.status === "empty" ? (
+                          ) : u.status.startsWith("empty") ? (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">
-                              Пусто
+                              Не удалось прочитать
                             </span>
                           ) : (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">

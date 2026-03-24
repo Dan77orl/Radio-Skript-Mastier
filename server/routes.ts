@@ -240,6 +240,110 @@ function extractFirecrawlKeywords(topics: string[]): string[] {
   }).filter(t => t.length > 0);
 }
 
+async function firecrawlScrapeUrl(url: string): Promise<string> {
+  const apiKey = process.env.FIRECRAWL_API_KEY;
+  if (!apiKey) return "";
+
+  try {
+    const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        url,
+        formats: ["markdown"],
+        waitFor: 5000,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`Firecrawl scrape error: ${response.status}`);
+      return "";
+    }
+
+    const data = await response.json();
+    const markdown = data.data?.markdown || "";
+    return markdown.substring(0, 20000);
+  } catch (err: any) {
+    console.error("Firecrawl scrape error:", err.message);
+    return "";
+  }
+}
+
+function isJsRenderedUrl(url: string): boolean {
+  return /chatgpt\.com|chat\.openai\.com|claude\.ai|gemini\.google\.com/i.test(url);
+}
+
+async function fetchUrlContent(url: string): Promise<{ text: string; method: string }> {
+  if (isJsRenderedUrl(url)) {
+    console.log(`URL ${url}: known JS-rendered site, using Firecrawl directly`);
+    const markdown = await firecrawlScrapeUrl(url);
+    if (markdown.length > 50) {
+      return { text: markdown, method: "firecrawl" };
+    }
+    return { text: "", method: "firecrawl_empty" };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
+      },
+      redirect: "follow",
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      return { text: "", method: `error_${response.status}` };
+    }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    $("script, style, nav, footer, header, noscript, iframe, svg, img, link, meta").remove();
+
+    let text = "";
+    const mainSelectors = ["main", "article", "[role='main']", ".content", "#content", ".post-content", ".markdown-body", ".conversation-content"];
+    for (const sel of mainSelectors) {
+      const el = $(sel);
+      if (el.length) {
+        text = el.text().replace(/\s+/g, " ").trim();
+        if (text.length > 100) break;
+      }
+    }
+    if (text.length <= 100) {
+      text = $("body").text().replace(/\s+/g, " ").trim();
+    }
+
+    if (text.length > 20000) text = text.substring(0, 20000);
+
+    if (text.length > 50 && !isGarbageContent(text)) {
+      return { text, method: "direct" };
+    }
+
+    console.log(`URL ${url}: direct fetch got garbage/empty (${text.length} chars), trying Firecrawl...`);
+    const markdown = await firecrawlScrapeUrl(url);
+    if (markdown.length > 50) {
+      return { text: markdown, method: "firecrawl_fallback" };
+    }
+
+    return { text: "", method: "failed" };
+  } catch (err: any) {
+    console.log(`Failed to fetch URL ${url}: ${err.message}, trying Firecrawl...`);
+    const markdown = await firecrawlScrapeUrl(url);
+    if (markdown.length > 50) {
+      return { text: markdown, method: "firecrawl_fallback" };
+    }
+    return { text: "", method: "failed" };
+  }
+}
+
 async function fetchAndExpandUrls(promptText: string): Promise<{ prompt: string; fetchedContent: string }> {
   const urlRegex = /https?:\/\/[^\s]+/g;
   const urls = promptText.match(urlRegex);
@@ -251,50 +355,13 @@ async function fetchAndExpandUrls(promptText: string): Promise<{ prompt: string;
   let expandedPrompt = promptText;
 
   for (const url of urls.slice(0, 3)) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
-        },
-        redirect: "follow",
-      });
-      clearTimeout(timeout);
-
-      if (response.ok) {
-        const html = await response.text();
-        const $ = cheerio.load(html);
-        $("script, style, nav, footer, header, noscript, iframe, svg, img, link, meta").remove();
-
-        let text = "";
-        const mainSelectors = ["main", "article", "[role='main']", ".content", "#content", ".post-content", ".markdown-body", ".conversation-content"];
-        for (const sel of mainSelectors) {
-          const el = $(sel);
-          if (el.length) {
-            text = el.text().replace(/\s+/g, " ").trim();
-            if (text.length > 100) break;
-          }
-        }
-        if (text.length <= 100) {
-          text = $("body").text().replace(/\s+/g, " ").trim();
-        }
-
-        if (text.length > 20000) text = text.substring(0, 20000) + "...";
-
-        if (text.length > 50 && !isGarbageContent(text)) {
-          fetchedContent += `\n\n--- КОНТЕНТ ИЗ ССЫЛКИ ${url} ---\n${text}\n--- КОНЕЦ КОНТЕНТА ---\n`;
-          expandedPrompt = expandedPrompt.replace(url, `[контент загружен из: ${url}]`);
-        } else {
-          console.log(`URL ${url}: fetched content is garbage or too short (${text.length} chars), removing URL from prompt`);
-          expandedPrompt = expandedPrompt.replace(url, "").trim();
-        }
-      }
-    } catch (err: any) {
-      console.log(`Failed to fetch URL ${url}: ${err.message}`);
+    const { text, method } = await fetchUrlContent(url);
+    if (text.length > 50) {
+      fetchedContent += `\n\n--- КОНТЕНТ ИЗ ССЫЛКИ ${url} ---\n${text}\n--- КОНЕЦ КОНТЕНТА ---\n`;
+      expandedPrompt = expandedPrompt.replace(url, `[контент загружен из: ${url}]`);
+      console.log(`URL ${url}: loaded ${text.length} chars via ${method}`);
+    } else {
+      console.log(`URL ${url}: no content extracted (method: ${method})`);
       expandedPrompt = expandedPrompt.replace(url, "").trim();
     }
   }
@@ -2964,76 +3031,28 @@ ${existingList}
 
       if (urls && urls.length > 0) {
         for (const url of urls.slice(0, 5)) {
-          try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 15000);
-            const response = await fetch(url, {
-              signal: controller.signal,
-              headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
-              },
-              redirect: "follow",
-            });
-            clearTimeout(timeout);
+          const { text, method } = await fetchUrlContent(url);
 
-            if (response.ok) {
-              const html = await response.text();
-              const $ = cheerio.load(html);
-              $("script, style, nav, footer, header, noscript, iframe, svg, img, link, meta").remove();
-
-              let text = "";
-              const mainSelectors = ["main", "article", "[role='main']", ".content", "#content", ".post-content", ".markdown-body", ".conversation-content"];
-              for (const sel of mainSelectors) {
-                const el = $(sel);
-                if (el.length) {
-                  text = el.text().replace(/\s+/g, " ").trim();
-                  if (text.length > 100) break;
-                }
-              }
-              if (text.length <= 100) {
-                text = $("body").text().replace(/\s+/g, " ").trim();
-              }
-
-              if (text.length > 20000) text = text.substring(0, 20000);
-
-              const garbage = isGarbageContent(text);
-
-              results.urls.push({
-                url,
-                status: text.length < 50 ? "empty" : garbage ? "garbage" : "ok",
-                contentLength: text.length,
-                preview: text.substring(0, 500),
-              });
-
-              if (text.length > 50 && !garbage) {
-                results.totalContentLength += text.length;
-                results.expandedPrompt = results.expandedPrompt.replace(url, `[контент загружен: ${text.length} символов из ${url}]\n\n${text.substring(0, 2000)}${text.length > 2000 ? "\n...(ещё " + (text.length - 2000) + " символов)" : ""}`);
-              } else {
-                results.urls[results.urls.length - 1].status = garbage ? "garbage" : "empty";
-              }
-            } else {
-              results.urls.push({
-                url,
-                status: `error_${response.status}`,
-                contentLength: 0,
-                preview: `HTTP ${response.status} ${response.statusText}`,
-              });
-            }
-          } catch (err: any) {
+          if (text.length > 50) {
             results.urls.push({
               url,
-              status: "error",
+              status: "ok",
+              contentLength: text.length,
+              preview: text.substring(0, 500),
+            });
+            results.totalContentLength += text.length;
+            results.expandedPrompt = results.expandedPrompt.replace(url, `[контент загружен: ${text.length} символов из ${url} (${method})]\n\n${text.substring(0, 2000)}${text.length > 2000 ? "\n...(ещё " + (text.length - 2000) + " символов)" : ""}`);
+          } else {
+            results.urls.push({
+              url,
+              status: method.includes("error") ? method : method === "firecrawl_empty" ? "empty (JS-страница, Firecrawl не смог прочитать)" : "empty",
               contentLength: 0,
-              preview: err.message || "Connection failed",
+              preview: method === "firecrawl_empty" 
+                ? "Страница рендерится JavaScript. Firecrawl не смог извлечь контент." 
+                : "Не удалось извлечь контент",
             });
           }
         }
-      }
-
-      if (!urls || urls.length === 0) {
-        results.expandedPrompt = promptText;
       }
 
       res.json(results);
