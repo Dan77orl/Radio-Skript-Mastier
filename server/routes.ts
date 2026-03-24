@@ -3153,63 +3153,91 @@ ${instructions || "Создай альтернативный вариант с �
     return fallbackWebSearch(query, limit);
   }
 
-  function generateEnglishVariants(topics: string[]): string[] {
-    const ruToEnMap: Record<string, string> = {
-      "новости ии": "AI news latest",
-      "искусственный интеллект": "artificial intelligence news",
-      "нейросети": "neural networks AI",
-      "технологии": "technology news",
-      "шоу-бизнес": "entertainment celebrity news",
-      "звёзды": "celebrity news world",
-      "музыка": "music news latest",
-      "кино": "movies cinema news",
-      "здоровье": "health wellness news",
-      "спорт": "sports news world",
-      "наука": "science discoveries",
-      "космос": "space news",
-      "бизнес": "business news world",
-      "финансы": "finance news global",
-      "путешествия": "travel news",
-      "мода": "fashion trends",
-      "еда": "food trends world",
-      "авто": "automotive news",
-      "игры": "gaming news",
-      "экология": "environment climate news",
-      "образование": "education news",
-      "психология": "psychology wellness",
-      "турция": "Turkey news",
-      "аланья": "Alanya Turkey",
-    };
+  async function generateSmartSearchQueries(programPrompt: string, stationPrompt: string, topics: string[], userId?: string): Promise<string[]> {
+    const today = new Date();
+    const dateStr = today.toISOString().split("T")[0];
 
-    const englishTopics: string[] = [];
-    for (const topic of topics) {
-      const lower = topic.toLowerCase().trim();
-      if (/^[a-zA-Z\s]+$/.test(topic)) continue;
-      for (const [ru, en] of Object.entries(ruToEnMap)) {
-        if (lower.includes(ru)) {
-          englishTopics.push(en);
-          break;
-        }
+    const contextParts: string[] = [];
+    if (stationPrompt) contextParts.push(`ПРОМПТ СТАНЦИИ:\n${stationPrompt.substring(0, 500)}`);
+    if (programPrompt) contextParts.push(`ПРОМПТ ПЕРЕДАЧИ:\n${programPrompt.substring(0, 1500)}`);
+    if (topics.length > 0) contextParts.push(`КЛЮЧЕВЫЕ СЛОВА: ${topics.join(", ")}`);
+
+    const aiPrompt = `Дата: ${dateStr}
+
+${contextParts.join("\n\n")}
+
+На основе промпта передачи и станции сгенерируй 4-6 поисковых запросов для веб-поиска актуальных новостей.
+
+ПРАВИЛА:
+1. Запросы должны покрывать ВСЕ направления из промпта (если написано "мировой, турецкий, российский" — нужны запросы по КАЖДОМУ)
+2. Запросы на РАЗНЫХ языках: английский для мировых тем, русский для российских, можно турецкий для турецких
+3. Запросы должны находить СВЕЖИЕ новости (добавляй "2026", "latest", "news", "today")
+4. Каждый запрос — 3-6 слов, конкретный и поисковый
+5. НЕ дублируй одну и ту же тему на разных языках
+
+Примеры хороших запросов для шоу-бизнеса:
+- "Hollywood celebrity news March 2026"
+- "Turkish TV series stars 2026"
+- "российские звёзды новости сегодня"
+- "Grammy Oscar awards 2026"
+- "турецкие сериалы актёры новости"
+
+Ответь JSON: {"queries": ["запрос1", "запрос2", ...]}`;
+
+    try {
+      const settingsData = await storage.getSettings(userId);
+      let respText = "";
+
+      if (settingsData?.anthropicApiKey) {
+        const anthropic = new Anthropic({ apiKey: settingsData.anthropicApiKey });
+        const response = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 300,
+          system: "Ты генерируешь поисковые запросы для веб-поиска. Отвечай ТОЛЬКО JSON.",
+          messages: [{ role: "user", content: aiPrompt }],
+        });
+        respText = response.content[0].type === "text" ? response.content[0].text : "{}";
+      } else {
+        const openai = new OpenAI();
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          max_tokens: 300,
+          messages: [
+            { role: "system", content: "Ты генерируешь поисковые запросы для веб-поиска. Отвечай ТОЛЬКО JSON." },
+            { role: "user", content: aiPrompt },
+          ],
+        });
+        respText = response.choices[0]?.message?.content || "{}";
       }
-      if (englishTopics.length === 0 || englishTopics[englishTopics.length - 1] !== topic) {
-        const words = lower.split(/\s+/).filter(w => w.length > 3);
-        if (words.length > 0) {
-          englishTopics.push(`${words.join(" ")} news latest`);
-        }
-      }
+
+      const jsonMatch = respText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const cleanJson = jsonMatch ? jsonMatch[1].trim() : respText.trim();
+      const parsed = JSON.parse(cleanJson);
+      const queries = Array.isArray(parsed) ? parsed : (parsed.queries || []);
+      console.log(`AI generated search queries: ${JSON.stringify(queries)}`);
+      return queries.slice(0, 6);
+    } catch (err: any) {
+      console.error("Failed to generate smart search queries:", err.message);
+      return topics.slice(0, 3);
     }
-    return englishTopics.slice(0, 3);
   }
 
-  async function researchForProgram(topics: string[]): Promise<string> {
-    if (!topics || topics.length === 0) return "";
+  async function researchForProgram(topics: string[], programPrompt?: string, stationPrompt?: string, userId?: string): Promise<string> {
+    const hasPromptContext = (programPrompt && programPrompt.length > 20) || (topics && topics.length > 0);
+    if (!hasPromptContext) return "";
+
+    let searchQueries: string[];
+    if (programPrompt && programPrompt.length > 20) {
+      searchQueries = await generateSmartSearchQueries(programPrompt, stationPrompt || "", topics || [], userId);
+    } else {
+      searchQueries = topics.slice(0, 4);
+    }
+
+    if (searchQueries.length === 0) return "";
 
     const allResults: string[] = [];
-    const englishVariants = generateEnglishVariants(topics);
-    const allTopics = [...topics.slice(0, 2), ...englishVariants.slice(0, 2)];
-
-    for (const topic of allTopics.slice(0, 4)) {
-      const results = await firecrawlSearch(topic, 3);
+    for (const query of searchQueries.slice(0, 5)) {
+      const results = await firecrawlSearch(query, 2);
       allResults.push(...results);
     }
 
@@ -3310,9 +3338,10 @@ ${existingList}
       if (!programType) return res.status(404).json({ error: "Type not found" });
 
       const topics = req.body.topics || programType.firecrawlTopics || [];
-      if (topics.length === 0) return res.status(400).json({ error: "No topics configured" });
+      if (topics.length === 0 && !programType.defaultPrompt) return res.status(400).json({ error: "No topics configured" });
 
-      const research = await researchForProgram(topics);
+      const settingsForResearch = await storage.getSettings(req.session?.userId);
+      const research = await researchForProgram(topics, programType.defaultPrompt || "", settingsForResearch?.defaultPrompt || "", req.session?.userId);
       res.json({ research, topicsUsed: topics });
     } catch (error) {
       console.error("Firecrawl research error:", error);
@@ -3482,9 +3511,11 @@ ${existingList}
 - НЕ ПИШИ БОЛЬШЕ ${maxWords} слов! Лучше короче и ёмче, чем длинно и водянисто
 - Если ${durationSec} секунд — это коротко, сфокусируйся на ОДНОЙ теме/истории, не пытайся охватить всё`;
 
-      if (fcKeywords.length > 0) {
+      const hasSearchContext = fcKeywords.length > 0 || (rawPrompt && rawPrompt.length > 50);
+      if (hasSearchContext) {
         try {
-          const research = await researchForProgram(fcKeywords);
+          const stationSettings = await storage.getSettings(req.session.userId);
+          const research = await researchForProgram(fcKeywords, rawPrompt, stationSettings?.defaultPrompt || "", req.session.userId);
           if (research) {
             prompt += research;
           }
@@ -3823,16 +3854,21 @@ ${expandedDefaultPrompt}
         prompt += `\nЭТАЛОНЫЙ КОНТЕНТ — изучи стиль, формат, тон. Создай новые выпуски ТОЧНО В ТАКОМ ЖЕ стиле:\n${referenceContent.substring(0, 30000)}\n`;
       }
 
-      if (fcKeywords.length > 0) {
+      const batchRawPrompt = programType.defaultPrompt || "";
+      const batchHasSearchContext = fcKeywords.length > 0 || (batchRawPrompt && batchRawPrompt.length > 50);
+      if (batchHasSearchContext) {
         try {
-          const research = await researchForProgram(fcKeywords);
+          const batchStationSettings = await storage.getSettings(req.session.userId);
+          const research = await researchForProgram(fcKeywords, batchRawPrompt, batchStationSettings?.defaultPrompt || "", req.session.userId);
           if (research) {
             prompt += research;
           }
         } catch (err: any) {
           console.error("Firecrawl research in batch-create failed:", err.message);
         }
-        prompt += `\nТематика передачи: ${fcKeywords.join(", ")}. Все выпуски должны быть в рамках этих тем.\n`;
+        if (fcKeywords.length > 0) {
+          prompt += `\nТематика передачи: ${fcKeywords.join(", ")}. Все выпуски должны быть в рамках этих тем.\n`;
+        }
       }
 
       if (existingTitles) {
