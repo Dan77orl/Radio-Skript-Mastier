@@ -812,5 +812,15 @@
     "ru": "Русский",
     "en": "English",
     "tr": "Türkçe"
+  },
+  "validation": {
+    "required": "Bu alan zorunludur",
+    "minLength": "En az {{min}} karakter olmalıdır",
+    "maxLength": "En fazla {{max}} karakter olmalıdır",
+    "minValue": "En az {{min}} olmalıdır",
+    "maxValue": "En fazla {{max}} olmalıdır",
+    "email": "Geçerli bir e-posta girin",
+    "url": "Geçerli bir URL girin",
+    "invalidType": "Geçersiz değer"
   }
 }

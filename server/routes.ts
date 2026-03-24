@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { registerUser, loginUser, logoutUser, getCurrentUser, requireAuth } from "./auth";
+import { registerUser, loginUser, logoutUser, getCurrentUser, updateUserLanguage, requireAuth } from "./auth";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
@@ -300,6 +300,7 @@ export async function registerRoutes(
   app.post("/api/auth/login", loginUser);
   app.post("/api/auth/logout", logoutUser);
   app.get("/api/auth/me", getCurrentUser);
+  app.patch("/api/auth/language", updateUserLanguage);
 
   app.use("/api", (req, res, next) => {
     if (req.path.startsWith("/auth/")) return next();

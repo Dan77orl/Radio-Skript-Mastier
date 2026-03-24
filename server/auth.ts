@@ -39,6 +39,7 @@ export async function registerUser(req: Request, res: Response) {
       id: user.id,
       email: user.email,
       name: user.name,
+      language: user.language || "ru",
     });
   } catch (error) {
     console.error("Registration error:", error);
@@ -71,6 +72,7 @@ export async function loginUser(req: Request, res: Response) {
       id: user.id,
       email: user.email,
       name: user.name,
+      language: user.language || "ru",
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -102,7 +104,22 @@ export async function getCurrentUser(req: Request, res: Response) {
     id: user.id,
     email: user.email,
     name: user.name,
+    language: user.language || "ru",
   });
+}
+
+export async function updateUserLanguage(req: Request, res: Response) {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  const { language } = req.body;
+  if (!language || !["ru", "en", "tr"].includes(language)) {
+    return res.status(400).json({ error: "Invalid language" });
+  }
+
+  await storage.updateUserLanguage(req.session.userId, language);
+  return res.json({ ok: true, language });
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {

@@ -7,6 +7,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
+import { apiRequest } from "@/lib/queryClient";
 
 const languages = [
   { code: "ru", label: "Русский", flag: "🇷🇺" },
@@ -16,11 +18,18 @@ const languages = [
 
 export function LanguageSwitcher() {
   const { i18n } = useTranslation();
+  const { isAuthenticated } = useAuth();
 
   const currentLang = languages.find((l) => l.code === i18n.language) || languages[0];
 
-  const changeLanguage = (code: string) => {
+  const changeLanguage = async (code: string) => {
     i18n.changeLanguage(code);
+    if (isAuthenticated) {
+      try {
+        await apiRequest("PATCH", "/api/auth/language", { language: code });
+      } catch (e) {
+      }
+    }
   };
 
   return (
