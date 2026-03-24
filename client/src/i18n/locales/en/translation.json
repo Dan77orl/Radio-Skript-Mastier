@@ -951,6 +951,7 @@
       "terms": "Terms of Service",
       "privacy": "Privacy Policy",
       "copyright": "© {{year}} RadioFlow AI. All rights reserved."
-    }
+    },
+    "productName": "RadioFlow AI"
   }
 }

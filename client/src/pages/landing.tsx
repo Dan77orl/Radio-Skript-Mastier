@@ -25,8 +25,10 @@ import {
 export default function LandingPage() {
   const { t } = useTranslation();
 
+  const productName = t("landing.productName");
+
   useEffect(() => {
-    document.title = "RadioFlow AI — " + t("landing.hero.badge");
+    document.title = productName + " — " + t("landing.hero.badge");
     const meta = document.querySelector('meta[name="description"]');
     if (meta) {
       meta.setAttribute("content", t("landing.hero.subtitle"));
@@ -45,10 +47,10 @@ export default function LandingPage() {
       }
       el.setAttribute("content", content);
     };
-    setOg("og:title", "RadioFlow AI");
+    setOg("og:title", productName);
     setOg("og:description", t("landing.hero.subtitle"));
     setOg("og:type", "website");
-  }, [t]);
+  }, [t, productName]);
 
   const features = [
     { icon: Wand2, titleKey: "landing.features.aiScripts.title", descKey: "landing.features.aiScripts.desc" },
@@ -116,7 +118,7 @@ export default function LandingPage() {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
                 <Radio className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold" data-testid="text-brand-name">RadioFlow AI</span>
+              <span className="text-xl font-bold" data-testid="text-brand-name">{productName}</span>
             </div>
             <div className="flex items-center gap-2">
               <LanguageSwitcher />
@@ -315,7 +317,7 @@ export default function LandingPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                   <Radio className="h-4 w-4 text-primary-foreground" />
                 </div>
-                <span className="text-lg font-bold">RadioFlow AI</span>
+                <span className="text-lg font-bold">{productName}</span>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {t("landing.footer.description")}

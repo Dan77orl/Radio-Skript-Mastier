@@ -951,6 +951,7 @@
       "terms": "Условия использования",
       "privacy": "Политика конфиденциальности",
       "copyright": "© {{year}} RadioFlow AI. Все права защищены."
-    }
+    },
+    "productName": "RadioFlow AI"
   }
 }

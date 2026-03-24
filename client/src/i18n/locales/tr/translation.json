@@ -951,6 +951,7 @@
       "terms": "Kullanım Koşulları",
       "privacy": "Gizlilik Politikası",
       "copyright": "© {{year}} RadioFlow AI. Tüm hakları saklıdır."
-    }
+    },
+    "productName": "RadioFlow AI"
   }
 }
