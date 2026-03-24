@@ -3456,6 +3456,10 @@ ${existingList}
       }
 
       const durationSec = programType.defaultDurationSeconds || 60;
+      const wordsPerMinute = 150;
+      const targetWords = Math.round((durationSec / 60) * wordsPerMinute);
+      const minWords = Math.round(targetWords * 0.8);
+      const maxWords = Math.round(targetWords * 1.15);
       const durationMin = Math.floor(durationSec / 60);
       const durationRemSec = durationSec % 60;
       const durationStr = durationRemSec > 0 ? `${durationMin}:${String(durationRemSec).padStart(2, "0")}` : `${durationMin}:00`;
@@ -3472,7 +3476,11 @@ ${existingList}
       prompt += `\nСезон: ${seasonMap[season]}`;
       prompt += `\nУчитывай текущий сезон и погоду при создании контента — темы, настроение и советы должны соответствовать времени года.`;
 
-      prompt += `\nЦелевой хронометраж: ~${durationStr} минут. Рассчитывай объём текста под эту длительность.`;
+      prompt += `\n\nХРОНОМЕТРАЖ — СТРОГО СОБЛЮДАЙ:
+- Целевая длительность: ${durationSec} секунд (~${durationStr} мин)
+- Объём текста: от ${minWords} до ${maxWords} слов (скорость чтения ~150 слов/мин)
+- НЕ ПИШИ БОЛЬШЕ ${maxWords} слов! Лучше короче и ёмче, чем длинно и водянисто
+- Если ${durationSec} секунд — это коротко, сфокусируйся на ОДНОЙ теме/истории, не пытайся охватить всё`;
 
       if (fcKeywords.length > 0) {
         try {
@@ -3843,6 +3851,12 @@ ${expandedDefaultPrompt}
       }
 
       const hasReference = hasEpisodeContent || hasUrlContent || hasReferenceContent;
+      const batchDurationSec = programType.defaultDurationSeconds || 60;
+      const batchWordsPerMinute = 150;
+      const batchTargetWords = Math.round((batchDurationSec / 60) * batchWordsPerMinute);
+      const batchMinWords = Math.round(batchTargetWords * 0.8);
+      const batchMaxWords = Math.round(batchTargetWords * 1.15);
+
       const formatNote = isMultiSpeaker
         ? ", в мульти-спикерном формате [Имя]: [теги] текст"
         : speakerNames.length >= 1
@@ -3850,6 +3864,11 @@ ${expandedDefaultPrompt}
           : ", с репликами ведущих";
 
       prompt += `
+
+ХРОНОМЕТРАЖ КАЖДОГО ВЫПУСКА — СТРОГО:
+- Целевая длительность: ${batchDurationSec} секунд
+- Объём КАЖДОГО сценария: от ${batchMinWords} до ${batchMaxWords} слов (скорость чтения ~150 слов/мин)
+- НЕ ПИШИ БОЛЬШЕ ${batchMaxWords} слов на один выпуск! Лучше короче и ёмче
 
 СТИЛЬ ПОВЕСТВОВАНИЯ — ОБЯЗАТЕЛЬНО для каждого выпуска:
 - Пиши как РАССКАЗ, а НЕ как список фактов. Каждый выпуск — это история с началом, развитием и концом
@@ -4021,6 +4040,15 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 НЕ пиши текст без префикса [${singleSpeakerName}]:! Каждый блок должен начинаться с имени ведущего.
 Создавай контент на русском языке.`;
       }
+
+      const genDurationSec = programType.defaultDurationSeconds || 60;
+      const genTargetWords = Math.round((genDurationSec / 60) * 150);
+      const genMinWords = Math.round(genTargetWords * 0.8);
+      const genMaxWords = Math.round(genTargetWords * 1.15);
+      systemPrompt += `\n\nХРОНОМЕТРАЖ — СТРОГО СОБЛЮДАЙ:
+- Целевая длительность: ${genDurationSec} секунд
+- Объём текста: от ${genMinWords} до ${genMaxWords} слов (скорость чтения ~150 слов/мин)
+- НЕ ПИШИ БОЛЬШЕ ${genMaxWords} слов!`;
 
       const settingsForGen = await storage.getSettings(req.session.userId);
       const stationDefaultPromptGen = settingsForGen?.defaultPrompt || "";
