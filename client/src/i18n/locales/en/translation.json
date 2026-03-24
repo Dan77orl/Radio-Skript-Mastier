@@ -189,6 +189,7 @@
     "suggestTopics": "Suggest topics",
     "topicsGenerated": "Topics generated",
     "noResults": "No results found",
+    "generatingOtherDays": "Generating {{count}} day(s) in background",
     "autoTags": "Redo tags",
     "tagsAdded": "Emotion tags updated",
     "freshNews": "Fresh news",

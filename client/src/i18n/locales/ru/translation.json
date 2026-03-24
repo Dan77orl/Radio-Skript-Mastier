@@ -189,6 +189,7 @@
     "suggestTopics": "Предложить темы",
     "topicsGenerated": "Темы сгенерированы",
     "noResults": "Ничего не найдено",
+    "generatingOtherDays": "Генерация идёт для {{count}} дн. в фоне",
     "autoTags": "Пересоздать теги",
     "tagsAdded": "Теги эмоций обновлены",
     "freshNews": "Свежие новости",

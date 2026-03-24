@@ -177,19 +177,24 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
     },
   });
 
+  const [generatingDates, setGeneratingDates] = useState<Set<string>>(new Set());
+
   const generateAllSlotsMutation = useMutation({
     mutationFn: async (data: { date: string; totalSlots: number; firecrawlContent?: string }) => {
+      setGeneratingDates(prev => new Set([...prev, data.date]));
       const response = await apiRequest("POST", "/api/generate-day-dialogs", data);
-      return response.json() as Promise<{ dialogs: Dialog[]; generatedCount: number }>;
+      return { result: await response.json() as { dialogs: Dialog[]; generatedCount: number }, date: data.date };
     },
-    onSuccess: (data) => {
+    onSuccess: ({ result, date }) => {
+      setGeneratingDates(prev => { const next = new Set(prev); next.delete(date); return next; });
       queryClient.invalidateQueries({ queryKey: ["/api/dialogs"] });
       toast({
         title: t("generator.dialogsGenerated"),
-        description: t("generator.createdCount", { count: data.generatedCount, date: formatDate(selectedDate) }),
+        description: t("generator.createdCount", { count: result.generatedCount, date: formatDate(date) }),
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables) => {
+      setGeneratingDates(prev => { const next = new Set(prev); next.delete(variables.date); return next; });
       toast({
         title: t("common.error"),
         description: error.message || t("generator.generateError"),
@@ -395,10 +400,10 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
               <div className="flex flex-wrap gap-3">
                 <Button
                   onClick={onGenerateAllSlots}
-                  disabled={generateAllSlotsMutation.isPending}
+                  disabled={generatingDates.has(selectedDate)}
                   data-testid="button-generate-all"
                 >
-                  {generateAllSlotsMutation.isPending ? (
+                  {generatingDates.has(selectedDate) ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Wand2 className="mr-2 h-4 w-4" />
@@ -436,13 +441,21 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                 </div>
               )}
 
-              {generateAllSlotsMutation.isPending && (
+              {generatingDates.has(selectedDate) && (
                 <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
                   <Loader2 className="h-5 w-5 animate-spin" />
                   <div>
                     <p className="font-medium">{t("generator.generating")}</p>
                     <p className="text-sm text-muted-foreground">{t("generator.generatingTime")}</p>
                   </div>
+                </div>
+              )}
+              {generatingDates.size > 0 && !generatingDates.has(selectedDate) && (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                  <p className="text-sm text-blue-700 dark:text-blue-400">
+                    {t("generator.generatingOtherDays", { count: generatingDates.size })}
+                  </p>
                 </div>
               )}
             </CardContent>
