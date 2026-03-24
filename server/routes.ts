@@ -99,8 +99,8 @@ async function fetchNewsFromSource(source: { url: string; type: string }): Promi
   }
 }
 
-async function getAnthropicClient(): Promise<Anthropic | null> {
-  const settings = await storage.getSettings();
+async function getAnthropicClient(userId?: string): Promise<Anthropic | null> {
+  const settings = await storage.getSettings(userId);
   if (!settings?.anthropicApiKey) {
     return null;
   }
@@ -124,8 +124,8 @@ interface StationContext {
   knowledgeBase: string;
 }
 
-async function buildStationContext(): Promise<StationContext> {
-  const settings = await storage.getSettings();
+async function buildStationContext(userId?: string): Promise<StationContext> {
+  const settings = await storage.getSettings(userId);
   const voices = await storage.getVoices();
   
   const stationName = settings?.stationName || "Alanya FM";
@@ -403,7 +403,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Prompt is required and must be at least 10 characters" });
       }
 
-      const ctx = await buildStationContext();
+      const ctx = await buildStationContext(req.session.userId);
       const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}". 
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 Твоя задача - написать короткий диалог между ведущими: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
@@ -418,7 +418,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
 Реплики должны чередоваться логично, как естественный диалог.`;
 
-      const anthropic = await getAnthropicClient();
+      const anthropic = await getAnthropicClient(req.session.userId);
       
       if (anthropic) {
         const response = await anthropic.messages.create({
@@ -484,7 +484,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 Сохрани суть оригинального промпта.
 Верни ТОЛЬКО улучшенный промпт, без объяснений.`;
 
-      const anthropic = await getAnthropicClient();
+      const anthropic = await getAnthropicClient(req.session.userId);
 
       if (anthropic) {
         const response = await anthropic.messages.create({
@@ -598,7 +598,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         return res.status(400).json({ error: "Both male and female texts are required" });
       }
 
-      const settings = await storage.getSettings();
+      const settings = await storage.getSettings(req.session.userId);
       if (!settings?.elevenLabsApiKey) {
         return res.status(400).json({ error: "ElevenLabs API key not configured. Please add it in Settings." });
       }
@@ -735,8 +735,8 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         }
       });
 
-      const settings = await storage.getSettings();
-      const ctx = await buildStationContext();
+      const settings = await storage.getSettings(req.session.userId);
+      const ctx = await buildStationContext(req.session.userId);
       const newsItems = await storage.getNewsItems(10);
       const unusedNews = newsItems.filter(n => !n.isUsed).slice(0, 5);
       
@@ -826,7 +826,7 @@ ${hour >= 18 ? "Вечерний слот: расслабленный тон, и
         const userPrompt = `Создай диалог для слота #${slotNumber} (${timeLabel}, ${timeOfDay}).`;
 
         try {
-          const anthropic = await getAnthropicClient();
+          const anthropic = await getAnthropicClient(req.session.userId);
           let maleText = "";
           let femaleText = "";
           let title = `Слот #${slotNumber}`;
@@ -935,7 +935,7 @@ ${hour >= 18 ? "Вечерний слот: расслабленный тон, и
         return res.status(404).json({ error: "Dialog not found" });
       }
 
-      const ctx = await buildStationContext();
+      const ctx = await buildStationContext(req.session.userId);
 
       let maleHost = ctx.malePersona;
       let femaleHost = ctx.femalePersona;
@@ -965,7 +965,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
   "femaleText": "новый текст для ${femaleHost}"
 }`;
 
-      const anthropic = await getAnthropicClient();
+      const anthropic = await getAnthropicClient(req.session.userId);
       let maleText = dialog.maleText || "";
       let femaleText = dialog.femaleText || "";
 
@@ -1039,7 +1039,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
         return res.json({ queued: 0, message: "No dialogs to generate" });
       }
 
-      const settings = await storage.getSettings();
+      const settings = await storage.getSettings(req.session.userId);
       if (!settings?.elevenLabsApiKey) {
         return res.status(400).json({ error: "ElevenLabs API key not configured" });
       }
@@ -1246,7 +1246,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
 
       const fullScript = `Мужской голос: ${maleText || ""}\n\nЖенский голос: ${femaleText || ""}`;
 
-      const ctx = await buildStationContext();
+      const ctx = await buildStationContext(req.session.userId);
       const systemPrompt = `Ты - модератор контента для радиостанции "${ctx.stationName}". 
 Твоя задача - проверить радио-скрипт на соответствие следующим правилам:
 1. Нет оскорбительного или неуместного контента
@@ -1263,7 +1263,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
 }`;
 
       let result;
-      const anthropic = await getAnthropicClient();
+      const anthropic = await getAnthropicClient(req.session.userId);
 
       if (anthropic) {
         const response = await anthropic.messages.create({
@@ -1329,7 +1329,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
         return res.status(400).json({ error: "Date is required" });
       }
 
-      const settings = await storage.getSettings();
+      const settings = await storage.getSettings(req.session.userId);
       const basePrompt = prompt || settings?.defaultPrompt || "";
 
       const dateObj = new Date(date);
@@ -1351,7 +1351,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
         ? `\nСегодня праздник: ${holidayInfoStr}. Учти это в диалогах.`
         : "";
 
-      const ctx = await buildStationContext();
+      const ctx = await buildStationContext(req.session.userId);
       const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}".
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}${holidayContext}
 ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeBase}\n` : ""}
@@ -1373,7 +1373,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
 
 Создай ровно ${dailyCount} диалогов.`;
 
-      const anthropic = await getAnthropicClient();
+      const anthropic = await getAnthropicClient(req.session.userId);
       let dialogsData: { dialogs: Array<{ title: string; maleText: string; femaleText: string }> };
 
       if (anthropic) {
@@ -1617,7 +1617,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
         return res.status(400).json({ error: "Prompt is required and must be at least 10 characters" });
       }
 
-      const ctx = await buildStationContext();
+      const ctx = await buildStationContext(req.session.userId);
       const systemPrompt = `Ты - копирайтер рекламного агентства для радио "${ctx.stationName}".
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 Твоя задача - написать короткий рекламный ролик в формате диалога между ведущими: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
@@ -1633,7 +1633,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
 Реклама должна быть ненавязчивой, но убедительной.`;
 
-      const anthropic = await getAnthropicClient();
+      const anthropic = await getAnthropicClient(req.session.userId);
       
       if (anthropic) {
         const response = await anthropic.messages.create({
@@ -1711,7 +1711,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       }
 
       const { variantsCount = 5 } = req.body;
-      const ctx = await buildStationContext();
+      const ctx = await buildStationContext(req.session.userId);
       
       const systemPrompt = `Ты - креативный копирайтер для радио "${ctx.stationName}".
 Твоя задача - создать ${variantsCount} РАЗНЫХ вариантов рекламного ролика.
@@ -1744,7 +1744,7 @@ ${ad.clientName ? `- Клиент: ${ad.clientName}` : ""}
 
 Каждый вариант - это готовый текст для озвучки, без разметки на голоса.`;
 
-      const anthropic = await getAnthropicClient();
+      const anthropic = await getAnthropicClient(req.session.userId);
       
       if (anthropic) {
         const response = await anthropic.messages.create({
@@ -1843,7 +1843,7 @@ ${ad.clientName ? `- Клиент: ${ad.clientName}` : ""}
         return res.status(404).json({ error: "Ad not found" });
       }
 
-      const ctx = await buildStationContext();
+      const ctx = await buildStationContext(req.session.userId);
       
       const systemPrompt = `Ты - креативный копирайтер для радио "${ctx.stationName}".
 Тебе дан текст рекламного ролика. Нужно создать новый вариант на его основе.
@@ -1856,7 +1856,7 @@ ${instructions || "Создай альтернативный вариант с �
 
 ВАЖНО: Верни только новый текст рекламы без JSON обертки.`;
 
-      const anthropic = await getAnthropicClient();
+      const anthropic = await getAnthropicClient(req.session.userId);
       
       if (anthropic) {
         const response = await anthropic.messages.create({
@@ -1916,7 +1916,7 @@ ${instructions || "Создай альтернативный вариант с �
         return res.status(400).json({ error: "No variant selected" });
       }
 
-      const settings = await storage.getSettings();
+      const settings = await storage.getSettings(req.session.userId);
       if (!settings?.elevenLabsApiKey) {
         return res.status(400).json({ error: "ElevenLabs API key not configured" });
       }
@@ -1994,7 +1994,7 @@ ${instructions || "Создай альтернативный вариант с �
         const pdfBuffer = await fs.readFile(filePath);
         const base64Pdf = pdfBuffer.toString("base64");
 
-        const settings = await storage.getSettings();
+        const settings = await storage.getSettings(req.session.userId);
         const anthropicApiKey = settings?.anthropicApiKey;
 
         if (anthropicApiKey) {
@@ -2186,7 +2186,7 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.get("/api/elevenlabs/voices", async (req, res) => {
     try {
-      const settings = await storage.getSettings();
+      const settings = await storage.getSettings(req.session.userId);
       if (!settings?.elevenLabsApiKey) {
         return res.status(400).json({ error: "ElevenLabs API key not configured" });
       }
@@ -2222,7 +2222,7 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.post("/api/elevenlabs/voices/add-shared", async (req, res) => {
     try {
-      const settings = await storage.getSettings();
+      const settings = await storage.getSettings(req.session.userId);
       if (!settings?.elevenLabsApiKey) {
         return res.status(400).json({ error: "ElevenLabs API key not configured" });
       }
@@ -2261,7 +2261,7 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.get("/api/elevenlabs/voices/search", async (req, res) => {
     try {
-      const settings = await storage.getSettings();
+      const settings = await storage.getSettings(req.session.userId);
       if (!settings?.elevenLabsApiKey) {
         return res.status(400).json({ error: "ElevenLabs API key not configured" });
       }
@@ -2625,14 +2625,14 @@ ${instructions || "Создай альтернативный вариант с �
 ТЕМА: Эффект плацебо в психологии
 После этого начинай сценарий.`;
 
-      const ctx = await buildStationContext();
+      const ctx = await buildStationContext(req.session.userId);
       const systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
 ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 Активные ведущие: ${ctx.personaList}.
 Создавай контент на русском языке в стиле радиостанции.`;
 
       let scriptText = "";
-      const anthropic = await getAnthropicClient();
+      const anthropic = await getAnthropicClient(req.session.userId);
 
       try {
         if (anthropic) {
@@ -2788,8 +2788,8 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         .map(p => p.title)
         .join(", ");
 
-      const ctx = await buildStationContext();
-      const anthropic = await getAnthropicClient();
+      const ctx = await buildStationContext(req.session.userId);
+      const anthropic = await getAnthropicClient(req.session.userId);
 
       const voicesList = await storage.getVoices();
       const assignedVoices = resolveAssignedVoices(voicesList, programType);
@@ -2952,7 +2952,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const prompt = program.prompt || programType.defaultPrompt;
       let scriptText: string;
 
-      const ctx = await buildStationContext();
+      const ctx = await buildStationContext(req.session.userId);
       const voicesList = await storage.getVoices();
       const assignedVoices = resolveAssignedVoices(voicesList, programType);
       const isMultiSpeaker = assignedVoices.length >= 2;
@@ -2983,7 +2983,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 Создавай контент на русском языке в стиле радиостанции.`;
       }
 
-      const anthropic = await getAnthropicClient();
+      const anthropic = await getAnthropicClient(req.session.userId);
       
       if (anthropic) {
         const message = await anthropic.messages.create({
@@ -3030,7 +3030,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         return res.status(400).json({ error: "No script to generate audio from" });
       }
 
-      const settings = await storage.getSettings();
+      const settings = await storage.getSettings(req.session.userId);
       if (!settings?.elevenLabsApiKey) {
         return res.status(400).json({ error: "ElevenLabs API key not configured" });
       }
@@ -3171,7 +3171,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         return res.status(400).json({ error: "No audio file to process" });
       }
 
-      const settings = await storage.getSettings();
+      const settings = await storage.getSettings(req.session.userId);
       if (!settings?.elevenLabsApiKey) {
         return res.status(400).json({ error: "ElevenLabs API key not configured" });
       }
@@ -3386,7 +3386,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
               return;
             }
 
-            const ctx = await buildStationContext();
+            const ctx = await buildStationContext(req.session.userId);
             const personaContext = `\nВЕДУЩИЕ: ${maleVoice.personaName || maleVoice.name} (мужчина) и ${femaleVoice.personaName || femaleVoice.name} (женщина). Используй их имена в диалоге естественно.\n`;
             const stationContext = `Радиостанция: ${ctx.stationName}. ${ctx.stationDescription ? ctx.stationDescription : ""}\n`;
 
@@ -3417,7 +3417,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
               return;
             }
 
-            const ctx = await buildStationContext();
+            const ctx = await buildStationContext(req.session.userId);
             const stationContext = `Радиостанция: ${ctx.stationName}. ${ctx.stationDescription ? ctx.stationDescription : ""}\n`;
             
             for (let i = 0; i < itemsCount; i++) {
@@ -3470,15 +3470,15 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
   // Freesound API for royalty-free music
   const FREESOUND_API_BASE = "https://freesound.org/apiv2";
   
-  async function getFreesoundApiKey(): Promise<string | null> {
-    const settings = await storage.getSettings();
+  async function getFreesoundApiKey(userId?: string): Promise<string | null> {
+    const settings = await storage.getSettings(userId);
     return settings?.freesoundApiKey || null;
   }
   
   app.get("/api/music/search", async (req, res) => {
     try {
       const { query } = req.query;
-      const apiKey = await getFreesoundApiKey();
+      const apiKey = await getFreesoundApiKey(req.session.userId);
       
       if (!apiKey) {
         return res.status(400).json({ 
@@ -3520,7 +3520,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
   app.get("/api/music/track/:trackId/stream", async (req, res) => {
     try {
       const { trackId } = req.params;
-      const apiKey = await getFreesoundApiKey();
+      const apiKey = await getFreesoundApiKey(req.session.userId);
       
       if (!apiKey) {
         return res.status(400).json({ error: "Freesound API key not configured" });
@@ -3550,12 +3550,12 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         return res.status(400).json({ error: "Ad text is required" });
       }
 
-      const anthropic = await getAnthropicClient();
+      const anthropic = await getAnthropicClient(req.session.userId);
       if (!anthropic) {
         return res.status(400).json({ error: "Claude API key not configured" });
       }
 
-      const freesoundKey = await getFreesoundApiKey();
+      const freesoundKey = await getFreesoundApiKey(req.session.userId);
       if (!freesoundKey) {
         return res.status(400).json({ 
           error: "Freesound API key not configured",
@@ -3720,7 +3720,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
           if (programType.autoUpload !== false && program.audioUrl) {
             try {
-              const settings = await storage.getSettings();
+              const settings = await storage.getSettings(req.session.userId);
               if (settings?.yandexDiskToken) {
                 const normalizedUrl = program.audioUrl.startsWith("/") ? program.audioUrl.slice(1) : program.audioUrl;
                 const audioPath = path.join(process.cwd(), "public", normalizedUrl);
@@ -3852,7 +3852,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       if (country && typeof country === "string") {
         resolvedCountry = country.toUpperCase();
       } else {
-        const stSettings = await storage.getSettings();
+        const stSettings = await storage.getSettings(req.session.userId);
         resolvedCountry = resolveStationCountry(stSettings?.stationLocation);
       }
 
@@ -4024,7 +4024,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       const weekday = jsDay === 0 ? 7 : jsDay;
 
       const template = await storage.getTemplateForWeekday(weekday);
-      const settings = await storage.getSettings();
+      const settings = await storage.getSettings(req.session.userId);
 
       const allHolidays = getHolidaysForDate(date);
       const stationCountry = resolveStationCountry(settings?.stationLocation);
