@@ -187,6 +187,8 @@
     "searchingInfo": "Ищем информацию...",
     "autoTopics": "Авто",
     "topicsGenerated": "Темы сгенерированы",
+    "autoTags": "Авто-теги",
+    "tagsAdded": "Теги эмоций добавлены",
     "freshNews": "Свежие новости",
     "usedInGeneration": "Будут использованы в генерации",
     "promptSettings": "Настройки промптов",

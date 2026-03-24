@@ -256,20 +256,53 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
     setExpandedSlots(newExpanded);
   };
 
+  const [editMaleText, setEditMaleText] = useState("");
+  const [editFemaleText, setEditFemaleText] = useState("");
+
   const startEditing = (slotNumber: number, dialog: Dialog) => {
     setEditingSlot(slotNumber);
     setEditPrompt(dialog.prompt || "");
+    setEditMaleText(dialog.maleText || "");
+    setEditFemaleText(dialog.femaleText || "");
   };
 
   const cancelEditing = () => {
     setEditingSlot(null);
     setEditPrompt("");
+    setEditMaleText("");
+    setEditFemaleText("");
   };
 
   const saveEdit = (dialog: Dialog) => {
     if (!editPrompt.trim()) return;
     regenerateSlotMutation.mutate({ dialogId: dialog.id, prompt: editPrompt });
   };
+
+  const saveTextMutation = useMutation({
+    mutationFn: async ({ dialogId, maleText, femaleText }: { dialogId: string; maleText: string; femaleText: string }) => {
+      const response = await apiRequest("PATCH", `/api/dialogs/${dialogId}`, { maleText, femaleText });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dialogs"] });
+      cancelEditing();
+      toast({ title: t("common.saved") });
+    },
+  });
+
+  const autoTagsMutation = useMutation({
+    mutationFn: async (dialogId: string) => {
+      const response = await apiRequest("POST", `/api/dialogs/${dialogId}/auto-tags`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dialogs"] });
+      toast({ title: t("generator.tagsAdded") });
+    },
+    onError: () => {
+      toast({ title: t("common.error"), variant: "destructive" });
+    },
+  });
 
   const onGenerateAllSlots = () => {
     generateAllSlotsMutation.mutate({ 
@@ -565,26 +598,67 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
 
                                 {isEditing ? (
                                   <div className="space-y-3">
-                                    <Textarea
-                                      value={editPrompt}
-                                      onChange={(e) => setEditPrompt(e.target.value)}
-                                      placeholder={t("generator.regeneratePromptPlaceholder")}
-                                      className="min-h-[100px]"
-                                      data-testid={`textarea-edit-${slotNumber}`}
-                                    />
-                                    <div className="flex gap-2">
+                                    {(() => {
+                                      const maleVoice = slotInfo?.voiceIds?.[0] ? activeVoices.find(v => v.id === slotInfo.voiceIds[0]) : null;
+                                      const femaleVoice = slotInfo?.voiceIds?.[1] ? activeVoices.find(v => v.id === slotInfo.voiceIds[1]) : null;
+                                      const maleName = maleVoice?.personaName || maleVoice?.name || t("generator.maleVoice");
+                                      const femaleName = femaleVoice?.personaName || femaleVoice?.name || t("generator.femaleVoice");
+                                      return (
+                                        <>
+                                          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                                            <div className="flex items-center gap-2 mb-2">
+                                              <User className="h-4 w-4 text-blue-500" />
+                                              <span className="text-sm font-medium text-blue-700 dark:text-blue-400">{maleName}</span>
+                                            </div>
+                                            <Textarea
+                                              value={editMaleText}
+                                              onChange={(e) => setEditMaleText(e.target.value)}
+                                              className="min-h-[80px] bg-background"
+                                              data-testid={`textarea-male-${slotNumber}`}
+                                            />
+                                          </div>
+                                          <div className="p-3 rounded-lg bg-pink-500/10 border border-pink-500/20">
+                                            <div className="flex items-center gap-2 mb-2">
+                                              <User className="h-4 w-4 text-pink-500" />
+                                              <span className="text-sm font-medium text-pink-700 dark:text-pink-400">{femaleName}</span>
+                                            </div>
+                                            <Textarea
+                                              value={editFemaleText}
+                                              onChange={(e) => setEditFemaleText(e.target.value)}
+                                              className="min-h-[80px] bg-background"
+                                              data-testid={`textarea-female-${slotNumber}`}
+                                            />
+                                          </div>
+                                        </>
+                                      );
+                                    })()}
+                                    <div className="flex gap-2 flex-wrap">
                                       <Button
                                         size="sm"
-                                        onClick={() => saveEdit(dialog)}
-                                        disabled={regenerateSlotMutation.isPending}
-                                        data-testid={`button-save-${slotNumber}`}
+                                        onClick={() => saveTextMutation.mutate({ dialogId: dialog.id, maleText: editMaleText, femaleText: editFemaleText })}
+                                        disabled={saveTextMutation.isPending}
+                                        data-testid={`button-save-text-${slotNumber}`}
                                       >
-                                        {regenerateSlotMutation.isPending ? (
+                                        {saveTextMutation.isPending ? (
                                           <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                                         ) : (
-                                          <RefreshCw className="mr-1 h-3 w-3" />
+                                          <Save className="mr-1 h-3 w-3" />
                                         )}
-                                        {t("generator.regenerate")}
+                                        {t("common.save")}
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => autoTagsMutation.mutate(dialog.id)}
+                                        disabled={autoTagsMutation.isPending}
+                                        data-testid={`button-auto-tags-${slotNumber}`}
+                                      >
+                                        {autoTagsMutation.isPending ? (
+                                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <Wand2 className="mr-1 h-3 w-3" />
+                                        )}
+                                        {t("generator.autoTags")}
                                       </Button>
                                       <Button
                                         size="sm"
@@ -595,31 +669,75 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                         {t("common.cancel")}
                                       </Button>
                                     </div>
+                                    <Collapsible>
+                                      <CollapsibleTrigger asChild>
+                                        <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                          <RefreshCw className="h-3 w-3" />
+                                          {t("generator.regenerate")}
+                                          <ChevronDown className="h-3 w-3" />
+                                        </button>
+                                      </CollapsibleTrigger>
+                                      <CollapsibleContent>
+                                        <div className="mt-2 space-y-2">
+                                          <Textarea
+                                            value={editPrompt}
+                                            onChange={(e) => setEditPrompt(e.target.value)}
+                                            placeholder={t("generator.regeneratePromptPlaceholder")}
+                                            className="min-h-[60px] text-xs"
+                                            data-testid={`textarea-regen-${slotNumber}`}
+                                          />
+                                          <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            onClick={() => saveEdit(dialog)}
+                                            disabled={regenerateSlotMutation.isPending}
+                                            data-testid={`button-regen-${slotNumber}`}
+                                          >
+                                            {regenerateSlotMutation.isPending ? (
+                                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <RefreshCw className="mr-1 h-3 w-3" />
+                                            )}
+                                            {t("generator.regenerate")}
+                                          </Button>
+                                        </div>
+                                      </CollapsibleContent>
+                                    </Collapsible>
                                   </div>
                                 ) : (
                                   <div className="space-y-3">
-                                    {dialog.maleText && (
-                                      <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                                        <div className="flex items-center gap-2 mb-2">
-                                          <User className="h-4 w-4 text-blue-500" />
-                                          <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
-                                            {t("generator.maleVoice")}
-                                          </span>
-                                        </div>
-                                        <p className="text-sm">{dialog.maleText}</p>
-                                      </div>
-                                    )}
-                                    {dialog.femaleText && (
-                                      <div className="p-3 rounded-lg bg-pink-500/10 border border-pink-500/20">
-                                        <div className="flex items-center gap-2 mb-2">
-                                          <User className="h-4 w-4 text-pink-500" />
-                                          <span className="text-sm font-medium text-pink-700 dark:text-pink-400">
-                                            {t("generator.femaleVoice")}
-                                          </span>
-                                        </div>
-                                        <p className="text-sm">{dialog.femaleText}</p>
-                                      </div>
-                                    )}
+                                    {(() => {
+                                      const maleVoice = slotInfo?.voiceIds?.[0] ? activeVoices.find(v => v.id === slotInfo.voiceIds[0]) : null;
+                                      const femaleVoice = slotInfo?.voiceIds?.[1] ? activeVoices.find(v => v.id === slotInfo.voiceIds[1]) : null;
+                                      const maleName = maleVoice?.personaName || maleVoice?.name || t("generator.maleVoice");
+                                      const femaleName = femaleVoice?.personaName || femaleVoice?.name || t("generator.femaleVoice");
+                                      return (
+                                        <>
+                                          {dialog.maleText && (
+                                            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                                              <div className="flex items-center gap-2 mb-2">
+                                                <User className="h-4 w-4 text-blue-500" />
+                                                <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                                                  {maleName}
+                                                </span>
+                                              </div>
+                                              <p className="text-sm">{dialog.maleText}</p>
+                                            </div>
+                                          )}
+                                          {dialog.femaleText && (
+                                            <div className="p-3 rounded-lg bg-pink-500/10 border border-pink-500/20">
+                                              <div className="flex items-center gap-2 mb-2">
+                                                <User className="h-4 w-4 text-pink-500" />
+                                                <span className="text-sm font-medium text-pink-700 dark:text-pink-400">
+                                                  {femaleName}
+                                                </span>
+                                              </div>
+                                              <p className="text-sm">{dialog.femaleText}</p>
+                                            </div>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
                                     {dialog.audioUrl && (
                                       <div className="flex items-center gap-2">
                                         <Button size="sm" variant="outline" asChild>
@@ -627,6 +745,20 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                             <Play className="mr-1 h-3 w-3" />
                                             {t("generator.listen")}
                                           </a>
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={(e) => { e.stopPropagation(); autoTagsMutation.mutate(dialog.id); }}
+                                          disabled={autoTagsMutation.isPending}
+                                          data-testid={`button-auto-tags-view-${slotNumber}`}
+                                        >
+                                          {autoTagsMutation.isPending ? (
+                                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                          ) : (
+                                            <Wand2 className="mr-1 h-3 w-3" />
+                                          )}
+                                          {t("generator.autoTags")}
                                         </Button>
                                       </div>
                                     )}

@@ -187,6 +187,8 @@
     "searchingInfo": "Searching for information...",
     "autoTopics": "Auto",
     "topicsGenerated": "Topics generated",
+    "autoTags": "Auto-tags",
+    "tagsAdded": "Emotion tags added",
     "freshNews": "Fresh news",
     "usedInGeneration": "Will be used in generation",
     "promptSettings": "Prompt settings",

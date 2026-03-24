@@ -401,6 +401,74 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/dialogs/:id", async (req, res) => {
+    try {
+      const dialog = await storage.getDialog(req.params.id);
+      if (!dialog) return res.status(404).json({ error: "Dialog not found" });
+      const updated = await storage.updateDialog(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating dialog:", error);
+      res.status(500).json({ error: "Failed to update dialog" });
+    }
+  });
+
+  app.post("/api/dialogs/:id/auto-tags", async (req, res) => {
+    try {
+      const dialog = await storage.getDialog(req.params.id);
+      if (!dialog) return res.status(404).json({ error: "Dialog not found" });
+
+      const text = dialog.maleText && dialog.femaleText 
+        ? `Мужская реплика:\n${dialog.maleText}\n\nЖенская реплика:\n${dialog.femaleText}`
+        : dialog.scriptText || "";
+
+      if (!text) return res.status(400).json({ error: "No text to tag" });
+
+      const systemPrompt = `Ты — разметчик эмоций для радио-диалогов. Добавь метатеги эмоций в начало каждого абзаца текста.
+
+Доступные теги: [energetic], [fast], [slow], [surprised], [thoughtful], [happy], [calm], [warm], [confident], [excited], [gentle], [announcer]
+
+Правила:
+- Ставь 1-2 тега в начало каждого абзаца/реплики
+- Выбирай тег по настроению и содержанию текста
+- НЕ меняй сам текст, только добавляй теги
+- Верни JSON: {"maleText": "...", "femaleText": "..."} если есть оба текста, или {"scriptText": "..."} если один`;
+
+      const settingsData = await storage.getSettings(req.session.userId);
+      let result: Record<string, string>;
+
+      if (settingsData?.anthropicApiKey) {
+        const anthropic = new Anthropic({ apiKey: settingsData.anthropicApiKey });
+        const response = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 2000,
+          system: systemPrompt,
+          messages: [{ role: "user", content: text }],
+        });
+        const respText = response.content[0].type === "text" ? response.content[0].text : "{}";
+        result = JSON.parse(respText);
+      } else {
+        const openai = new OpenAI();
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          max_tokens: 2000,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: text },
+          ],
+        });
+        const respText = response.choices[0]?.message?.content || "{}";
+        result = JSON.parse(respText);
+      }
+
+      const updated = await storage.updateDialog(req.params.id, result);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error auto-tagging dialog:", error);
+      res.status(500).json({ error: "Failed to auto-tag dialog" });
+    }
+  });
+
   app.post("/api/generate-script", async (req, res) => {
     try {
       const { prompt } = req.body;
