@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AuthPage from "@/pages/auth";
+import LandingPage from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import Generator from "@/pages/generator";
 import Schedule from "@/pages/schedule";
@@ -96,7 +97,12 @@ function AppContent() {
   }
 
   if (!isAuthenticated) {
-    return <AuthPage />;
+    return (
+      <Switch>
+        <Route path="/auth" component={AuthPage} />
+        <Route component={LandingPage} />
+      </Switch>
+    );
   }
 
   return <AdminLayout />;

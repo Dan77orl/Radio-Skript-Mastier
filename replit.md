@@ -39,8 +39,9 @@ Preferred communication style: Simple, everyday language.
 - **Password hashing**: bcryptjs for secure password storage
 - **Auth endpoints**: POST `/api/auth/register`, POST `/api/auth/login`, POST `/api/auth/logout`, GET `/api/auth/me`
 - **Auth middleware**: All `/api/*` routes (except `/api/auth/*`) require authentication, returning 401 for unauthenticated requests
-- **Frontend auth flow**: `useAuth()` hook checks `/api/auth/me`; unauthenticated users see login/register page; authenticated users see admin dashboard
-- **Auth files**: `server/auth.ts` (backend logic), `client/src/hooks/use-auth.ts` (frontend hook), `client/src/pages/auth.tsx` (login/register page)
+- **Frontend auth flow**: `useAuth()` hook checks `/api/auth/me`; unauthenticated users see landing page at "/"; auth page at "/auth"; authenticated users see admin dashboard
+- **Landing page**: `client/src/pages/landing.tsx` — hero, features, pricing, how-it-works, CTA, footer; fully i18n'd (en/ru/tr); SEO meta tags set via useEffect
+- **Auth files**: `server/auth.ts` (backend logic), `client/src/hooks/use-auth.ts` (frontend hook), `client/src/pages/auth.tsx` (login/register page at /auth route)
 
 ### Core Entities
 1. **Users** - Authentication with email, password (hashed), name

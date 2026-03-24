@@ -825,5 +825,132 @@
     "email": "Geçerli bir e-posta girin",
     "url": "Geçerli bir URL girin",
     "invalidType": "Geçersiz değer"
+  },
+  "landing": {
+    "nav": {
+      "login": "Giriş Yap",
+      "signup": "Kayıt Ol"
+    },
+    "hero": {
+      "badge": "Yapay Zeka ile Radyo Otomasyonu",
+      "title": "Radyo İçeriğinizi Yapay Zeka ile Otomatikleştirin",
+      "subtitle": "Senaryo oluşturma, çok sesli programlar, profesyonel seslendirme ve yayın planlaması — hepsi yapay zeka destekli.",
+      "cta": "Ücretsiz Başlayın",
+      "learnMore": "Daha Fazla Bilgi"
+    },
+    "stats": {
+      "scripts": "10K+",
+      "scriptsLabel": "Oluşturulan senaryo",
+      "hours": "500+",
+      "hoursLabel": "Saat ses",
+      "stations": "50+",
+      "stationsLabel": "Radyo istasyonu",
+      "languages": "3",
+      "languagesLabel": "Arayüz dili"
+    },
+    "features": {
+      "title": "İstasyonunuzun İhtiyacı Olan Her Şey",
+      "subtitle": "Modern radyo içerik üretimi için eksiksiz araç seti — senaryodan yayına.",
+      "aiScripts": {
+        "title": "Yapay Zeka Senaryo Üretimi",
+        "desc": "Claude AI ile etkileyici radyo senaryoları oluşturun. Diyaloglar, haber özetleri, hava durumu raporları — hepsi istasyonunuzun tarzına uyarlanabilir."
+      },
+      "multiSpeaker": {
+        "title": "Çok Sesli Programlar",
+        "desc": "Farklı kişiliklere sahip birden fazla sunucu için senaryolar oluşturun. Her konuşmacı, doğal konuşmalar için duygu etiketleriyle benzersiz replikler alır."
+      },
+      "tts": {
+        "title": "Metinden Sese Dönüştürme",
+        "desc": "ElevenLabs sesleriyle senaryoları profesyonel sese dönüştürün. Birden fazla ses, duygu kontrolü ve otomatik ses birleştirme."
+      },
+      "scheduling": {
+        "title": "Akıllı Zamanlama",
+        "desc": "Sunucu rotasyonlu esnek günlük program şablonları. Zaman dilimlerini ayarlayın, sesleri atayın — sistem gerisini halleder."
+      },
+      "ads": {
+        "title": "Reklam Üretimi",
+        "desc": "Yapay zeka ile radyo reklamları oluşturun. Çoklu senaryo varyantları, sponsor entegrasyonu, müzik miksajı ve toplu üretim."
+      },
+      "cloud": {
+        "title": "Bulut Depolama",
+        "desc": "Oluşturulan sesin buluta otomatik yüklenmesi. Özelleştirilebilir adlandırma şablonlarıyla düzenli klasör yapısı."
+      },
+      "shows": {
+        "title": "Program Yönetimi",
+        "desc": "Bağımsız ayarlarla birden fazla program türünü yönetin. Her program türünün kendi istemi, takvimi ve ses yapılandırması vardır."
+      },
+      "multilang": {
+        "title": "Çok Dilli Arayüz",
+        "desc": "Rusça, İngilizce ve Türkçe için tam arayüz desteği. Manuel geçişle otomatik dil algılama."
+      },
+      "automation": {
+        "title": "Tam Otomasyon",
+        "desc": "Ayarlayın ve unutun. Senaryoların otomatik üretimi, seslendirme ve buluta yükleme programlanabilir. İşlem hattı saatlik çalışır."
+      }
+    },
+    "howItWorks": {
+      "title": "Nasıl Çalışır",
+      "subtitle": "Radyo içerik üretiminizi otomatikleştirmek için üç basit adım.",
+      "step1": {
+        "title": "İstasyonunuzu Yapılandırın",
+        "desc": "İstasyon profilinizi oluşturun, AI sesleri ekleyin, program türlerini ve takvim şablonlarını tanımlayın."
+      },
+      "step2": {
+        "title": "İçerik Oluşturun",
+        "desc": "AI, istemlerinize, güncel olaylara ve istasyon bağlamına göre senaryolar oluşturur. İnceleyin, düzenleyin veya tek tıkla yeniden oluşturun."
+      },
+      "step3": {
+        "title": "Otomatik Yayınlayın",
+        "desc": "Senaryolar seslendirilir, işlenir ve bulut depolamaya otomatik olarak yüklenir. Yayın sisteminiz için hazır."
+      }
+    },
+    "pricing": {
+      "title": "Basit, Şeffaf Fiyatlandırma",
+      "subtitle": "İstasyonunuza uygun planı seçin. Büyüdükçe ölçeklendirin.",
+      "month": "ay",
+      "popular": "En Popüler",
+      "getStarted": "Başlayın",
+      "starter": {
+        "name": "Başlangıç",
+        "price": "$29",
+        "f1": "Aylık 50 senaryoya kadar",
+        "f2": "2 AI sesi",
+        "f3": "1 program türü",
+        "f4": "Bulut depolama yükleme"
+      },
+      "pro": {
+        "name": "Profesyonel",
+        "price": "$79",
+        "f1": "Sınırsız senaryo",
+        "f2": "10 AI sesi",
+        "f3": "Sınırsız program türü",
+        "f4": "Tam otomasyon hattı",
+        "f5": "Reklam üretimi"
+      },
+      "enterprise": {
+        "name": "Kurumsal",
+        "price": "$199",
+        "f1": "Profesyoneldeki her şey",
+        "f2": "Özel AI model ayarı",
+        "f3": "Öncelikli destek",
+        "f4": "API erişimi",
+        "f5": "Çoklu istasyon yönetimi"
+      }
+    },
+    "cta": {
+      "title": "Radyonuzu Dönüştürmeye Hazır mısınız?",
+      "subtitle": "İçerik oluşturmayı RadioFlow AI'ye güvenen dünya çapındaki radyo istasyonlarına katılın.",
+      "button": "Ücretsiz Denemeyi Başlat"
+    },
+    "footer": {
+      "description": "Radyo içerik oluşturmayı otomatikleştiren AI destekli platform. Senaryolar, ses ve zamanlama — hepsi tek yerde.",
+      "product": "Ürün",
+      "features": "Özellikler",
+      "pricing": "Fiyatlandırma",
+      "company": "Şirket",
+      "terms": "Kullanım Koşulları",
+      "privacy": "Gizlilik Politikası",
+      "copyright": "© {{year}} RadioFlow AI. Tüm hakları saklıdır."
+    }
   }
 }

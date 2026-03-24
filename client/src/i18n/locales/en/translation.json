@@ -825,5 +825,132 @@
     "email": "Please enter a valid email",
     "url": "Please enter a valid URL",
     "invalidType": "Invalid value"
+  },
+  "landing": {
+    "nav": {
+      "login": "Log In",
+      "signup": "Sign Up"
+    },
+    "hero": {
+      "badge": "AI-Powered Radio Automation",
+      "title": "Automate Your Radio Content with AI",
+      "subtitle": "Generate scripts, create multi-speaker programs, synthesize professional audio, and schedule broadcasts — all powered by artificial intelligence.",
+      "cta": "Get Started Free",
+      "learnMore": "Learn More"
+    },
+    "stats": {
+      "scripts": "10K+",
+      "scriptsLabel": "Scripts generated",
+      "hours": "500+",
+      "hoursLabel": "Hours of audio",
+      "stations": "50+",
+      "stationsLabel": "Radio stations",
+      "languages": "3",
+      "languagesLabel": "Interface languages"
+    },
+    "features": {
+      "title": "Everything Your Station Needs",
+      "subtitle": "A complete toolkit for modern radio content production, from script to broadcast.",
+      "aiScripts": {
+        "title": "AI Script Generation",
+        "desc": "Create engaging radio scripts with Claude AI. Dialog formats, news digests, weather reports, and more — all customizable with your station's voice and style."
+      },
+      "multiSpeaker": {
+        "title": "Multi-Speaker Programs",
+        "desc": "Generate scripts for multiple hosts with distinct personalities. Each speaker gets unique lines with emotion tags for natural-sounding conversations."
+      },
+      "tts": {
+        "title": "Text-to-Speech Audio",
+        "desc": "Convert scripts to professional audio using ElevenLabs voices. Support for multiple voices, emotion control, and automatic audio concatenation."
+      },
+      "scheduling": {
+        "title": "Smart Scheduling",
+        "desc": "Flexible per-day schedule templates with host rotation. Set up time slots, assign voices, and let the system handle the rest."
+      },
+      "ads": {
+        "title": "Ad Production",
+        "desc": "Create radio advertisements with AI. Multiple script variants, sponsor integration, background music mixing, and batch production."
+      },
+      "cloud": {
+        "title": "Cloud Storage",
+        "desc": "Automatic upload of generated audio to cloud storage. Organized folder structure with customizable naming templates."
+      },
+      "shows": {
+        "title": "Show Management",
+        "desc": "Manage multiple program types with independent settings. Each show type has its own prompt, schedule, and voice configuration."
+      },
+      "multilang": {
+        "title": "Multilingual Interface",
+        "desc": "Full interface support for Russian, English, and Turkish. Auto-detection of user language with manual override."
+      },
+      "automation": {
+        "title": "Full Automation",
+        "desc": "Set it and forget it. Auto-generate scripts, voice them, and upload to cloud on a customizable schedule. Pipeline runs hourly."
+      }
+    },
+    "howItWorks": {
+      "title": "How It Works",
+      "subtitle": "Three simple steps to automate your radio content production.",
+      "step1": {
+        "title": "Configure Your Station",
+        "desc": "Set up your station profile, add AI voices, define show types and schedule templates. Customize prompts for your unique style."
+      },
+      "step2": {
+        "title": "Generate Content",
+        "desc": "AI creates scripts based on your prompts, current events, and station context. Review, edit, or regenerate with one click."
+      },
+      "step3": {
+        "title": "Broadcast Automatically",
+        "desc": "Scripts are voiced, processed, and uploaded to your cloud storage automatically. Ready for your broadcast system."
+      }
+    },
+    "pricing": {
+      "title": "Simple, Transparent Pricing",
+      "subtitle": "Choose the plan that fits your station. Scale as you grow.",
+      "month": "month",
+      "popular": "Most Popular",
+      "getStarted": "Get Started",
+      "starter": {
+        "name": "Starter",
+        "price": "9",
+        "f1": "Up to 50 scripts/month",
+        "f2": "2 AI voices",
+        "f3": "1 show type",
+        "f4": "Cloud storage upload"
+      },
+      "pro": {
+        "name": "Professional",
+        "price": "9",
+        "f1": "Unlimited scripts",
+        "f2": "10 AI voices",
+        "f3": "Unlimited show types",
+        "f4": "Full automation pipeline",
+        "f5": "Ad production"
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "price": "99",
+        "f1": "Everything in Professional",
+        "f2": "Custom AI model tuning",
+        "f3": "Priority support",
+        "f4": "API access",
+        "f5": "Multi-station management"
+      }
+    },
+    "cta": {
+      "title": "Ready to Transform Your Radio?",
+      "subtitle": "Join radio stations worldwide that trust RadioFlow AI to create engaging content automatically.",
+      "button": "Start Free Trial"
+    },
+    "footer": {
+      "description": "AI-powered platform for automating radio content creation. Scripts, audio, and scheduling — all in one place.",
+      "product": "Product",
+      "features": "Features",
+      "pricing": "Pricing",
+      "company": "Company",
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy",
+      "copyright": "© {{year}} RadioFlow AI. All rights reserved."
+    }
   }
 }
