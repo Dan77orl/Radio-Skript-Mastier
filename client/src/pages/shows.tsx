@@ -191,6 +191,14 @@ export default function ShowsPage() {
   const [isAddTypeDialogOpen, setIsAddTypeDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [isEditPromptDialogOpen, setIsEditPromptDialogOpen] = useState(false);
+  const [promptAnalysis, setPromptAnalysis] = useState<{
+    urls: { url: string; status: string; contentLength: number; preview: string }[];
+    speaker: string | null;
+    hasEpisodeContent: boolean;
+    totalContentLength: number;
+    expandedPrompt: string;
+  } | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [editingType, setEditingType] = useState<ProgramType | null>(null);
   const [settingsType, setSettingsType] = useState<ProgramType | null>(null);
   const [newTypeName, setNewTypeName] = useState("");
@@ -1315,27 +1323,146 @@ export default function ShowsPage() {
 
       {renderAddTypeDialog()}
 
-      <Dialog open={isEditPromptDialogOpen} onOpenChange={setIsEditPromptDialogOpen}>
-        <DialogContent className="!w-[min(42rem,calc(100vw-2rem))] !max-w-none">
+      <Dialog open={isEditPromptDialogOpen} onOpenChange={(open) => {
+        setIsEditPromptDialogOpen(open);
+        if (!open) setPromptAnalysis(null);
+      }}>
+        <DialogContent className="!w-[min(52rem,calc(100vw-2rem))] !max-w-none max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t("shows.editPromptTitle", { name: editingType?.name })}</DialogTitle>
             <DialogDescription>
               {t("shows.editPromptDesc")}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-3">
             <div className="flex gap-1 items-start">
               <Textarea
                 value={editingType?.defaultPrompt || ""}
-                onChange={(e) => setEditingType(prev => prev ? { ...prev, defaultPrompt: e.target.value } : null)}
+                onChange={(e) => {
+                  setEditingType(prev => prev ? { ...prev, defaultPrompt: e.target.value } : null);
+                  setPromptAnalysis(null);
+                }}
                 rows={12}
                 className="font-mono text-sm flex-1"
+                data-testid="textarea-prompt"
               />
               <VoiceInput onTranscript={(text) => setEditingType(prev => prev ? { ...prev, defaultPrompt: prev.defaultPrompt + " " + text } : null)} />
             </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isAnalyzing || !editingType?.defaultPrompt?.trim()}
+                onClick={async () => {
+                  if (!editingType?.defaultPrompt?.trim()) return;
+                  setIsAnalyzing(true);
+                  setPromptAnalysis(null);
+                  try {
+                    const res = await apiRequest("POST", "/api/analyze-prompt", {
+                      promptText: editingType.defaultPrompt,
+                    });
+                    const data = await res.json();
+                    setPromptAnalysis(data);
+                  } catch (err: any) {
+                    toast({ title: "Ошибка анализа", description: err.message, variant: "destructive" });
+                  } finally {
+                    setIsAnalyzing(false);
+                  }
+                }}
+                data-testid="button-analyze-prompt"
+              >
+                {isAnalyzing ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Анализ...</>
+                ) : (
+                  <><Eye className="mr-2 h-4 w-4" />Анализ промпта</>
+                )}
+              </Button>
+            </div>
+
+            {promptAnalysis && (
+              <div className="border rounded-lg p-4 space-y-3 bg-muted/30 text-sm">
+                <div className="font-semibold text-base">Результат анализа</div>
+
+                {promptAnalysis.speaker && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">Ведущий(ая):</span>
+                    <span className="font-medium text-green-600 dark:text-green-400">{promptAnalysis.speaker}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Эталонный контент:</span>
+                  {promptAnalysis.hasEpisodeContent ? (
+                    <span className="font-medium text-green-600 dark:text-green-400 flex items-center gap-1">
+                      <CheckCircle2 className="h-4 w-4" /> Обнаружен
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <XCircle className="h-4 w-4" /> Не обнаружен
+                    </span>
+                  )}
+                </div>
+
+                {promptAnalysis.urls.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-muted-foreground">Ссылки ({promptAnalysis.urls.length}):</div>
+                    {promptAnalysis.urls.map((u, i) => (
+                      <div key={i} className="border rounded p-3 space-y-1 bg-background">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Link className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span className="text-xs font-mono break-all">{u.url}</span>
+                          {u.status === "ok" ? (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                              {u.contentLength.toLocaleString()} симв.
+                            </span>
+                          ) : u.status === "garbage" ? (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
+                              Мусор (JS-страница)
+                            </span>
+                          ) : u.status === "empty" ? (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">
+                              Пусто
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">
+                              Ошибка: {u.status}
+                            </span>
+                          )}
+                        </div>
+                        {u.preview && (
+                          <div className="text-xs text-muted-foreground mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap border-t pt-1">
+                            {u.preview}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {promptAnalysis.totalContentLength > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        Всего загружено: {promptAnalysis.totalContentLength.toLocaleString()} символов
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {promptAnalysis.urls.length === 0 && !promptAnalysis.hasEpisodeContent && !promptAnalysis.speaker && (
+                  <div className="text-muted-foreground">
+                    В промпте не обнаружено ссылок, эталонного контента или имени ведущего. Система будет использовать стандартный формат генерации.
+                  </div>
+                )}
+
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                    Развёрнутый промпт (как видит система)
+                  </summary>
+                  <pre className="mt-2 text-xs bg-background border rounded p-3 whitespace-pre-wrap max-h-64 overflow-y-auto">
+                    {promptAnalysis.expandedPrompt}
+                  </pre>
+                </details>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditPromptDialogOpen(false)}>
+            <Button variant="outline" onClick={() => { setIsEditPromptDialogOpen(false); setPromptAnalysis(null); }}>
               {t("shows.cancel")}
             </Button>
             <Button
