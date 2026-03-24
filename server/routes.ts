@@ -232,7 +232,11 @@ function extractFirecrawlKeywords(topics: string[]): string[] {
     if (t.startsWith("http")) {
       const qMatch = t.match(/[?&]q=([^&]+)/);
       if (qMatch) {
-        return decodeURIComponent(qMatch[1]).replace(/\+/g, " ").replace(/%s\s*/g, "").trim();
+        try {
+          return decodeURIComponent(qMatch[1]).replace(/\+/g, " ").replace(/%s\s*/g, "").trim();
+        } catch {
+          return qMatch[1].replace(/\+/g, " ").replace(/%s\s*/g, "").trim();
+        }
       }
       return "";
     }
