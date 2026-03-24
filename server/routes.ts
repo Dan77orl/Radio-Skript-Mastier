@@ -2585,47 +2585,71 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.post("/api/generate-search-topics", async (req, res) => {
     try {
-      const { prompt } = req.body;
+      const { prompt, existingTopics } = req.body;
       if (!prompt) return res.status(400).json({ error: "Prompt required" });
 
-      const systemPrompt = `Ты — помощник для радиостанции. Проанализируй промпт для генерации радио-диалогов и создай 3-6 поисковых запросов для поиска актуальной информации в интернете. 
+      const today = new Date();
+      const dayOfWeek = ["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"][today.getDay()];
+      const monthName = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"][today.getMonth()];
+      const dateContext = `Сегодня: ${dayOfWeek}, ${today.getDate()} ${monthName} ${today.getFullYear()}`;
 
-Запросы должны быть:
-- На русском или английском (что лучше подходит для поиска)
-- Конкретными и актуальными (погода, новости, события)
-- Связанными с темами из промпта
-- Полезными для создания живого радио-контента
+      const existingList = existingTopics?.length ? `\nУже есть темы: ${existingTopics.join(", ")}. Не дублируй их, предложи НОВЫЕ.` : "";
 
-Верни ТОЛЬКО JSON массив строк, без пояснений. Пример: ["weather Alanya today", "новости Аланья", "события Турция март 2026"]`;
+      const systemPrompt = `Ты — AI-продюсер контента для радиостанции. ${dateContext}
 
-      const settings = await storage.getSettings(req.session.userId);
-      let topics: string[] = [];
+Проанализируй промпт радиостанции и предложи 4-8 поисковых запросов для Firecrawl.
 
-      if (settings?.anthropicApiKey) {
-        const anthropic = new Anthropic({ apiKey: settings.anthropicApiKey });
+ВАЖНО — запросы должны быть:
+1. ВЕЧНОЗЕЛЁНЫЕ (работают круглый год) — не привязаны к конкретному месяцу/дате
+2. Релевантные аудитории и локации станции
+3. Разнообразные по категориям:
+   - Местные новости и события (город/регион)
+   - Погода и природа (без дат!)
+   - Культура, еда, лайфстайл
+   - Интересные факты для эфира
+   - Полезная информация для аудитории
+4. На языке, оптимальном для поиска (английский для международных тем, русский для русскоязычных)
+5. БЕЗ указания месяцев, годов, конкретных дат — запросы должны работать всегда
+
+Плохие примеры: "события Турция март 2026", "новости Аланья январь"
+Хорошие примеры: "Alanya events today", "лучшие рестораны Аланья", "weather Alanya forecast", "что делать в Аланье"
+${existingList}
+
+Верни JSON: {"topics": ["запрос1", "запрос2", ...], "reasoning": "краткое объяснение выбора тем на русском"}`;
+
+      const settingsData = await storage.getSettings(req.session?.userId);
+      let respText: string;
+
+      if (settingsData?.anthropicApiKey) {
+        const anthropic = new Anthropic({ apiKey: settingsData.anthropicApiKey });
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 300,
+          max_tokens: 500,
           system: systemPrompt,
           messages: [{ role: "user", content: prompt }],
         });
-        const text = response.content[0].type === "text" ? response.content[0].text : "";
-        topics = JSON.parse(text);
+        respText = response.content[0].type === "text" ? response.content[0].text : "{}";
       } else {
         const openai = new OpenAI();
         const response = await openai.chat.completions.create({
           model: "gpt-4o-mini",
-          max_tokens: 300,
+          max_tokens: 500,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: prompt },
           ],
         });
-        const text = response.choices[0]?.message?.content || "[]";
-        topics = JSON.parse(text);
+        respText = response.choices[0]?.message?.content || "{}";
       }
 
-      res.json({ topics });
+      const jsonMatch = respText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const cleanJson = jsonMatch ? jsonMatch[1].trim() : respText.trim();
+      const parsed = JSON.parse(cleanJson);
+
+      const topics = Array.isArray(parsed) ? parsed : parsed.topics || [];
+      const reasoning = parsed.reasoning || "";
+
+      res.json({ topics, reasoning });
     } catch (error) {
       console.error("Error generating search topics:", error);
       res.status(500).json({ error: "Failed to generate search topics" });

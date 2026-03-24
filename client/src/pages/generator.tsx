@@ -70,6 +70,8 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
   const [newTopic, setNewTopic] = useState("");
   const [firecrawlContent, setFirecrawlContent] = useState<string>("");
   const [isFirecrawlOpen, setIsFirecrawlOpen] = useState(false);
+  const [topicResults, setTopicResults] = useState<Record<string, { status: "pending" | "done" | "error"; preview: string }>>({});
+  const [autoTopicsReasoning, setAutoTopicsReasoning] = useState<string>("");
 
   const { data: settings } = useQuery<Settings>({
     queryKey: ["/api/settings"],
@@ -118,14 +120,15 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
   const activeVoices = voices?.filter(v => v.isActive) || [];
 
   const autoTopicsMutation = useMutation({
-    mutationFn: async (prompt: string) => {
-      const response = await apiRequest("POST", "/api/generate-search-topics", { prompt });
-      const data = await response.json() as { topics: string[] };
-      return data.topics;
+    mutationFn: async ({ prompt, existingTopics }: { prompt: string; existingTopics?: string[] }) => {
+      const response = await apiRequest("POST", "/api/generate-search-topics", { prompt, existingTopics });
+      const data = await response.json() as { topics: string[]; reasoning: string };
+      return data;
     },
-    onSuccess: (topics) => {
-      setFirecrawlTopics(topics);
-      toast({ title: t("generator.topicsGenerated"), description: `${topics.length} ${t("generator.topics")}` });
+    onSuccess: (data) => {
+      setFirecrawlTopics(prev => [...new Set([...prev, ...data.topics])]);
+      setAutoTopicsReasoning(data.reasoning || "");
+      toast({ title: t("generator.topicsGenerated"), description: `${data.topics.length} ${t("generator.topics")}` });
     },
     onError: () => {
       toast({ title: t("common.error"), variant: "destructive" });
@@ -135,12 +138,26 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
   const firecrawlSearchMutation = useMutation({
     mutationFn: async (topics: string[]) => {
       const results: string[] = [];
+      const newTopicResults: Record<string, { status: "pending" | "done" | "error"; preview: string }> = {};
+      topics.forEach(t => { newTopicResults[t] = { status: "pending", preview: "" }; });
+      setTopicResults({ ...newTopicResults });
+
       for (const topic of topics) {
-        const response = await apiRequest("POST", "/api/firecrawl/search", { query: topic, limit: 3 });
-        const data = await response.json() as { results: string[] };
-        if (data.results?.length) {
-          results.push(`--- ${topic} ---\n${data.results.join("\n\n")}`);
+        try {
+          const response = await apiRequest("POST", "/api/firecrawl/search", { query: topic, limit: 3 });
+          const data = await response.json() as { results: string[] };
+          if (data.results?.length) {
+            const content = data.results.join("\n\n");
+            results.push(`--- ${topic} ---\n${content}`);
+            const preview = content.substring(0, 150).replace(/\n/g, " ").trim();
+            newTopicResults[topic] = { status: "done", preview };
+          } else {
+            newTopicResults[topic] = { status: "done", preview: "" };
+          }
+        } catch {
+          newTopicResults[topic] = { status: "error", preview: "" };
         }
+        setTopicResults({ ...newTopicResults });
       }
       return results.join("\n\n");
     },
@@ -831,56 +848,88 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                   <Globe className="h-5 w-5" />
                   Firecrawl
                 </CardTitle>
-                <Button
-                  size="sm"
-                  variant={firecrawlContent ? "default" : "outline"}
-                  className={firecrawlContent ? "bg-green-600 hover:bg-green-700" : ""}
-                  onClick={() => firecrawlSearchMutation.mutate(firecrawlTopics)}
-                  disabled={firecrawlSearchMutation.isPending || firecrawlTopics.length === 0}
-                  data-testid="button-firecrawl-search"
-                >
-                  {firecrawlSearchMutation.isPending ? (
-                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Search className="mr-1 h-3.5 w-3.5" />
-                  )}
-                  {firecrawlContent ? t("common.refresh") : t("common.find")}
-                </Button>
+                <div className="flex gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => autoTopicsMutation.mutate({ prompt: dailyPromptValue || settings?.dailyPrompt || "", existingTopics: firecrawlTopics })}
+                    disabled={autoTopicsMutation.isPending}
+                    data-testid="button-auto-topics"
+                  >
+                    {autoTopicsMutation.isPending ? (
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Wand2 className="mr-1 h-3.5 w-3.5" />
+                    )}
+                    {t("generator.suggestTopics")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={firecrawlContent ? "default" : "outline"}
+                    className={firecrawlContent ? "bg-green-600 hover:bg-green-700" : ""}
+                    onClick={() => firecrawlSearchMutation.mutate(firecrawlTopics)}
+                    disabled={firecrawlSearchMutation.isPending || firecrawlTopics.length === 0}
+                    data-testid="button-firecrawl-search"
+                  >
+                    {firecrawlSearchMutation.isPending ? (
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Search className="mr-1 h-3.5 w-3.5" />
+                    )}
+                    {firecrawlContent ? t("common.refresh") : t("common.find")}
+                  </Button>
+                </div>
               </div>
               <CardDescription>
                 {t("generator.searchWebContent")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-1.5 items-center">
-                {firecrawlTopics.map(topic => (
-                  <Badge key={topic} variant="secondary" className="gap-1 pr-1">
-                    {topic}
-                    <button
-                      onClick={() => removeTopic(topic)}
-                      className="ml-0.5 hover:text-destructive rounded-full"
-                      data-testid={`remove-topic-${topic}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => autoTopicsMutation.mutate(dailyPromptValue || settings?.dailyPrompt || "")}
-                  disabled={autoTopicsMutation.isPending}
-                  data-testid="button-auto-topics"
-                >
-                  {autoTopicsMutation.isPending ? (
-                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                  ) : (
-                    <Wand2 className="mr-1 h-3 w-3" />
-                  )}
-                  {t("generator.autoTopics")}
-                </Button>
+              {autoTopicsReasoning && (
+                <div className="text-xs text-muted-foreground bg-violet-500/10 border border-violet-500/20 rounded-lg p-2.5 flex items-start gap-2">
+                  <Wand2 className="h-3.5 w-3.5 text-violet-500 mt-0.5 shrink-0" />
+                  <span>{autoTopicsReasoning}</span>
+                  <button onClick={() => setAutoTopicsReasoning("")} className="ml-auto shrink-0 hover:text-foreground">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                {firecrawlTopics.map(topic => {
+                  const result = topicResults[topic];
+                  return (
+                    <div key={topic} className="flex items-start gap-2 group">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          {result?.status === "pending" && <Loader2 className="h-3 w-3 animate-spin text-blue-500 shrink-0" />}
+                          {result?.status === "done" && result.preview && <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />}
+                          {result?.status === "done" && !result.preview && <X className="h-3 w-3 text-orange-400 shrink-0" />}
+                          {result?.status === "error" && <X className="h-3 w-3 text-red-500 shrink-0" />}
+                          {!result && <Search className="h-3 w-3 text-muted-foreground shrink-0" />}
+                          <Badge variant="secondary" className="gap-1 pr-1 text-xs">
+                            {topic}
+                            <button
+                              onClick={() => removeTopic(topic)}
+                              className="ml-0.5 hover:text-destructive rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                              data-testid={`remove-topic-${topic}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        </div>
+                        {result?.status === "done" && result.preview && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5 ml-5 line-clamp-2">{result.preview}</p>
+                        )}
+                        {result?.status === "done" && !result.preview && (
+                          <p className="text-[11px] text-orange-500 mt-0.5 ml-5">{t("generator.noResults")}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+
               <div className="flex gap-1.5">
                 <Input
                   value={newTopic}
@@ -900,19 +949,19 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                   <CollapsibleTrigger asChild>
                     <button className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 hover:underline w-full">
                       <CheckCircle className="h-3 w-3" />
-                      {t("generator.contentLoaded")}
+                      {t("generator.contentLoaded")} ({Math.round(firecrawlContent.length / 1024)}KB)
                       {isFirecrawlOpen ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <div className="mt-2 rounded-lg border bg-muted/50 p-2 max-h-[200px] overflow-y-auto">
-                      <pre className="text-xs whitespace-pre-wrap text-muted-foreground">{firecrawlContent.substring(0, 1000)}{firecrawlContent.length > 1000 ? "..." : ""}</pre>
+                      <pre className="text-xs whitespace-pre-wrap text-muted-foreground">{firecrawlContent.substring(0, 1500)}{firecrawlContent.length > 1500 ? "..." : ""}</pre>
                     </div>
                     <Button
                       size="sm"
                       variant="ghost"
                       className="mt-1 h-6 text-xs text-destructive"
-                      onClick={() => setFirecrawlContent("")}
+                      onClick={() => { setFirecrawlContent(""); setTopicResults({}); }}
                     >
                       <Trash2 className="mr-1 h-3 w-3" />
                       {t("common.clear")}
@@ -924,7 +973,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
               {firecrawlSearchMutation.isPending && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  {t("generator.searchingInfo")}
+                  {t("generator.searchingInfo")} ({Object.values(topicResults).filter(r => r.status === "done").length}/{firecrawlTopics.length})
                 </div>
               )}
             </CardContent>
