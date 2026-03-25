@@ -123,6 +123,11 @@ export async function updateUserLanguage(req: Request, res: Response) {
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const internalKey = req.headers["x-internal-key"] as string;
+  if (internalKey && internalKey === process.env.VOICE_AGENT_API_KEY) {
+    req.session.userId = req.headers["x-internal-user-id"] as string || "system";
+    return next();
+  }
   if (!req.session.userId) {
     return res.status(401).json({ error: "Authentication required" });
   }
