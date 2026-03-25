@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import i18n from "@/i18n";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,11 @@ export default function AuthPage() {
       const res = await apiRequest("POST", "/api/auth/login", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      if (data?.language) {
+        i18n.changeLanguage(data.language);
+        localStorage.setItem("radioflow-language", data.language);
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       setLocation("/");
     },

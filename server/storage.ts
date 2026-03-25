@@ -1,6 +1,6 @@
 import { users, settings, dialogs, newsSources, newsItems, ads, adPresets, voices, programTypes, programs, automations, automationRuns, scheduleTemplates, hostShifts, customHolidays, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdPreset, type InsertAdPreset, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun, type ScheduleTemplate, type InsertScheduleTemplate, type HostShift, type InsertHostShift, type CustomHoliday, type InsertCustomHoliday } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc, sql } from "drizzle-orm";
+import { eq, desc, asc, sql, or, isNull } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -43,7 +43,7 @@ export interface IStorage {
   deleteVoice(id: string): Promise<boolean>;
   getVoicesCount(): Promise<number>;
   
-  getProgramTypes(): Promise<ProgramType[]>;
+  getProgramTypes(userId?: string): Promise<ProgramType[]>;
   getProgramType(id: string): Promise<ProgramType | undefined>;
   createProgramType(programType: InsertProgramType): Promise<ProgramType>;
   updateProgramType(id: string, programType: Partial<InsertProgramType>): Promise<ProgramType | undefined>;
@@ -304,7 +304,12 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.count || 0;
   }
 
-  async getProgramTypes(): Promise<ProgramType[]> {
+  async getProgramTypes(userId?: string): Promise<ProgramType[]> {
+    if (userId) {
+      return db.select().from(programTypes)
+        .where(or(eq(programTypes.userId, userId), isNull(programTypes.userId)))
+        .orderBy(asc(programTypes.sortOrder));
+    }
     return db.select().from(programTypes).orderBy(asc(programTypes.sortOrder));
   }
 

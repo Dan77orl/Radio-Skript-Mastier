@@ -2936,7 +2936,7 @@ ${instructions || "Создай альтернативный вариант с �
   // Program Types routes
   app.get("/api/program-types", async (req, res) => {
     try {
-      const types = await storage.getProgramTypes();
+      const types = await storage.getProgramTypes(req.session.userId);
       res.json(types);
     } catch (error) {
       console.error("Error fetching program types:", error);
@@ -2946,7 +2946,7 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.post("/api/program-types", async (req, res) => {
     try {
-      const programType = await storage.createProgramType(req.body);
+      const programType = await storage.createProgramType({ ...req.body, userId: req.session.userId });
       res.json(programType);
     } catch (error) {
       console.error("Error creating program type:", error);

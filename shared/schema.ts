@@ -228,6 +228,7 @@ export type Voice = typeof voices.$inferSelect;
 
 export const programTypes = pgTable("program_types", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   description: text("description"),
