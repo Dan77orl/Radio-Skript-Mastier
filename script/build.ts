@@ -66,7 +66,7 @@ async function buildAll() {
 
 async function seedDatabase() {
   try {
-    await access("seed-prod.sql");
+    await access("seed-prod.dump");
     console.log("pushing database schema...");
     try {
       execSync("npx drizzle-kit push", { stdio: "inherit" });
@@ -75,14 +75,14 @@ async function seedDatabase() {
     }
     console.log("seeding production database...");
     try {
-      execSync(`psql "$DATABASE_URL" --set ON_ERROR_STOP=off -f seed-prod.sql`, { stdio: "inherit" });
+      execSync(`pg_restore --data-only --no-owner --no-privileges --disable-triggers --if-exists --clean -d "$DATABASE_URL" seed-prod.dump || true`, { stdio: "inherit" });
     } catch (e: any) {
       console.warn("seed had some errors (non-fatal):", e.message);
     }
     console.log("database seed step complete");
   } catch (e: any) {
     if (e.code === 'ENOENT') {
-      console.log("no seed file found, skipping seed");
+      console.log("no seed dump found, skipping seed");
     } else {
       console.warn("seed warning:", e.message);
     }
