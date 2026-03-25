@@ -1,6 +1,7 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, access } from "fs/promises";
+import { execSync } from "child_process";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -63,7 +64,26 @@ async function buildAll() {
   });
 }
 
-buildAll().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+async function seedDatabase() {
+  try {
+    await access("seed-prod.sql");
+    console.log("pushing database schema...");
+    execSync("npx drizzle-kit push", { stdio: "inherit" });
+    console.log("seeding production database...");
+    execSync(`psql "$DATABASE_URL" -f seed-prod.sql`, { stdio: "inherit" });
+    console.log("database seeded successfully");
+  } catch (e: any) {
+    if (e.code === 'ENOENT') {
+      console.log("no seed file found, skipping seed");
+    } else {
+      console.warn("seed warning:", e.message);
+    }
+  }
+}
+
+buildAll()
+  .then(() => seedDatabase())
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
