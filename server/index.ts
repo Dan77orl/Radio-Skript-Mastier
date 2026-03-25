@@ -27,6 +27,8 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+app.set("trust proxy", 1);
+
 const PgStore = connectPgSimple(session);
 app.use(
   session({
