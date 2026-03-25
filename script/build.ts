@@ -75,7 +75,7 @@ async function seedDatabase() {
     }
     console.log("seeding production database...");
     try {
-      execSync(`pg_restore --data-only --no-owner --no-privileges --disable-triggers --if-exists --clean -d "$DATABASE_URL" seed-prod.dump || true`, { stdio: "inherit" });
+      execSync(`pg_restore --data-only --no-owner --no-privileges --disable-triggers -d "$DATABASE_URL" seed-prod.dump 2>&1 || true`, { stdio: "inherit" });
     } catch (e: any) {
       console.warn("seed had some errors (non-fatal):", e.message);
     }
