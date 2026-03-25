@@ -8,7 +8,9 @@ export async function seedDemoIfNeeded() {
   try {
     const existing = await storage.getUserByEmail("demo@dallaswave.com");
     if (existing) {
-      console.log("[seed] Demo user already exists, skipping");
+      const hashedPw = await bcrypt.hash("demo123", 10);
+      await db.update(users).set({ password: hashedPw }).where(eq(users.id, existing.id));
+      console.log("[seed] Demo user exists, password reset to demo123");
       return;
     }
 
