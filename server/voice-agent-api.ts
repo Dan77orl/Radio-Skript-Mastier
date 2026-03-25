@@ -322,10 +322,87 @@ export function registerVoiceAgentRoutes(app: Express) {
       res.json({
         query,
         results,
-        summary: `Найдено ${results.length} результатов по запросу "${query}".`,
+        summary: `Found ${results.length} results for "${query}".`,
       });
     } catch (error) {
       res.status(500).json({ error: "Search failed" });
+    }
+  });
+
+  app.post("/api/voice-agent/research-topics", requireAgentKey, async (req, res) => {
+    try {
+      const { programTypeName } = req.body;
+      if (!programTypeName) {
+        return res.status(400).json({ error: "programTypeName is required" });
+      }
+
+      const types = await storage.getProgramTypes();
+      const programType = types.find(t =>
+        t.isActive && t.name.toLowerCase().includes(programTypeName.toLowerCase())
+      );
+      if (!programType) {
+        return res.status(404).json({ error: `Show "${programTypeName}" not found` });
+      }
+
+      const fcApiKey = process.env.FIRECRAWL_API_KEY;
+      if (!fcApiKey) {
+        return res.json({
+          programType: programType.name,
+          topics: programType.firecrawlTopics || [],
+          results: [],
+          summary: `Firecrawl is not configured. The show "${programType.name}" has these configured topics: ${(programType.firecrawlTopics || []).join(", ")}`,
+        });
+      }
+
+      const searchTopics = programType.firecrawlTopics && programType.firecrawlTopics.length > 0
+        ? programType.firecrawlTopics
+        : [programType.description || programType.name];
+
+      const allResults: any[] = [];
+
+      for (const topic of searchTopics.slice(0, 3)) {
+        try {
+          const fcRes = await fetch("https://api.firecrawl.dev/v1/search", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${fcApiKey}`,
+            },
+            body: JSON.stringify({ query: topic, limit: 3 }),
+          });
+
+          if (fcRes.ok) {
+            const data = await fcRes.json() as any;
+            const results = (data.data || []).map((r: any) => ({
+              title: r.title || "",
+              url: r.url || "",
+              snippet: (r.markdown || "").substring(0, 300),
+              searchTopic: topic,
+            }));
+            allResults.push(...results);
+          }
+        } catch {}
+      }
+
+      const existingPrograms = await storage.getProgramsByType(programType.id);
+      const existingTitles = existingPrograms
+        .filter(p => p.scriptText)
+        .slice(-10)
+        .map(p => p.title);
+
+      const topicSummaries = allResults.map((r, i) => `${i + 1}. ${r.title}`).join("\n");
+
+      res.json({
+        programType: programType.name,
+        description: programType.description,
+        configuredTopics: programType.firecrawlTopics || [],
+        freshTopics: allResults.map(r => ({ title: r.title, snippet: r.snippet, source: r.url })),
+        recentEpisodes: existingTitles,
+        summary: `Here is what I found for "${programType.name}":\n\n${topicSummaries}\n\nAlready created episodes: ${existingTitles.length > 0 ? existingTitles.join(", ") : "none yet"}.\n\nI can create an episode on any of these topics, or generate a fresh one automatically. Just tell me what you like!`,
+      });
+    } catch (error) {
+      console.error("Voice agent research-topics error:", error);
+      res.status(500).json({ error: "Failed to research topics" });
     }
   });
 }
