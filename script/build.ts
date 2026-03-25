@@ -68,10 +68,18 @@ async function seedDatabase() {
   try {
     await access("seed-prod.sql");
     console.log("pushing database schema...");
-    execSync("npx drizzle-kit push", { stdio: "inherit" });
+    try {
+      execSync("npx drizzle-kit push", { stdio: "inherit" });
+    } catch (e: any) {
+      console.warn("db:push warning (non-fatal):", e.message);
+    }
     console.log("seeding production database...");
-    execSync(`psql "$DATABASE_URL" -f seed-prod.sql`, { stdio: "inherit" });
-    console.log("database seeded successfully");
+    try {
+      execSync(`psql "$DATABASE_URL" --set ON_ERROR_STOP=off -f seed-prod.sql`, { stdio: "inherit" });
+    } catch (e: any) {
+      console.warn("seed had some errors (non-fatal):", e.message);
+    }
+    console.log("database seed step complete");
   } catch (e: any) {
     if (e.code === 'ENOENT') {
       console.log("no seed file found, skipping seed");
