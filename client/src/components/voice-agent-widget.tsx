@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Phone, PhoneOff, GripVertical, Mic, MicOff } from "lucide-react";
 
 const AGENT_ID = import.meta.env.VITE_ELEVENLABS_AGENT_ID || "";
 
 export function VoiceAgentWidget() {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -169,7 +171,7 @@ export function VoiceAgentWidget() {
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
           className="w-6 h-6 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-50 hover:opacity-100 transition-opacity"
-          title="Перетащить виджет"
+          title={t("voiceWidget.drag")}
           data-testid="voice-widget-drag"
         >
           <GripVertical className="w-4 h-4 text-gray-400" />
@@ -183,7 +185,7 @@ export function VoiceAgentWidget() {
                 ? "bg-red-500 hover:bg-red-600 text-white"
                 : "bg-gray-700 hover:bg-gray-600 text-white"
             }`}
-            title={isMuted ? "Включить микрофон" : "Выключить микрофон"}
+            title={isMuted ? t("voiceWidget.unmute") : t("voiceWidget.mute")}
             data-testid="voice-widget-mute"
           >
             {isMuted ? (
@@ -206,13 +208,13 @@ export function VoiceAgentWidget() {
           {isConnected ? (
             <>
               <PhoneOff className="w-5 h-5" />
-              <span className="text-sm">Завершить</span>
+              <span className="text-sm">{t("voiceWidget.disconnect")}</span>
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" />
             </>
           ) : (
             <>
               <Phone className="w-5 h-5" />
-              <span className="text-sm">Голосовой помощник</span>
+              <span className="text-sm">{t("voiceWidget.title")}</span>
             </>
           )}
         </button>

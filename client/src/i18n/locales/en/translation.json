@@ -1042,5 +1042,12 @@
     "stopVoice": "Stop voice input",
     "welcome": "Hi! I'm your RadioFlow AI assistant. Ask me anything about the platform — how to set up voices, generate scripts, configure schedules, and more.",
     "error": "Sorry, something went wrong. Please try again."
+  },
+  "voiceWidget": {
+    "title": "Voice Assistant",
+    "disconnect": "Disconnect",
+    "drag": "Drag widget",
+    "mute": "Mute microphone",
+    "unmute": "Unmute microphone"
   }
 }

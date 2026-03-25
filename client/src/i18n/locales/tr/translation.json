@@ -1024,5 +1024,12 @@
     "stopVoice": "Sesli girişi durdur",
     "welcome": "Merhaba! RadioFlow AI asistanınızım. Platform hakkında her şeyi sorabilirsiniz — ses ayarları, senaryo oluşturma, zamanlama ve daha fazlası.",
     "error": "Üzgünüz, bir hata oluştu. Lütfen tekrar deneyin."
+  },
+  "voiceWidget": {
+    "title": "Sesli Asistan",
+    "disconnect": "Bağlantıyı Kes",
+    "drag": "Widget'ı sürükle",
+    "mute": "Mikrofonu kapat",
+    "unmute": "Mikrofonu aç"
   }
 }
