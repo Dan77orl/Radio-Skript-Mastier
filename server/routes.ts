@@ -5022,8 +5022,12 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
   });
 
   async function refreshCustomHolidays() {
-    const custom = await storage.getCustomHolidays();
-    setCustomHolidays(custom);
+    try {
+      const custom = await storage.getCustomHolidays();
+      setCustomHolidays(custom);
+    } catch (e) {
+      console.warn("[holidays] Could not load custom holidays:", (e as any).message);
+    }
   }
   refreshCustomHolidays();
 
