@@ -64,43 +64,18 @@ async function buildAll() {
   });
 }
 
-async function seedDatabase() {
+async function syncSchema() {
+  console.log("pushing database schema...");
   try {
-    console.log("pushing database schema...");
-    try {
-      execSync("npx drizzle-kit push", { stdio: "inherit" });
-    } catch (e: any) {
-      console.warn("db:push warning (non-fatal):", e.message);
-    }
-
-    const hasData = execSync(
-      `psql "$DATABASE_URL" -t -c "SELECT count(*) FROM users" 2>/dev/null || echo "0"`,
-    ).toString().trim();
-
-    if (parseInt(hasData) > 0) {
-      console.log(`database already has ${hasData} users, skipping seed`);
-      return;
-    }
-
-    await access("seed-prod.dump");
-    console.log("seeding production database (empty DB detected)...");
-    try {
-      execSync(`pg_restore --data-only --no-owner --no-privileges -d "$DATABASE_URL" seed-prod.dump 2>&1 || true`, { stdio: "inherit" });
-    } catch (e: any) {
-      console.warn("seed had some errors (non-fatal):", e.message);
-    }
-    console.log("database seed complete");
+    execSync("npx drizzle-kit push", { stdio: "inherit" });
+    console.log("schema sync complete");
   } catch (e: any) {
-    if (e.code === 'ENOENT') {
-      console.log("no seed dump found, skipping seed");
-    } else {
-      console.warn("seed warning:", e.message);
-    }
+    console.warn("db:push warning (non-fatal):", e.message);
   }
 }
 
 buildAll()
-  .then(() => seedDatabase())
+  .then(() => syncSchema())
   .catch((err) => {
     console.error(err);
     process.exit(1);
