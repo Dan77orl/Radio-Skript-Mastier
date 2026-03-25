@@ -21,6 +21,67 @@ async function fixOrphanedProgramTypes() {
   }
 }
 
+async function ensureDemoShowsExist(userId: string) {
+  try {
+    const existingTypes = await storage.getProgramTypes(userId);
+    const existingNames = existingTypes.map(t => t.name.toLowerCase());
+
+    const allVoices = await db.select().from(voices);
+    let mikeId = allVoices.find(v => v.personaName === "Mike")?.id;
+    let sarahId = allVoices.find(v => v.personaName === "Sarah")?.id;
+
+    if (!mikeId) {
+      const [v] = await db.insert(voices).values({
+        name: "Mike", elevenLabsVoiceId: "N2lVS1w4EtoT3dr4eOWO",
+        personaName: "Mike", description: "Male host - energetic American radio voice", sortOrder: 10,
+      }).returning();
+      mikeId = v.id;
+    }
+    if (!sarahId) {
+      const [v] = await db.insert(voices).values({
+        name: "Sarah", elevenLabsVoiceId: "EXAVITQu4vr4xnSDxMaL",
+        personaName: "Sarah", description: "Female host - warm and professional", sortOrder: 11,
+      }).returning();
+      sarahId = v.id;
+    }
+
+    const showsToCreate = [
+      { name: "Dallas News", slug: "dallas-news-" + userId.substring(0, 8), description: "Daily news from Dallas and Texas - local events, community updates, and breaking stories", prompt: "Create a short 2-minute radio news segment for Dallas Wave FM. Cover local Dallas news, Texas events. Write in English.", duration: 120, icon: "newspaper", daily: 3, voiceIds: [mikeId, sarahId], topics: ["Dallas Texas news today", "Dallas local events 2026", "Texas community news"], template: "Mike and Sarah host together. Mike is energetic, Sarah is analytical. Multi-speaker format with [Mike]: and [Sarah]: prefixes and emotion tags." },
+      { name: "Pop Buzz", slug: "pop-buzz-" + userId.substring(0, 8), description: "Celebrity news, music charts, entertainment", prompt: "Create a fun 90-second pop culture segment for Dallas Wave FM. Write in English.", duration: 90, icon: "star", daily: 2, voiceIds: [sarahId], topics: ["celebrity news today", "pop music charts 2026"], template: "Sarah's solo segment. Fun, gossipy style. Format: [Sarah]: with emotion tags." },
+      { name: "Dallas Weather", slug: "dallas-weather-" + userId.substring(0, 8), description: "Weather forecast for Dallas-Fort Worth", prompt: "Create a 30-second weather forecast for Dallas-Fort Worth. Write in English.", duration: 30, icon: "cloud-sun", daily: 4, voiceIds: [mikeId], topics: ["Dallas Texas weather forecast today"], template: "Mike delivers quick weather. Format: [Mike]: with emotion tags." },
+      { name: "Tech Minute", slug: "tech-minute-" + userId.substring(0, 8), description: "Quick tech news - gadgets, AI, digital trends", prompt: "Create a 60-second tech news segment for Dallas Wave FM. Write in English.", duration: 60, icon: "cpu", daily: 2, voiceIds: [mikeId, sarahId], topics: ["tech news today AI", "new gadgets 2026"], template: "Mike and Sarah discuss tech. Multi-speaker with emotion tags." },
+    ];
+
+    let created = 0;
+    for (const show of showsToCreate) {
+      if (!existingNames.includes(show.name.toLowerCase())) {
+        await db.insert(programTypes).values({
+          userId,
+          name: show.name,
+          slug: show.slug,
+          description: show.description,
+          defaultPrompt: show.prompt,
+          defaultDurationSeconds: show.duration,
+          icon: show.icon,
+          dailyCount: show.daily,
+          assignedVoiceIds: show.voiceIds,
+          isActive: true,
+          sortOrder: 100 + created,
+          useFirecrawl: true,
+          firecrawlTopics: show.topics,
+          scriptTemplate: show.template,
+        });
+        created++;
+      }
+    }
+    if (created > 0) {
+      console.log(`[seed] Created ${created} missing demo shows`);
+    }
+  } catch (e: any) {
+    console.warn("[seed] ensureDemoShowsExist error:", e.message);
+  }
+}
+
 export async function seedDemoIfNeeded() {
   try {
     await fixOrphanedProgramTypes();
@@ -30,6 +91,7 @@ export async function seedDemoIfNeeded() {
       const hashedPw = await bcrypt.hash("demo123", 10);
       await db.update(users).set({ password: hashedPw }).where(eq(users.id, existing.id));
       console.log("[seed] Demo user exists, password reset to demo123");
+      await ensureDemoShowsExist(existing.id);
       return;
     }
 
