@@ -307,7 +307,7 @@ export class DatabaseStorage implements IStorage {
   async getProgramTypes(userId?: string): Promise<ProgramType[]> {
     if (userId) {
       return db.select().from(programTypes)
-        .where(or(eq(programTypes.userId, userId), isNull(programTypes.userId)))
+        .where(eq(programTypes.userId, userId))
         .orderBy(asc(programTypes.sortOrder));
     }
     return db.select().from(programTypes).orderBy(asc(programTypes.sortOrder));

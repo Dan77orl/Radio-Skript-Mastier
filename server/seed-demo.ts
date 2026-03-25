@@ -2,10 +2,29 @@ import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { db } from "./db";
 import { users, settings, voices, programTypes, programs } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
+
+async function fixOrphanedProgramTypes() {
+  try {
+    const mainUser = await storage.getUserByEmail("test@test.com");
+    if (!mainUser) return;
+
+    const orphaned = await db.select().from(programTypes).where(isNull(programTypes.userId));
+    if (orphaned.length > 0) {
+      await db.update(programTypes)
+        .set({ userId: mainUser.id })
+        .where(isNull(programTypes.userId));
+      console.log(`[seed] Assigned ${orphaned.length} orphaned program types to ${mainUser.email}`);
+    }
+  } catch (e) {
+    console.error("[seed] fixOrphanedProgramTypes error:", e);
+  }
+}
 
 export async function seedDemoIfNeeded() {
   try {
+    await fixOrphanedProgramTypes();
+
     const existing = await storage.getUserByEmail("demo@dallaswave.com");
     if (existing) {
       const hashedPw = await bcrypt.hash("demo123", 10);
