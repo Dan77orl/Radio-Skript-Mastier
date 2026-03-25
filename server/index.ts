@@ -3,6 +3,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { registerVoiceAgentRoutes } from "./voice-agent-api";
+import { seedDemoIfNeeded } from "./seed-demo";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import path from "path";
@@ -123,6 +124,7 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      setTimeout(() => seedDemoIfNeeded(), 5000);
     },
   );
 })();
