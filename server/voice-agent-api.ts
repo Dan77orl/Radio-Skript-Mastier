@@ -2,7 +2,6 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 
 const AGENT_USER_ID = "96995f3b-637e-49f4-8eaa-6f43eb9280bf";
-const PORT = process.env.PORT || 5000;
 
 function requireAgentKey(req: Request, res: Response, next: NextFunction) {
   const apiKey = req.headers["x-api-key"] || req.query.api_key;
@@ -15,7 +14,8 @@ function requireAgentKey(req: Request, res: Response, next: NextFunction) {
 }
 
 async function internalFetch(path: string, method: string = "GET", body?: any) {
-  const url = `http://localhost:${PORT}${path}`;
+  const port = process.env.PORT || 5000;
+  const url = `http://localhost:${port}${path}`;
   const opts: any = {
     method,
     headers: {
@@ -25,7 +25,13 @@ async function internalFetch(path: string, method: string = "GET", body?: any) {
     },
   };
   if (body) opts.body = JSON.stringify(body);
-  return fetch(url, opts);
+  try {
+    const res = await fetch(url, opts);
+    return res;
+  } catch (e: any) {
+    console.error(`[voice-agent] internalFetch failed: ${method} ${url} - ${e.message}`);
+    throw e;
+  }
 }
 
 export function registerVoiceAgentRoutes(app: Express) {
@@ -354,9 +360,12 @@ export function registerVoiceAgentRoutes(app: Express) {
         });
       }
 
-      const searchTopics = programType.firecrawlTopics && programType.firecrawlTopics.length > 0
+      const baseTopics = programType.firecrawlTopics && programType.firecrawlTopics.length > 0
         ? programType.firecrawlTopics
         : [programType.description || programType.name];
+
+      const today = new Date().toISOString().split("T")[0];
+      const searchTopics = baseTopics.map(t => `${t} latest news ${today}`);
 
       const allResults: any[] = [];
 
@@ -368,17 +377,35 @@ export function registerVoiceAgentRoutes(app: Express) {
               "Content-Type": "application/json",
               "Authorization": `Bearer ${fcApiKey}`,
             },
-            body: JSON.stringify({ query: topic, limit: 3 }),
+            body: JSON.stringify({
+              query: topic,
+              limit: 5,
+            }),
           });
 
           if (fcRes.ok) {
             const data = await fcRes.json() as any;
-            const results = (data.data || []).map((r: any) => ({
-              title: r.title || "",
-              url: r.url || "",
-              snippet: (r.markdown || "").substring(0, 300),
-              searchTopic: topic,
-            }));
+            const results = (data.data || [])
+              .filter((r: any) => {
+                const url = (r.url || "").toLowerCase();
+                return !url.match(/\.(com|org|net|gov)\/?$/) && !url.endsWith("/news") && !url.endsWith("/events");
+              })
+              .map((r: any) => {
+                const markdown = r.markdown || "";
+                const firstParagraphs = markdown
+                  .split("\n")
+                  .filter((line: string) => line.trim().length > 30 && !line.startsWith("#") && !line.startsWith("["))
+                  .slice(0, 3)
+                  .join(" ")
+                  .substring(0, 400);
+
+                return {
+                  title: r.title || "",
+                  url: r.url || "",
+                  snippet: firstParagraphs || markdown.substring(0, 400),
+                  searchTopic: topic,
+                };
+              });
             allResults.push(...results);
           }
         } catch {}
@@ -390,7 +417,10 @@ export function registerVoiceAgentRoutes(app: Express) {
         .slice(-10)
         .map(p => p.title);
 
-      const topicSummaries = allResults.map((r, i) => `${i + 1}. ${r.title}`).join("\n");
+      const topicSummaries = allResults.map((r, i) => {
+        const shortSnippet = r.snippet.substring(0, 100);
+        return `${i + 1}. ${r.title}${shortSnippet ? ` — ${shortSnippet}...` : ""}`;
+      }).join("\n");
 
       res.json({
         programType: programType.name,
@@ -398,7 +428,7 @@ export function registerVoiceAgentRoutes(app: Express) {
         configuredTopics: programType.firecrawlTopics || [],
         freshTopics: allResults.map(r => ({ title: r.title, snippet: r.snippet, source: r.url })),
         recentEpisodes: existingTitles,
-        summary: `Here is what I found for "${programType.name}":\n\n${topicSummaries}\n\nAlready created episodes: ${existingTitles.length > 0 ? existingTitles.join(", ") : "none yet"}.\n\nI can create an episode on any of these topics, or generate a fresh one automatically. Just tell me what you like!`,
+        summary: `Fresh topics for "${programType.name}":\n\n${topicSummaries}\n\nRecent episodes: ${existingTitles.length > 0 ? existingTitles.join(", ") : "none yet"}.\n\nPick a topic or say "create automatically" to generate an episode!`,
       });
     } catch (error) {
       console.error("Voice agent research-topics error:", error);
