@@ -37,7 +37,7 @@ async function internalFetch(path: string, method: string = "GET", body?: any) {
 export function registerVoiceAgentRoutes(app: Express) {
   app.get("/api/voice-agent/program-types", requireAgentKey, async (_req, res) => {
     try {
-      const types = await storage.getProgramTypes();
+      const types = await storage.getProgramTypes(AGENT_USER_ID);
       const active = types.filter(t => t.isActive);
       res.json({
         programTypes: active.map(t => ({
@@ -61,7 +61,7 @@ export function registerVoiceAgentRoutes(app: Express) {
         return res.status(400).json({ error: "programTypeName is required" });
       }
 
-      const types = await storage.getProgramTypes();
+      const types = await storage.getProgramTypes(AGENT_USER_ID);
       const programType = types.find(t =>
         t.isActive && t.name.toLowerCase().includes(programTypeName.toLowerCase())
       );
@@ -128,7 +128,7 @@ export function registerVoiceAgentRoutes(app: Express) {
       if (programId) {
         programIds = [programId];
       } else if (programTypeName) {
-        const types = await storage.getProgramTypes();
+        const types = await storage.getProgramTypes(AGENT_USER_ID);
         const programType = types.find(t =>
           t.isActive && t.name.toLowerCase().includes(programTypeName.toLowerCase())
         );
@@ -191,7 +191,7 @@ export function registerVoiceAgentRoutes(app: Express) {
         return res.status(400).json({ error: "programTypeName is required" });
       }
 
-      const types = await storage.getProgramTypes();
+      const types = await storage.getProgramTypes(AGENT_USER_ID);
       const programType = types.find(t =>
         t.isActive && t.name.toLowerCase().includes(programTypeName.toLowerCase())
       );
@@ -253,7 +253,7 @@ export function registerVoiceAgentRoutes(app: Express) {
   app.get("/api/voice-agent/programs-status", requireAgentKey, async (req, res) => {
     try {
       const date = (req.query.date as string) || new Date().toISOString().split("T")[0];
-      const types = await storage.getProgramTypes();
+      const types = await storage.getProgramTypes(AGENT_USER_ID);
       const activeTypes = types.filter(t => t.isActive);
 
       const results: any[] = [];
@@ -342,7 +342,7 @@ export function registerVoiceAgentRoutes(app: Express) {
         return res.status(400).json({ error: "programTypeName is required" });
       }
 
-      const types = await storage.getProgramTypes();
+      const types = await storage.getProgramTypes(AGENT_USER_ID);
       const programType = types.find(t =>
         t.isActive && t.name.toLowerCase().includes(programTypeName.toLowerCase())
       );
