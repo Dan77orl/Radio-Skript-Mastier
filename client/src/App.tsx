@@ -26,6 +26,7 @@ import AutomationsPage from "@/pages/automations";
 import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import { SupportChat } from "@/components/support-chat";
+import { VoiceAgentWidget } from "@/components/voice-agent-widget";
 
 function AdminRouter() {
   return (
@@ -116,6 +117,7 @@ function App() {
         <TooltipProvider>
           <AppContent />
           <SupportChat />
+          <VoiceAgentWidget />
           <Toaster />
         </TooltipProvider>
       </ThemeProvider>
