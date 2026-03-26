@@ -1,4 +1,4 @@
-import { users, settings, dialogs, newsSources, newsItems, ads, adPresets, voices, programTypes, programs, automations, automationRuns, scheduleTemplates, hostShifts, customHolidays, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdPreset, type InsertAdPreset, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun, type ScheduleTemplate, type InsertScheduleTemplate, type HostShift, type InsertHostShift, type CustomHoliday, type InsertCustomHoliday } from "@shared/schema";
+import { users, settings, dialogs, newsSources, newsItems, ads, adPresets, voices, programTypes, programs, automations, automationRuns, scheduleTemplates, hostShifts, customHolidays, usageLogs, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdPreset, type InsertAdPreset, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun, type ScheduleTemplate, type InsertScheduleTemplate, type HostShift, type InsertHostShift, type CustomHoliday, type InsertCustomHoliday, type UsageLog, type InsertUsageLog } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql, and, or, isNull } from "drizzle-orm";
 
@@ -91,6 +91,16 @@ export interface IStorage {
   createCustomHoliday(holiday: InsertCustomHoliday): Promise<CustomHoliday>;
   updateCustomHoliday(id: string, userId: string, holiday: Partial<InsertCustomHoliday>): Promise<CustomHoliday | undefined>;
   deleteCustomHoliday(id: string, userId: string): Promise<boolean>;
+
+  getAllUsers(): Promise<User[]>;
+  updateUserRole(id: string, role: string): Promise<User | undefined>;
+  updateUserBlocked(id: string, blocked: boolean): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
+  getUserStats(userId: string): Promise<{ dialogs: number; programs: number; voices: number; programTypes: number }>;
+
+  createUsageLog(log: InsertUsageLog): Promise<UsageLog>;
+  getUsageLogs(userId?: string, limit?: number): Promise<UsageLog[]>;
+  getUsageStats(): Promise<{ userId: string; action: string; count: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -569,6 +579,59 @@ export class DatabaseStorage implements IStorage {
   async deleteCustomHoliday(id: string, userId: string): Promise<boolean> {
     const result = await db.delete(customHolidays).where(and(eq(customHolidays.id, id), eq(customHolidays.userId, userId))).returning();
     return result.length > 0;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async updateUserRole(id: string, role: string): Promise<User | undefined> {
+    const [updated] = await db.update(users).set({ role }).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
+  async updateUserBlocked(id: string, blocked: boolean): Promise<User | undefined> {
+    const [updated] = await db.update(users).set({ blocked }).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getUserStats(userId: string): Promise<{ dialogs: number; programs: number; voices: number; programTypes: number }> {
+    const [dCount] = await db.select({ count: sql<number>`count(*)` }).from(dialogs).where(eq(dialogs.userId, userId));
+    const [pCount] = await db.select({ count: sql<number>`count(*)` }).from(programs).where(eq(programs.userId, userId));
+    const [vCount] = await db.select({ count: sql<number>`count(*)` }).from(voices).where(eq(voices.userId, userId));
+    const [ptCount] = await db.select({ count: sql<number>`count(*)` }).from(programTypes).where(eq(programTypes.userId, userId));
+    return {
+      dialogs: Number(dCount?.count ?? 0),
+      programs: Number(pCount?.count ?? 0),
+      voices: Number(vCount?.count ?? 0),
+      programTypes: Number(ptCount?.count ?? 0),
+    };
+  }
+
+  async createUsageLog(log: InsertUsageLog): Promise<UsageLog> {
+    const [created] = await db.insert(usageLogs).values(log).returning();
+    return created;
+  }
+
+  async getUsageLogs(userId?: string, limit?: number): Promise<UsageLog[]> {
+    const conditions = userId ? eq(usageLogs.userId, userId) : undefined;
+    const q = db.select().from(usageLogs);
+    const withWhere = conditions ? q.where(conditions) : q;
+    return withWhere.orderBy(desc(usageLogs.createdAt)).limit(limit || 500);
+  }
+
+  async getUsageStats(): Promise<{ userId: string; action: string; count: number }[]> {
+    const result = await db.select({
+      userId: usageLogs.userId,
+      action: usageLogs.action,
+      count: sql<number>`count(*)`,
+    }).from(usageLogs).groupBy(usageLogs.userId, usageLogs.action);
+    return result.map(r => ({ userId: r.userId || "", action: r.action, count: Number(r.count) }));
   }
 }
 

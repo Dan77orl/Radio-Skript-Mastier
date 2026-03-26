@@ -1,7 +1,7 @@
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { LayoutDashboard, Mic, Settings, Radio, Megaphone, Users, Podcast, LogOut } from "lucide-react";
+import { LayoutDashboard, Mic, Settings, Radio, Megaphone, Users, Podcast, LogOut, Shield } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -40,6 +40,7 @@ export function AppSidebar() {
     { title: t("nav.ads"), url: "/ads", icon: Megaphone },
     { title: t("nav.voices"), url: "/voices", icon: Users },
     { title: t("nav.settings"), url: "/settings", icon: Settings },
+    ...(user?.role === "admin" ? [{ title: t("nav.admin", "Admin"), url: "/admin", icon: Shield }] : []),
   ];
 
   return (

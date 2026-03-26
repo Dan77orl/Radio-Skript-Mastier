@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { registerUser, loginUser, logoutUser, getCurrentUser, updateUserLanguage, requireAuth } from "./auth";
+import { registerUser, loginUser, logoutUser, getCurrentUser, updateUserLanguage, requireAuth, requireAdmin } from "./auth";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
@@ -717,6 +717,14 @@ function getWeatherDescription(code: number): string {
   return descriptions[code] || "неизвестно";
 }
 
+async function logUsage(userId: string, action: string, details?: string, tokensUsed?: number) {
+  try {
+    await storage.createUsageLog({ userId, action, details: details || null, tokensUsed: tokensUsed || null });
+  } catch (e) {
+    console.error("Failed to log usage:", e);
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -735,7 +743,122 @@ export async function registerRoutes(
     if (req.path === "/support-chat") return next();
     return requireAuth(req, res, next);
   });
-  
+
+  app.get("/api/admin/users", requireAdmin, async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const usersWithStats = await Promise.all(
+        allUsers.map(async (u) => {
+          const stats = await storage.getUserStats(u.id);
+          return {
+            id: u.id,
+            email: u.email,
+            name: u.name,
+            role: u.role || "user",
+            blocked: u.blocked || false,
+            createdAt: u.createdAt,
+            stats,
+          };
+        })
+      );
+      return res.json(usersWithStats);
+    } catch (error) {
+      console.error("Admin get users error:", error);
+      return res.status(500).json({ error: "Failed to get users" });
+    }
+  });
+
+  const adminUpdateUserSchema = z.object({
+    role: z.enum(["admin", "user"]).optional(),
+    blocked: z.boolean().optional(),
+  }).strict();
+
+  app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const parsed = adminUpdateUserSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0].message });
+      }
+      const { role, blocked } = parsed.data;
+
+      if (id === req.session.userId) {
+        return res.status(400).json({ error: "Cannot modify your own account" });
+      }
+
+      if (role !== undefined) {
+        await storage.updateUserRole(id, role);
+      }
+
+      if (blocked !== undefined) {
+        await storage.updateUserBlocked(id, blocked);
+      }
+
+      const user = await storage.getUser(id);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      return res.json({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        blocked: user.blocked,
+      });
+    } catch (error) {
+      console.error("Admin update user error:", error);
+      return res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      if (id === req.session.userId) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+      const deleted = await storage.deleteUser(id);
+      if (!deleted) return res.status(404).json({ error: "User not found" });
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error("Admin delete user error:", error);
+      return res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  app.get("/api/admin/usage", requireAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getUsageStats();
+      const logs = await storage.getUsageLogs(undefined, 200);
+      return res.json({ stats, logs });
+    } catch (error) {
+      console.error("Admin usage error:", error);
+      return res.status(500).json({ error: "Failed to get usage stats" });
+    }
+  });
+
+  app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const now = new Date();
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      const newThisWeek = allUsers.filter(u => new Date(u.createdAt) >= weekAgo).length;
+      const newThisMonth = allUsers.filter(u => new Date(u.createdAt) >= monthAgo).length;
+
+      return res.json({
+        totalUsers: allUsers.length,
+        newThisWeek,
+        newThisMonth,
+        activeUsers: allUsers.filter(u => !u.blocked).length,
+        blockedUsers: allUsers.filter(u => u.blocked).length,
+      });
+    } catch (error) {
+      console.error("Admin dashboard error:", error);
+      return res.status(500).json({ error: "Failed to get dashboard" });
+    }
+  });
+
   app.get("/api/settings", async (req, res) => {
     try {
       const settings = await storage.getSettings(req.session.userId);
@@ -1028,6 +1151,7 @@ ${styleInstructions}
         }
 
         const parsed = JSON.parse(jsonMatch[0]);
+        logUsage(req.session.userId!, "script_generation", "Claude", response.usage?.input_tokens ? response.usage.input_tokens + (response.usage?.output_tokens || 0) : undefined);
         return res.json(parseReplicasResponse(parsed));
       }
 
@@ -1047,6 +1171,7 @@ ${styleInstructions}
       }
 
       const parsed = JSON.parse(content);
+      logUsage(req.session.userId!, "script_generation", "OpenAI");
       res.json(parseReplicasResponse(parsed));
     } catch (error) {
       console.error("Error generating script:", error);
@@ -1281,6 +1406,7 @@ ${styleInstructions}
         yandexPath: null,
       });
 
+      logUsage(req.session.userId!, "audio_generation", "dialog");
       res.json(dialog);
     } catch (error) {
       console.error("Error generating audio:", error);
@@ -2374,6 +2500,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
           category: category || "general",
         });
 
+        logUsage(req.session.userId!, "ad_generation", "Claude");
         return res.json(ad);
       }
 
@@ -2405,6 +2532,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         category: category || "general",
       });
 
+      logUsage(req.session.userId!, "ad_generation", "OpenAI");
       res.json(ad);
     } catch (error) {
       console.error("Error generating ad:", error);

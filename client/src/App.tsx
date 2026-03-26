@@ -24,6 +24,7 @@ import VoicesPage from "@/pages/voices";
 import ShowsPage from "@/pages/shows";
 import AutomationsPage from "@/pages/automations";
 import SettingsPage from "@/pages/settings";
+import AdminPage from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 import { VoiceAgentWidget } from "@/components/voice-agent-widget";
 
@@ -40,6 +41,7 @@ function AdminRouter() {
       <Route path="/shows" component={ShowsPage} />
       <Route path="/automations" component={AutomationsPage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/admin" component={AdminPage} />
       <Route component={NotFound} />
     </Switch>
   );

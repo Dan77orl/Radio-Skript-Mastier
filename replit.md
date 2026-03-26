@@ -52,6 +52,17 @@ Preferred communication style: Simple, everyday language.
 - **Landing page**: `client/src/pages/landing.tsx` — hero with AI-generated images, features with interactive selector, animated counters, scroll animations (IntersectionObserver), floating particles, gradient text, pricing with hover effects, CTA, footer; fully i18n'd (52 languages); SEO meta tags set via useEffect
 - **i18n**: 52 languages supported — ru, en, tr, de, es, fr, pt, it, uk, pl, nl, sv, da, no, fi, cs, sk, hu, ro, bg, el, hr, sr, sl, bs, mk, sq, lt, lv, et, kk, uz, ky, tg, mn, az, ka, hy, ar, he, fa, zh, ja, ko, hi, bn, ta, th, vi, id, ms, sw; fallback: en; detection: localStorage → navigator → htmlTag; key: `radioflow-language`; searchable language switcher with grouped dropdown
 - **Auth files**: `server/auth.ts` (backend logic), `client/src/hooks/use-auth.ts` (frontend hook), `client/src/pages/auth.tsx` (login/register page at /auth route)
+- **Blocked users**: Users with `blocked=true` cannot log in (403 response)
+
+### Admin Panel
+- **Route**: `/admin` — only accessible to users with `role="admin"`
+- **Backend middleware**: `requireAdmin` in `server/auth.ts` checks user role before allowing access to `/api/admin/*` routes
+- **Dashboard**: GET `/api/admin/dashboard` — total users, new registrations (week/month), active/blocked counts
+- **User management**: GET `/api/admin/users` (list with stats), PATCH `/api/admin/users/:id` (role/block), DELETE `/api/admin/users/:id`
+- **Usage tracking**: `usage_logs` table tracks script generation, audio generation, ad generation per user; GET `/api/admin/usage` returns aggregated stats and recent logs
+- **Self-protection**: Admin cannot modify/delete their own account via admin API
+- **Frontend**: `client/src/pages/admin.tsx` — tabs for Dashboard, Users, Usage; sidebar shows Admin link only for admin users
+- **Usage instrumentation**: `logUsage()` helper called on successful script generation (Claude/OpenAI), audio generation, and ad generation
 
 ### AI Support Chat
 - **Endpoint**: `POST /api/support-chat` — accessible without authentication (placed before auth middleware)
@@ -63,7 +74,7 @@ Preferred communication style: Simple, everyday language.
 - **Session management**: Conversation history kept in memory, cleared hourly; max 40 messages per session
 
 ### Core Entities
-1. **Users** - Authentication with email, password (hashed), name
+1. **Users** - Authentication with email, password (hashed), name, role (admin/user), blocked flag
 2. **Settings** - Application configuration (API keys, voice IDs, default prompts, dialog style, replicas count)
 3. **Dialogs** - Generated radio scripts with status tracking (pending, generating, ready, error); multi-turn `scriptText` format
 4. **Schedule Templates** - Per-weekday broadcast templates (name, weekdays, startHour, endHour, slotsPerHour, voiceIds)

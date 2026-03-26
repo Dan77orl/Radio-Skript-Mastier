@@ -11,6 +11,7 @@ export const users = pgTable("users", {
   name: text("name"),
   language: text("language"),
   role: text("role").default("user"),
+  blocked: boolean("blocked").default(false),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
@@ -447,3 +448,20 @@ export const insertNewsItemSchema = createInsertSchema(newsItems).omit({
 
 export type InsertNewsItem = z.infer<typeof insertNewsItemSchema>;
 export type NewsItem = typeof newsItems.$inferSelect;
+
+export const usageLogs = pgTable("usage_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  action: text("action").notNull(),
+  details: text("details"),
+  tokensUsed: integer("tokens_used"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertUsageLogSchema = createInsertSchema(usageLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertUsageLog = z.infer<typeof insertUsageLogSchema>;
+export type UsageLog = typeof usageLogs.$inferSelect;

@@ -1,0 +1,371 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { Users, Activity, Shield, ShieldOff, Trash2, UserCheck, UserX, BarChart3, Clock } from "lucide-react";
+
+interface UserWithStats {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  blocked: boolean;
+  createdAt: string;
+  stats: {
+    dialogs: number;
+    programs: number;
+    voices: number;
+    programTypes: number;
+  };
+}
+
+interface DashboardData {
+  totalUsers: number;
+  newThisWeek: number;
+  newThisMonth: number;
+  activeUsers: number;
+  blockedUsers: number;
+}
+
+interface UsageLog {
+  id: string;
+  userId: string | null;
+  action: string;
+  details: string | null;
+  tokensUsed: number | null;
+  createdAt: string;
+}
+
+interface UsageData {
+  stats: { userId: string; action: string; count: number }[];
+  logs: UsageLog[];
+}
+
+export default function AdminPage() {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("dashboard");
+
+  const isAdmin = user?.role === "admin";
+
+  const { data: dashboard, isLoading: dashLoading } = useQuery<DashboardData>({
+    queryKey: ["/api/admin/dashboard"],
+    enabled: isAdmin,
+  });
+
+  const { data: users, isLoading: usersLoading } = useQuery<UserWithStats[]>({
+    queryKey: ["/api/admin/users"],
+    enabled: isAdmin,
+  });
+
+  const { data: usage, isLoading: usageLoading } = useQuery<UsageData>({
+    queryKey: ["/api/admin/usage"],
+    enabled: isAdmin,
+  });
+
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
+      toast({ title: "User updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/admin/users/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
+      toast({ title: "User deleted" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  if (!isAdmin) {
+    setLocation("/");
+    return null;
+  }
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const actionLabels: Record<string, string> = {
+    script_generation: "Script Generation",
+    audio_generation: "Audio Generation",
+    ad_generation: "Ad Generation",
+  };
+
+  return (
+    <div className="p-6 space-y-6 max-w-7xl mx-auto" data-testid="admin-page">
+      <div className="flex items-center gap-3">
+        <Shield className="h-8 w-8 text-primary" />
+        <div>
+          <h1 className="text-2xl font-bold" data-testid="text-admin-title">Admin Panel</h1>
+          <p className="text-muted-foreground text-sm">Platform management and monitoring</p>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList data-testid="admin-tabs">
+          <TabsTrigger value="dashboard" data-testid="tab-dashboard">
+            <BarChart3 className="h-4 w-4 mr-1" />
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="users" data-testid="tab-users">
+            <Users className="h-4 w-4 mr-1" />
+            Users
+          </TabsTrigger>
+          <TabsTrigger value="usage" data-testid="tab-usage">
+            <Activity className="h-4 w-4 mr-1" />
+            Usage
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="dashboard" className="space-y-4">
+          {dashLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+          ) : dashboard ? (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Users</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold" data-testid="stat-total-users">{dashboard.totalUsers}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">New This Week</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-green-600" data-testid="stat-new-week">{dashboard.newThisWeek}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">New This Month</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-blue-600" data-testid="stat-new-month">{dashboard.newThisMonth}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Active Users</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-emerald-600" data-testid="stat-active">{dashboard.activeUsers}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Blocked</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-red-600" data-testid="stat-blocked">{dashboard.blockedUsers}</div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+        </TabsContent>
+
+        <TabsContent value="users" className="space-y-4">
+          {usersLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Dialogs</TableHead>
+                      <TableHead>Programs</TableHead>
+                      <TableHead>Voices</TableHead>
+                      <TableHead>Registered</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users?.map((u) => (
+                      <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{u.name || "—"}</div>
+                            <div className="text-xs text-muted-foreground">{u.email}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={u.role === "admin" ? "default" : "secondary"} data-testid={`badge-role-${u.id}`}>
+                            {u.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={u.blocked ? "destructive" : "outline"} data-testid={`badge-status-${u.id}`}>
+                            {u.blocked ? "Blocked" : "Active"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{u.stats.dialogs}</TableCell>
+                        <TableCell>{u.stats.programs}</TableCell>
+                        <TableCell>{u.stats.voices}</TableCell>
+                        <TableCell className="text-sm">{formatDate(u.createdAt)}</TableCell>
+                        <TableCell>
+                          {u.id !== user?.id && (
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => updateUserMutation.mutate({ id: u.id, data: { role: u.role === "admin" ? "user" : "admin" } })}
+                                title={u.role === "admin" ? "Remove admin" : "Make admin"}
+                                data-testid={`button-toggle-role-${u.id}`}
+                              >
+                                {u.role === "admin" ? <ShieldOff className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => updateUserMutation.mutate({ id: u.id, data: { blocked: !u.blocked } })}
+                                title={u.blocked ? "Unblock" : "Block"}
+                                data-testid={`button-toggle-block-${u.id}`}
+                              >
+                                {u.blocked ? <UserCheck className="h-4 w-4 text-green-600" /> : <UserX className="h-4 w-4 text-orange-600" />}
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="sm" variant="ghost" title="Delete user" data-testid={`button-delete-user-${u.id}`}>
+                                    <Trash2 className="h-4 w-4 text-red-600" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete user?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will permanently delete {u.email} and all their data. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteUserMutation.mutate(u.id)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                      data-testid={`button-confirm-delete-${u.id}`}
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="usage" className="space-y-4">
+          {usageLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+          ) : (
+            <>
+              {usage?.stats && usage.stats.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {Object.entries(
+                    usage.stats.reduce((acc, s) => {
+                      acc[s.action] = (acc[s.action] || 0) + s.count;
+                      return acc;
+                    }, {} as Record<string, number>)
+                  ).map(([action, count]) => (
+                    <Card key={action}>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          {actionLabels[action] || action}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold">{count}</div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Recent Activity</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {usage?.logs && usage.logs.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Action</TableHead>
+                          <TableHead>Details</TableHead>
+                          <TableHead>Tokens</TableHead>
+                          <TableHead>Time</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {usage.logs.slice(0, 50).map((log) => (
+                          <TableRow key={log.id}>
+                            <TableCell>
+                              <Badge variant="outline">{actionLabels[log.action] || log.action}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{log.details || "—"}</TableCell>
+                            <TableCell>{log.tokensUsed || "—"}</TableCell>
+                            <TableCell className="text-sm">
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <Clock className="h-3 w-3" />
+                                {formatDate(log.createdAt)}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No usage data yet. Usage will be tracked as users generate content.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
