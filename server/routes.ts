@@ -7,6 +7,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertAdPresetSchema, insertVoiceSchema, insertScheduleTemplateSchema, insertHostShiftSchema, insertCustomHolidaySchema } from "@shared/schema";
 import { getHolidaysForDate, getHolidaysForYear, getHolidaysForMonth, getHolidayInfo, setCustomHolidays } from "./holidays";
+import { getPromptStrings, getGenderLabel, getDefaultHostName, getLanguageDirective, getLanguageName } from "./prompt-locale";
 import { handleSupportChat } from "./support-chat";
 import { z } from "zod";
 import { promises as fs } from "fs";
@@ -145,9 +146,10 @@ interface StationContext {
   knowledgeBase: string;
 }
 
-async function buildStationContext(userId?: string): Promise<StationContext> {
+async function buildStationContext(userId?: string, lang?: string): Promise<StationContext> {
   const settings = await storage.getSettings(userId);
   const voices = userId ? await storage.getVoices(userId) : [];
+  const userLang = lang || "en";
   
   const stationName = settings?.stationName || "Radio FM";
   const stationDescription = settings?.stationDescription || "";
@@ -158,14 +160,14 @@ async function buildStationContext(userId?: string): Promise<StationContext> {
   
   const malePersona = maleVoices.length > 0 
     ? maleVoices.map(v => getCleanVoiceName(v)).join(", ")
-    : "ведущий";
+    : getDefaultHostName("male", userLang);
   const femalePersona = femaleVoices.length > 0 
     ? femaleVoices.map(v => getCleanVoiceName(v)).join(", ")
-    : "ведущая";
+    : getDefaultHostName("female", userLang);
   
   const personaList = activeVoices.length > 0 
-    ? activeVoices.map(v => `${getCleanVoiceName(v)} (${v.gender === "male" ? "мужчина" : "женщина"})`).join(", ")
-    : "ведущий (мужчина), ведущая (женщина)";
+    ? activeVoices.map(v => `${getCleanVoiceName(v)} (${getGenderLabel(v.gender || "male", userLang)})`).join(", ")
+    : `${getDefaultHostName("male", userLang)} (${getGenderLabel("male", userLang)}), ${getDefaultHostName("female", userLang)} (${getGenderLabel("female", userLang)})`;
 
   let knowledgeBase = "";
   if (settings?.stationAttachments && settings.stationAttachments.length > 0) {
@@ -1192,37 +1194,41 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Prompt is required and must be at least 10 characters" });
       }
 
-      const ctx = await buildStationContext(req.session.userId);
+      const user = req.session.userId ? await storage.getUser(req.session.userId) : null;
+      const userLang = user?.language || "en";
+      const ps = getPromptStrings(userLang);
+
+      const ctx = await buildStationContext(req.session.userId, userLang);
       const settings = await storage.getSettings(req.session.userId);
       const dialogStyle = (settings as any)?.dialogStyle || "lively";
       const dialogReplicas = (settings as any)?.dialogReplicas || 4;
 
       const styleInstructions = dialogStyle === "lively" 
-        ? `СТИЛЬ — ЖИВАЯ СТУДИЯ: Ведущие перебивают, реагируют ("Да ладно!", "Серьёзно?!"), подхватывают мысли, шутят. Каждая реплика 1-3 предложения.`
+        ? ps.styleLively
         : dialogStyle === "simple"
-        ? `СТИЛЬ — ПРОСТОЙ: Один говорит, другой отвечает. Каждая реплика 2-4 предложения.`
-        : `СТИЛЬ — УМЕРЕННЫЙ: Лёгкая дискуссия, иногда реагируют друг на друга. Каждая реплика 1-3 предложения.`;
+        ? ps.styleSimple
+        : ps.styleModerate;
 
-      const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}". 
-${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
-Твоя задача - написать короткий диалог между ведущими: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
-Диалог должен быть на русском языке, дружелюбным и естественным.
-Длительность при чтении - 30-50 секунд.
+      const systemPrompt = `${ps.langDirective}
+${ps.scriptWriter} "${ctx.stationName}". 
+${ctx.stationDescription ? ps.aboutStation(ctx.stationDescription) : ""}
+${ps.dialogTask(ctx.malePersona, ctx.femalePersona)}
+${ps.dialogLang}
+${ps.dialogDuration}
 ${styleInstructions}
 
-МЕТАТЕГИ ЭМОЦИЙ — ОБЯЗАТЕЛЬНО расставь в тексте:
-Доступные теги: [energetic], [fast], [slow], [surprised], [thoughtful], [happy], [calm], [warm], [confident], [excited], [gentle], [announcer]
-Ставь 1-2 тега в начало каждого смыслового блока/предложения.
+${ps.emotionInstructions}
+${ps.emotionTags}
 
-ФОРМАТ ОТВЕТА — JSON с чередующимися репликами:
+${ps.formatResponse}
 {
   "replicas": [
-    {"speaker": "${ctx.malePersona}", "text": "[energetic] [warm] реплика"},
-    {"speaker": "${ctx.femalePersona}", "text": "[happy] ответ"},
-    {"speaker": "${ctx.malePersona}", "text": "[thoughtful] реплика"}
+    {"speaker": "${ctx.malePersona}", "text": "[energetic] [warm] line"},
+    {"speaker": "${ctx.femalePersona}", "text": "[happy] response"},
+    {"speaker": "${ctx.malePersona}", "text": "[thoughtful] line"}
   ]
 }
-Минимум ${dialogReplicas} реплик.`;
+${ps.minReplicas(dialogReplicas)}`;
 
       function parseReplicasResponse(parsed: any) {
         if (parsed.replicas && Array.isArray(parsed.replicas)) {
@@ -1591,8 +1597,13 @@ ${styleInstructions}
         }
       });
 
+      const user = req.session.userId ? await storage.getUser(req.session.userId) : null;
+      const userLang = user?.language || "en";
+      const ps = getPromptStrings(userLang);
+      const langLocale = userLang === "ru" ? "ru-RU" : userLang === "tr" ? "tr-TR" : "en-US";
+
       const settings = await storage.getSettings(req.session.userId);
-      const ctx = await buildStationContext(req.session.userId);
+      const ctx = await buildStationContext(req.session.userId, userLang);
       const newsItemsList = await storage.getNewsItems(req.session.userId!, 10);
       const unusedNews = newsItemsList.filter(n => !n.isUsed).slice(0, 5);
       
@@ -1607,9 +1618,8 @@ ${styleInstructions}
       const tplSlotsPerHour = template?.slotsPerHour ?? 1;
       const totalSlots = totalSlotsOverride || (template ? (tplEndHour - tplStartHour) * tplSlotsPerHour : (settings?.dailyDialogsCount || 12));
 
-      const weekdays = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
-      const weekday = weekdays[dateObj.getDay()];
-      const dateFormatted = dateObj.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+      const dateFormatted = dateObj.toLocaleDateString(langLocale, { day: "numeric", month: "long", year: "numeric" });
+      const weekday = dateObj.toLocaleDateString(langLocale, { weekday: "long" });
       
       const holiday = getHolidayInfo(date);
       
@@ -1672,77 +1682,58 @@ ${blockContent}
         }
 
         const hostsLine = slotVoiceNames 
-          ? `Ведущие этого слота: ${slotVoiceNames}.`
-          : `Ведущие: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).`;
+          ? (userLang === "ru" ? `Ведущие этого слота: ${slotVoiceNames}.` : `Hosts for this slot: ${slotVoiceNames}.`)
+          : ps.dialogTask(ctx.malePersona, ctx.femalePersona);
         
-        const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}". 
-${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
+        const styleBlock = dialogStyle === "lively" ? ps.styleLively : dialogStyle === "simple" ? ps.styleSimple : ps.styleModerate;
+
+        const systemPrompt = `${ps.langDirective}
+${ps.scriptWriter} "${ctx.stationName}". 
+${ctx.stationDescription ? ps.aboutStation(ctx.stationDescription) : ""}
 ${hostsLine}
-${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeBase}\n` : ""}
-КОНТЕКСТ ДНЯ:
-- Дата: ${dateFormatted}, ${weekday}
-${holiday ? `- Праздник: ${holiday}` : ""}
-- Время слота: ${timeLabel} (${timeOfDay})
-- Слот номер: ${slotNumber} из ${totalSlots}
+${ctx.knowledgeBase ? `\n${ps.knowledgeBase}\n${ctx.knowledgeBase}\n` : ""}
+
+- Date: ${dateFormatted}, ${weekday}
+${holiday ? `- Holiday: ${holiday}` : ""}
+- Time slot: ${timeLabel} (${timeOfDay})
+- Slot: ${slotNumber} of ${totalSlots}
 ${newsContext}
-${dailyPrompt ? `ОБЩИЕ ИНСТРУКЦИИ НА ДЕНЬ:\n${dailyPrompt}\n` : ""}
-${slotPrompt ? `ИНСТРУКЦИИ ДЛЯ ЭТОГО СЛОТА:\n${slotPrompt}\n` : ""}
-${learnings ? `НАКОПЛЕННЫЙ ОПЫТ:\n${learnings}\n` : ""}
+${dailyPrompt ? `DAILY INSTRUCTIONS:\n${dailyPrompt}\n` : ""}
+${slotPrompt ? `SLOT INSTRUCTIONS:\n${slotPrompt}\n` : ""}
+${learnings ? `ACCUMULATED EXPERIENCE:\n${learnings}\n` : ""}
 
-Создай короткий диалог (30-50 секунд при чтении) из ${dialogReplicas}-${dialogReplicas + 2} реплик с чередованием ведущих.
+${ps.dialogDuration} ${dialogReplicas}-${dialogReplicas + 2} alternating lines.
 ${firecrawlSection}
-Учитывай время суток и день недели.
-${hour < 10 ? "Утренний слот: бодрое приветствие, энергичный тон." : ""}
-${hour >= 18 ? "Вечерний слот: расслабленный тон, итоги дня." : ""}
+${hour < 10 ? (userLang === "ru" ? "Утренний слот: бодрое приветствие, энергичный тон." : "Morning slot: upbeat greeting, energetic tone.") : ""}
+${hour >= 18 ? (userLang === "ru" ? "Вечерний слот: расслабленный тон, итоги дня." : "Evening slot: relaxed tone, day summary.") : ""}
 
-ЕСТЕСТВЕННОСТЬ ДИАЛОГА — КРИТИЧЕСКИ ВАЖНО:
-- Диалог должен ТЕЧЬ как настоящий разговор: одна мысль цепляет другую
-- Ведущие ПОДХВАТЫВАЮТ мысли друг друга: "О, точно! А я вот ещё слышал...", "Это напомнило мне..."
-- Переходы между темами через АССОЦИАЦИИ, а не "а теперь о другом"
-- Один ведущий задаёт вопрос или делает наблюдение → второй развивает мысль, добавляет свой опыт
-- НЕ выдумывай статистику и ссылки на исследования — лучше личные наблюдения и реальные примеры
-- Каждый факт вплетай в разговор естественно, как будто ведущий сам это узнал или пережил
+${styleBlock}
 
-${dialogStyle === "lively" ? `СТИЛЬ ДИАЛОГА — ЖИВАЯ СТУДИЯ:
-- Это настоящий разговор, а НЕ зачитывание текста по очереди
-- Ведущие ПЕРЕБИВАЮТ друг друга, реагируют эмоционально: "Да ладно!", "Серьёзно?!", "Ой, кстати!"
-- Один может перехватить тему: "Подожди-подожди, а я вот что слышал..."
-- Включай микро-реакции: смех, удивление, согласие, несогласие
-- Допускай НЕЗАВЕРШЁННЫЕ мысли, которые подхватывает собеседник
-- Импровизация: "Кстати, пока шёл в студию...", "А вот мне вчера рассказали..."
-- НЕ делай "монологи по очереди" — каждая реплика 1-3 предложения максимум
-- Разнообразие: иногда один говорит чуть больше, иногда меньше` : dialogStyle === "simple" ? `СТИЛЬ ДИАЛОГА — ПРОСТОЙ:
-- Классический формат: один говорит, другой отвечает
-- Каждая реплика 2-4 предложения
-- Спокойный ритм, без перебиваний` : `СТИЛЬ ДИАЛОГА — СРЕДНИЙ:
-- Лёгкая дискуссия между ведущими
-- Иногда реагируют друг на друга, но без чрезмерных перебиваний
-- Каждая реплика 1-3 предложения`}
+${ps.emotionInstructions}
+${ps.emotionTags}
 
-МЕТАТЕГИ ЭМОЦИЙ — ОБЯЗАТЕЛЬНО расставь в тексте:
-Доступные теги: [energetic], [fast], [slow], [surprised], [thoughtful], [happy], [calm], [warm], [confident], [excited], [gentle], [announcer]
-Ставь 1-2 тега в начало каждого смыслового блока/предложения внутри реплики.
-
-ФОРМАТ ОТВЕТА — JSON с чередующимися репликами:
+${ps.formatResponse}
 {
-  "title": "краткое название темы диалога",
+  "title": "short dialog topic",
   "replicas": [
-    {"speaker": "${ctx.malePersona}", "text": "[energetic] [warm] реплика с тегами"},
-    {"speaker": "${ctx.femalePersona}", "text": "[happy] ответная реплика"},
-    {"speaker": "${ctx.malePersona}", "text": "[thoughtful] следующая реплика"},
-    {"speaker": "${ctx.femalePersona}", "text": "[excited] и так далее..."}
+    {"speaker": "${ctx.malePersona}", "text": "[energetic] [warm] line with tags"},
+    {"speaker": "${ctx.femalePersona}", "text": "[happy] response line"},
+    {"speaker": "${ctx.malePersona}", "text": "[thoughtful] next line"},
+    {"speaker": "${ctx.femalePersona}", "text": "[excited] and so on..."}
   ]
 }
-Каждая реплика — 1-3 предложения. Чередуй ведущих, минимум ${dialogReplicas} реплик.`;
+${ps.minReplicas(dialogReplicas)}`;
 
-        const userPrompt = `Создай диалог для слота #${slotNumber} (${timeLabel}, ${timeOfDay}).`;
+        const userPrompt = userLang === "ru" 
+          ? `Создай диалог для слота #${slotNumber} (${timeLabel}, ${timeOfDay}).`
+          : `Create a dialog for slot #${slotNumber} (${timeLabel}, ${timeOfDay}).`;
 
         try {
           const anthropic = await getAnthropicClient(req.session.userId);
           let maleText = "";
           let femaleText = "";
           let scriptText = "";
-          let title = `Слот #${slotNumber}`;
+          let title = userLang === "ru" ? `Слот #${slotNumber}` : `Slot #${slotNumber}`;
 
           function parseDialogResponse(parsed: any) {
             if (parsed.replicas && Array.isArray(parsed.replicas)) {
@@ -1906,7 +1897,10 @@ ${dialogStyle === "lively" ? `СТИЛЬ ДИАЛОГА — ЖИВАЯ СТУД�
         return res.status(404).json({ error: "Dialog not found" });
       }
 
-      const ctx = await buildStationContext(req.session.userId);
+      const userRegen = req.session.userId ? await storage.getUser(req.session.userId) : null;
+      const userLangRegen = userRegen?.language || "en";
+      const psRegen = getPromptStrings(userLangRegen);
+      const ctx = await buildStationContext(req.session.userId, userLangRegen);
 
       let maleHost = ctx.malePersona;
       let femaleHost = ctx.femalePersona;
@@ -1919,21 +1913,16 @@ ${dialogStyle === "lively" ? `СТИЛЬ ДИАЛОГА — ЖИВАЯ СТУД�
         }
       }
       
-      const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}". 
-${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
-Ведущие: ${maleHost} (мужчина) и ${femaleHost} (женщина).
-${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeBase}\n` : ""}
-Текущий диалог:
-Мужской текст: ${dialog.maleText || ""}
-Женский текст: ${dialog.femaleText || ""}
+      const systemPrompt = `${psRegen.langDirective}
+${psRegen.scriptWriter} "${ctx.stationName}". 
+${ctx.stationDescription ? psRegen.aboutStation(ctx.stationDescription) : ""}
+${psRegen.dialogTask(maleHost, femaleHost)}
+${ctx.knowledgeBase ? `\n${psRegen.knowledgeBase}\n${ctx.knowledgeBase}\n` : ""}
 
-Перегенерируй диалог с учётом новых инструкций.
-Создай короткий диалог (30-50 секунд при чтении).
-
-ВАЖНО: Ответ в формате JSON:
+IMPORTANT: Response in JSON format:
 {
-  "maleText": "новый текст для ${maleHost}",
-  "femaleText": "новый текст для ${femaleHost}"
+  "maleText": "new text for ${maleHost}",
+  "femaleText": "new text for ${femaleHost}"
 }`;
 
       const anthropic = await getAnthropicClient(req.session.userId);
@@ -2326,32 +2315,37 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
         dailyCount = settings?.dailyDialogsCount || 12;
       }
 
+      const userBatch = req.session.userId ? await storage.getUser(req.session.userId) : null;
+      const userLangBatch = userBatch?.language || "en";
+      const psBatch = getPromptStrings(userLangBatch);
+
       const holidayInfoStr = getHolidayInfo(date);
       const holidayContext = holidayInfoStr
-        ? `\nСегодня праздник: ${holidayInfoStr}. Учти это в диалогах.`
+        ? (userLangBatch === "ru" ? `\nСегодня праздник: ${holidayInfoStr}. Учти это в диалогах.` : `\nToday's holiday: ${holidayInfoStr}. Incorporate this into the dialogs.`)
         : "";
 
-      const ctx = await buildStationContext(req.session.userId);
-      const systemPrompt = `Ты - сценарист для радио "${ctx.stationName}".
-${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}${holidayContext}
-${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeBase}\n` : ""}
-Создай ${dailyCount} разных коротких диалогов между ведущими: ${ctx.malePersona} (мужчина) и ${ctx.femalePersona} (женщина).
-Каждый диалог должен быть на русском языке, дружелюбным и естественным.
-Длительность каждого диалога при чтении - 30-50 секунд.
-Темы должны быть разнообразными: погода, местные события, советы экспатам, интересные факты о Турции, еда, культура, и т.д.
+      const ctx = await buildStationContext(req.session.userId, userLangBatch);
+      const systemPrompt = `${psBatch.langDirective}
+${psBatch.scriptWriter} "${ctx.stationName}".
+${ctx.stationDescription ? psBatch.aboutStation(ctx.stationDescription) : ""}${holidayContext}
+${ctx.knowledgeBase ? `\n${psBatch.knowledgeBase}\n${ctx.knowledgeBase}\n` : ""}
+${psBatch.dialogTask(ctx.malePersona, ctx.femalePersona)}
+${psBatch.dialogLang}
+${psBatch.dialogDuration}
+Create ${dailyCount} different short dialogs with diverse topics.
 
-ВАЖНО: Ответь в формате JSON массив:
+IMPORTANT: Response in JSON array format:
 {
   "dialogs": [
     {
-      "title": "краткое название темы",
-      "maleText": "все реплики ${ctx.malePersona} через пробел",
-      "femaleText": "все реплики ${ctx.femalePersona} через пробел"
+      "title": "short topic name",
+      "maleText": "all lines for ${ctx.malePersona}",
+      "femaleText": "all lines for ${ctx.femalePersona}"
     }
   ]
 }
 
-Создай ровно ${dailyCount} диалогов.`;
+Create exactly ${dailyCount} dialogs.`;
 
       const anthropic = await getAnthropicClient(req.session.userId);
       let dialogsData: { dialogs: Array<{ title: string; maleText: string; femaleText: string }> };
@@ -3832,6 +3826,10 @@ ${existingList}
         return res.status(404).json({ error: "Program type not found" });
       }
 
+      const user = req.session.userId ? await storage.getUser(req.session.userId) : null;
+      const userLang = user?.language || "en";
+      const ps = getPromptStrings(userLang);
+
       const today = new Date();
       const dateStr = today.toISOString().split("T")[0];
 
@@ -3866,7 +3864,7 @@ ${existingList}
 
       const fullText = rawPrompt + (fetchedContent || "");
       const hasEpisodeContent = fullText.length > 300 
-        && /(?:выпуск|[Сс] вами|[Пп]ривет.*программа|[Пп]рограмма.*[«"])/m.test(fullText)
+        && /(?:выпуск|[Сс] вами|[Пп]ривет.*программа|[Пп]рограмма.*[«"]|episode|[Hh]ello.*show|[Ww]elcome.*program)/m.test(fullText)
         && /\n.{50,}\n/m.test(fullText);
 
       const fcKeywords = programType.firecrawlTopics?.length
@@ -3874,28 +3872,18 @@ ${existingList}
         : [];
 
       if (hasUrlContent) {
-        prompt += `\n\nЭТАЛОННЫЕ ВЫПУСКИ ИЗ ССЫЛКИ — изучи стиль, тон, тематику:${fetchedContent}`;
+        prompt += `\n\n${ps.referenceEpisodes}${fetchedContent}`;
       }
 
       if (hasEpisodeContent || hasUrlContent) {
-        prompt += `\n\nКРИТИЧЕСКИ ВАЖНО:
-- Текст выше — это ЭТАЛОННЫЕ ВЫПУСКИ передачи "${programType.name}". Создай НОВЫЙ выпуск ТОЧНО В ТАКОМ ЖЕ стиле и тематической области
-- Тематика: оставайся В ТОЙ ЖЕ ПРЕДМЕТНОЙ ОБЛАСТИ (${fcKeywords.length > 0 ? fcKeywords.join(", ") : "как в эталонах выше"})
-- Выбери НОВЫЙ конкретный аспект/угол внутри этой предметной области
-- Ведущий(ая): ${speakerNames.join(", ")}. Используй ТОЧНО ${speakerNames.length === 1 ? "это имя" : "эти имена"} ведущих
-- Сохраняй структуру: приветствие, основная часть, заключение — как в эталонах
-- Без markdown-разметки, без звёздочек
-- ОБЯЗАТЕЛЬНО оформи вывод в формате [Имя]: [тег] текст (см. инструкции формата ниже), даже если в эталонах формат другой`;
+        prompt += `\n\n${ps.criticalImportant(programType.name, fcKeywords.length > 0 ? fcKeywords.join(", ") : "", speakerNames, speakerNames.length)}`;
       }
 
       if (slotDesc) {
-        prompt += `\n\nВременной слот: ${slotDesc}`;
+        prompt += `\n\n${ps.timeSlot(slotDesc)}`;
       }
       if (programType.sponsorName) {
-        prompt += `\n\nСпонсор передачи: ${programType.sponsorName}`;
-        if (programType.sponsorText) {
-          prompt += `. ${programType.sponsorText}`;
-        }
+        prompt += `\n\n${ps.sponsor(programType.sponsorName, programType.sponsorText || undefined)}`;
       }
 
       const durationSec = programType.defaultDurationSeconds || 60;
@@ -3906,24 +3894,14 @@ ${existingList}
       const durationMin = Math.floor(durationSec / 60);
       const durationRemSec = durationSec % 60;
       const durationStr = durationRemSec > 0 ? `${durationMin}:${String(durationRemSec).padStart(2, "0")}` : `${durationMin}:00`;
-      prompt += `\n\nДата: ${dateStr}, выпуск #${nextSlot} из ${programType.dailyCount || 1}`;
+      prompt += `\n\n${ps.dateSlot(dateStr, nextSlot, programType.dailyCount || 1)}`;
 
       const month = today.getMonth();
-      const seasonMap: Record<string, string> = {
-        winter: "Зима (декабрь-февраль). В Аланье мягкая зима, +12-18°C, дождливые дни. Период апельсинов и мандаринов, горнолыжный сезон рядом.",
-        spring: "Весна (март-май). В Аланье потепление +18-28°C, цветение, начало пляжного сезона. Рамадан, Навруз, пасхальные каникулы.",
-        summer: "Лето (июнь-август). В Аланье жарко +30-40°C, пик пляжного сезона, фрукты, летние фестивали. Закаты, ночная жизнь.",
-        autumn: "Осень (сентябрь-ноябрь). В Аланье бархатный сезон +22-30°C, гранаты, конец пляжного сезона, День Республики."
-      };
       const season = month <= 1 || month === 11 ? "winter" : month <= 4 ? "spring" : month <= 7 ? "summer" : "autumn";
-      prompt += `\nСезон: ${seasonMap[season]}`;
-      prompt += `\nУчитывай текущий сезон и погоду при создании контента — темы, настроение и советы должны соответствовать времени года.`;
+      prompt += `\n${ps.seasonPrefix} ${ps.seasons[season]}`;
+      prompt += `\n${ps.seasonNote}`;
 
-      prompt += `\n\nХРОНОМЕТРАЖ — СТРОГО СОБЛЮДАЙ:
-- Целевая длительность: ${durationSec} секунд (~${durationStr} мин)
-- Объём текста: от ${minWords} до ${maxWords} слов (скорость чтения ~150 слов/мин)
-- НЕ ПИШИ БОЛЬШЕ ${maxWords} слов! Лучше короче и ёмче, чем длинно и водянисто
-- Если ${durationSec} секунд — это коротко, сфокусируйся на ОДНОЙ теме/истории, не пытайся охватить всё`;
+      prompt += `\n\n${ps.durationStrict(durationSec, durationStr, minWords, maxWords)}`;
 
       const hasSearchContext = fcKeywords.length > 0 || (rawPrompt && rawPrompt.length > 50);
       if (hasSearchContext) {
@@ -3939,33 +3917,19 @@ ${existingList}
       }
 
       if (fcKeywords.length > 0) {
-        prompt += `\n\nТематика передачи "${programType.name}": ${fcKeywords.join(", ")}. Создавай контент СТРОГО в рамках этой тематики.`;
+        prompt += `\n\n${ps.topicArea(programType.name, fcKeywords.join(", "))}`;
       }
 
       const title = `${programType.name} ${dateStr} #${nextSlot}`;
 
       if (isMultiSpeaker) {
-        const speakerList = speakerNames.join(", ");
-        prompt += `\n\nОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА: мульти-спикерный скрипт. Спикеры: ${speakerList}
-Каждая реплика ОБЯЗАТЕЛЬНО начинается с [Имя]: и содержит теги эмоций.
-Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
-Пример:
-[${speakerNames[0]}]: [energetic] [fast] Текст...
-[${speakerNames[1] || speakerNames[0]}]: [announcer] ЗАГОЛОВОК`;
+        prompt += `\n\n${ps.multiSpeakerFormat(speakerNames.join(", "), speakerNames)}`;
       } else if (speakerNames.length >= 1) {
-        prompt += `\n\nОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА: скрипт с ведущим. Ведущий(ая): ${speakerNames[0]}
-КАЖДЫЙ абзац/блок текста ОБЯЗАТЕЛЬНО начинается с [${speakerNames[0]}]: и содержит теги эмоций в квадратных скобках.
-Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
-Пример:
-[${speakerNames[0]}]: [energetic] [warm] Привет! Текст ведущего...
-[${speakerNames[0]}]: [thoughtful] Следующий блок текста...
-НЕ пиши текст без префикса [${speakerNames[0]}]:! Каждый блок должен начинаться с имени ведущего.`;
+        prompt += `\n\n${ps.singleSpeakerFormat(speakerNames[0])}`;
       }
 
       if (programType.scriptTemplate) {
-        prompt += `\n\nСТРУКТУРА СЦЕНАРИЯ — СТРОГО СЛЕДУЙ ЭТОМУ ШАБЛОНУ:
-${programType.scriptTemplate}
-ВАЖНО: Распределяй текст между спикерами ТОЧНО по этой структуре. Каждый спикер выполняет ТОЛЬКО свою роль, указанную выше.`;
+        prompt += `\n\n${ps.templateStructure(programType.scriptTemplate)}`;
       }
 
       {
@@ -3976,7 +3940,7 @@ ${programType.scriptTemplate}
         const latestRef = scriptsWithFormat[0];
 
         if (latestRef?.scriptText) {
-          prompt += `\n\nОБРАЗЕЦ ФОРМАТА (копируй формат и стиль, но выбери новый аспект в рамках тематики передачи):\n---\n${latestRef.scriptText.substring(0, 3000)}\n---`;
+          prompt += `\n\n${ps.referenceFormat(latestRef.scriptText.substring(0, 3000))}`;
         }
       }
 
@@ -3986,42 +3950,27 @@ ${programType.scriptTemplate}
         .slice(0, 50);
 
       if (existingTitles.length > 0) {
-        prompt += `\n\nУЖЕ СОЗДАННЫЕ ВЫПУСКИ (НЕ повторяй эти конкретные темы!):\n${existingTitles.join("\n")}`;
+        prompt += `\n\n${ps.existingEpisodes(existingTitles.join("\n"))}`;
       }
 
-      prompt += `\n\nСТИЛЬ ПОВЕСТВОВАНИЯ — ОБЯЗАТЕЛЬНО:
-- Пиши как РАССКАЗ, а НЕ как список фактов. Каждый выпуск — это история с началом, развитием и концом
-- Между блоками/темами используй ПЛАВНЫЕ ПЕРЕХОДЫ: "А ещё интересно, что...", "Кстати, это напрямую связано с...", "И вот тут начинается самое любопытное...", "Знаете, что меня удивило?"
-- Веди слушателя ПУТЕВОДНОЙ НИТЬЮ — от одной мысли к другой логично, как в разговоре с другом
-- ЗАПРЕЩЕНО: перечислять факты тезисами один за другим без связи. Каждый факт должен вытекать из предыдущего
-- Добавляй ЖИВЫЕ ДЕТАЛИ: личные наблюдения ведущего, примеры из жизни, мини-истории ("Вот буквально на днях...")
-- Завершай выпуск так, чтобы слушатель унёс одну главную мысль
+      prompt += `\n\n${ps.narrativeRules(!!(hasEpisodeContent || hasUrlContent), speakerNames, fcKeywords)}
 
-СТРОГИЕ ПРАВИЛА:
-- Выбери НОВЫЙ аспект/угол${hasEpisodeContent || hasUrlContent ? " в рамках той же предметной области" : ""}, которого НЕТ в списке выше
-- НЕ выдумывай названия институтов, университетов и исследований
-- Если есть данные из интернета — ВПЛЕТАЙ конкретные факты и цифры в повествование естественно, как часть истории
-- Если нет данных из интернета — давай практические советы из опыта ведущего, БЕЗ выдуманных ссылок на исследования и статистику
-- НЕ повторяй темы, которые уже были в списке выше
-- Ведущий(ая): ${speakerNames.join(", ")}
+${ps.topicLine(fcKeywords.length > 0 ? fcKeywords[0].split(" ").slice(0, 3).join(" ") : (userLang === "ru" ? "Новый аспект темы" : "New topic angle"))}`;
 
-В САМОЙ ПЕРВОЙ СТРОКЕ ответа напиши ТЕМА: и краткое название темы выпуска (2-5 слов). Например:
-ТЕМА: ${fcKeywords.length > 0 ? fcKeywords[0].split(" ").slice(0, 3).join(" ") : "Новый аспект темы"}
-После этого начинай сценарий.`;
-
-      const ctx = await buildStationContext(req.session.userId);
+      const ctx = await buildStationContext(req.session.userId, userLang);
       const settingsForPrompt = await storage.getSettings(req.session.userId);
       const stationDefaultPrompt = settingsForPrompt?.defaultPrompt || "";
-      let systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
-${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
-Активные ведущие: ${ctx.personaList}.
-Создавай контент на русском языке в стиле радиостанции.
-Твой стиль — живое повествование, как рассказ друга: плавные переходы между мыслями, логические связки, путеводная нить через весь выпуск. Никогда не перечисляй факты тезисами.`;
+      let systemPrompt = `${ps.langDirective}
+${ps.contentAuthor} "${ctx.stationName}".
+${ctx.stationDescription ? ps.aboutStation(ctx.stationDescription) : ""}
+${ps.activeHosts(ctx.personaList)}
+${ps.createContentInStyle}
+${ps.narrativeStyle}`;
       if (stationDefaultPrompt) {
-        systemPrompt += `\n\nОБЩИЕ ИНСТРУКЦИИ СТАНЦИИ (ВСЕГДА СОБЛЮДАЙ):\n${stationDefaultPrompt}`;
+        systemPrompt += `\n\n${ps.stationInstructions}\n${stationDefaultPrompt}`;
       }
       if (ctx.knowledgeBase) {
-        systemPrompt += `\n\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeBase}`;
+        systemPrompt += `\n\n${ps.knowledgeBase}\n${ctx.knowledgeBase}`;
       }
 
       let scriptText = "";
@@ -4049,14 +3998,14 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         }
       } catch (genError) {
         console.error("Script generation failed:", genError);
-        return res.status(500).json({ error: "Не удалось сгенерировать скрипт. Слот не занят, попробуйте снова." });
+        return res.status(500).json({ error: ps.generationFailed });
       }
 
       let extractedTopic = "";
-      const topicMatch = scriptText.match(/^ТЕМА:\s*(.+)/m);
+      const topicMatch = scriptText.match(/^(?:ТЕМА|TOPIC):\s*(.+)/m);
       if (topicMatch) {
         extractedTopic = topicMatch[1].trim();
-        scriptText = scriptText.replace(/^ТЕМА:\s*.+\n*/m, "").trim();
+        scriptText = scriptText.replace(/^(?:ТЕМА|TOPIC):\s*.+\n*/m, "").trim();
       }
 
       const finalTitle = extractedTopic 
@@ -4462,7 +4411,11 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const prompt = program.prompt || programType.defaultPrompt;
       let scriptText: string;
 
-      const ctx = await buildStationContext(req.session.userId);
+      const userGen = req.session.userId ? await storage.getUser(req.session.userId) : null;
+      const userLangGen = userGen?.language || "en";
+      const psGen = getPromptStrings(userLangGen);
+
+      const ctx = await buildStationContext(req.session.userId, userLangGen);
       const voicesList = await storage.getVoices(req.session.userId!);
       const assignedVoices = resolveAssignedVoices(voicesList, programType);
       const isMultiSpeaker = assignedVoices.length >= 2;
@@ -4470,65 +4423,41 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       let systemPrompt: string;
       if (isMultiSpeaker) {
         const speakerList = assignedVoices.map(v => getCleanVoiceName(v)).join(", ");
-        systemPrompt = `Ты - сценарист для радио "${ctx.stationName}".
-${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
+        const speakerNames = assignedVoices.map(v => getCleanVoiceName(v));
+        systemPrompt = `${psGen.langDirective}
+${psGen.scriptWriter} "${ctx.stationName}".
+${ctx.stationDescription ? psGen.aboutStation(ctx.stationDescription) : ""}
 
-ФОРМАТ СКРИПТА — мульти-спикерный с тегами эмоций:
-Спикеры: ${speakerList}
-
-Каждая реплика начинается с [Имя]: и может содержать теги эмоций в квадратных скобках.
-Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
-
-Пример формата:
-[${getCleanVoiceName(assignedVoices[0])}]: [energetic] [fast] Привет! Текст первого спикера...
-[${assignedVoices[1] ? getCleanVoiceName(assignedVoices[1]) : getCleanVoiceName(assignedVoices[0])}]: [announcer] ЗАГОЛОВОК РУБРИКИ
-[${getCleanVoiceName(assignedVoices[0])}]: [surprised] Интересный факт! [thoughtful] Пояснение...
-
-Создавай контент на русском языке. Используй теги для придания выразительности.
-Обязательно чередуй спикеров, создавая динамичную передачу.`;
+${psGen.multiSpeakerFormat(speakerList, speakerNames)}`;
       } else {
         const singleSpeakerName = assignedVoices.length > 0
           ? getCleanVoiceName(assignedVoices[0])
           : (ctx.personaList.split(",")[0]?.trim() || programType.name);
-        systemPrompt = `Ты - автор контента для радио "${ctx.stationName}".
-${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
+        systemPrompt = `${psGen.langDirective}
+${psGen.contentAuthor} "${ctx.stationName}".
+${ctx.stationDescription ? psGen.aboutStation(ctx.stationDescription) : ""}
 
-ФОРМАТ СКРИПТА — с ведущим и тегами эмоций:
-Ведущий(ая): ${singleSpeakerName}
-
-КАЖДЫЙ абзац/блок текста ОБЯЗАТЕЛЬНО начинается с [${singleSpeakerName}]: и содержит теги эмоций в квадратных скобках.
-Доступные теги: [energetic] [fast] [slow] [surprised] [thoughtful] [happy] [sad] [exclaims] [announcer] [serious] [calm] [excited] [warm] [dramatic] [whisper] [loud] [gentle] [playful] [confident]
-
-Пример формата:
-[${singleSpeakerName}]: [energetic] [warm] Привет! Текст ведущего...
-[${singleSpeakerName}]: [thoughtful] Следующий блок текста...
-
-НЕ пиши текст без префикса [${singleSpeakerName}]:! Каждый блок должен начинаться с имени ведущего.
-Создавай контент на русском языке.`;
+${psGen.singleSpeakerFormat(singleSpeakerName)}`;
       }
 
       if (programType.scriptTemplate) {
-        systemPrompt += `\n\nСТРУКТУРА СЦЕНАРИЯ — СТРОГО СЛЕДУЙ ЭТОМУ ШАБЛОНУ:
-${programType.scriptTemplate}
-ВАЖНО: Распределяй текст между спикерами ТОЧНО по этой структуре. Каждый спикер выполняет ТОЛЬКО свою роль, указанную выше.`;
+        systemPrompt += `\n\n${psGen.templateStructure(programType.scriptTemplate)}`;
       }
 
       const genDurationSec = programType.defaultDurationSeconds || 60;
       const genTargetWords = Math.round((genDurationSec / 60) * 150);
       const genMinWords = Math.round(genTargetWords * 0.8);
       const genMaxWords = Math.round(genTargetWords * 1.15);
-      systemPrompt += `\n\nХРОНОМЕТРАЖ — СТРОГО СОБЛЮДАЙ:
-- Целевая длительность: ${genDurationSec} секунд
-- Объём текста: от ${genMinWords} до ${genMaxWords} слов (скорость чтения ~150 слов/мин)
-- НЕ ПИШИ БОЛЬШЕ ${genMaxWords} слов!`;
+      const genDurStr = `${Math.floor(genDurationSec / 60)}:${String(genDurationSec % 60).padStart(2, "0")}`;
+      systemPrompt += `\n\n${psGen.durationStrict(genDurationSec, genDurStr, genMinWords, genMaxWords)}`;
 
       const settingsForGen = await storage.getSettings(req.session.userId);
       const stationDefaultPromptGen = settingsForGen?.defaultPrompt || "";
       if (stationDefaultPromptGen) {
-        systemPrompt += `\n\nОБЩИЕ ИНСТРУКЦИИ СТАНЦИИ (ВСЕГДА СОБЛЮДАЙ):\n${stationDefaultPromptGen}`;
+        systemPrompt += `\n\n${psGen.stationInstructions}\n${stationDefaultPromptGen}`;
       }
       if (ctx.knowledgeBase) {
-        systemPrompt += `\n\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeBase}`;
+        systemPrompt += `\n\n${psGen.knowledgeBase}\n${ctx.knowledgeBase}`;
       }
 
       const anthropic = await getAnthropicClient(req.session.userId);

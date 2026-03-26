@@ -1,162 +1,72 @@
 # RadioFlow AI — Radio Content Automation Platform
 
 ## Overview
-
-RadioFlow AI is a SaaS platform for radio stations that automates content creation — dialog scripts, multi-speaker programs, ads, and more — using AI. Originally built for "RuWave 94FM Alanya" (a Russian-language station in Turkey), it is now being expanded into a multi-tenant service.
-
-The system automates the creation of short conversational dialogs between radio hosts, covering various topics, with AI-powered script generation, text-to-speech audio, and broadcast scheduling.
+RadioFlow AI is a SaaS platform designed for radio stations to automate content creation, including dialog scripts, multi-speaker programs, and advertisements, using artificial intelligence. Initially developed for a single station, it is expanding into a multi-tenant service. The platform focuses on generating short, conversational dialogs between radio hosts, providing AI-powered script generation, text-to-speech audio, and broadcast scheduling capabilities. The long-term vision is to become the leading AI-powered content automation solution for radio broadcasting globally.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
-### Frontend Architecture
+### Frontend
 - **Framework**: React 18 with TypeScript
-- **Routing**: Wouter (lightweight alternative to React Router)
-- **State Management**: TanStack React Query for server state
-- **UI Components**: shadcn/ui component library built on Radix UI primitives
-- **Styling**: Tailwind CSS with CSS variables for theming (light/dark mode support)
+- **Routing**: Wouter
+- **State Management**: TanStack React Query
+- **UI Components**: shadcn/ui (built on Radix UI)
+- **Styling**: Tailwind CSS with CSS variables (light/dark mode)
 - **Form Handling**: React Hook Form with Zod validation
-- **Build Tool**: Vite with HMR support
+- **Build Tool**: Vite
 
-### Backend Architecture
+### Backend
 - **Runtime**: Node.js with Express
-- **Language**: TypeScript compiled with tsx
-- **API Style**: RESTful JSON APIs under `/api/*` prefix
+- **Language**: TypeScript
+- **API Style**: RESTful JSON APIs (`/api/*`)
 - **Database ORM**: Drizzle ORM with PostgreSQL
-- **Schema Validation**: Zod with drizzle-zod for type-safe schemas
+- **Schema Validation**: Zod
 
-### Key Design Patterns
-- **Monorepo Structure**: Client (`/client`), Server (`/server`), and Shared (`/shared`) directories
-- **Path Aliases**: `@/*` for client imports, `@shared/*` for shared code
-- **Type Sharing**: Database schemas and types defined in `/shared/schema.ts` are used by both frontend and backend
-- **Storage Interface**: Abstract `IStorage` interface allowing for different storage implementations
+### Design Patterns
+- **Monorepo Structure**: Client, Server, and Shared directories.
+- **Type Sharing**: Database schemas and types are shared between frontend and backend.
+- **Storage Interface**: Abstract `IStorage` interface for flexible storage implementations.
 
-### Multi-Tenant Data Isolation
-- **userId column**: All shared tables (dialogs, voices, ads, adPresets, programs, programTypes, newsSources, newsItems, automations, scheduleTemplates, hostShifts, customHolidays, promptTemplates) have a `userId` foreign key
-- **Storage layer**: All collection methods (getDialogs, getVoices, getAds, etc.) require `userId` parameter and filter by it
-- **API routes**: All storage calls in `server/routes.ts` pass `req.session.userId` to ensure tenant isolation
-- **Role-based access**: Users have a `role` field ("admin" or "user"); admin users see full settings including API keys
-- **Settings protection**: GET `/api/settings` masks API keys (ElevenLabs, Anthropic, Yandex, Freesound) for non-admin users; POST `/api/settings` strips API key fields from non-admin requests
-- **Frontend**: Settings page hides "API Keys" tab for non-admin users; `useAuth()` hook exposes `role` field
+### Multi-Tenancy & Authentication
+- **Data Isolation**: All shared tables include a `userId` foreign key; all storage layer methods filter by `userId`.
+- **Role-Based Access**: Users have "admin" or "user" roles, controlling access to sensitive settings like API keys.
+- **Session-Based Authentication**: `express-session` with `connect-pg-simple`.
+- **Password Hashing**: `bcryptjs`.
+- **Authentication Endpoints**: Register, login, logout, get current user.
+- **Admin Panel**: Accessible only to admin users, offering user management, usage tracking, support inbox, and API key visibility.
+- **Internationalization (i18n)**: Supports 52 languages with locale detection and fallback.
+- **Support Chat**: AI-powered support chat (Claude/OpenAI fallback) with voice input, accessible without authentication.
 
-### Authentication System
-- **Session-based auth**: express-session with connect-pg-simple for PostgreSQL session storage
-- **Password hashing**: bcryptjs for secure password storage
-- **Auth endpoints**: POST `/api/auth/register`, POST `/api/auth/login`, POST `/api/auth/logout`, GET `/api/auth/me`
-- **Auth middleware**: All `/api/*` routes (except `/api/auth/*`) require authentication, returning 401 for unauthenticated requests
-- **Frontend auth flow**: `useAuth()` hook checks `/api/auth/me`; unauthenticated users see landing page at "/"; auth page at "/auth"; authenticated users see admin dashboard
-- **Role system**: `role` field on users table — "admin" (full access including API keys) or "user" (default, API keys hidden)
-- **Landing page**: `client/src/pages/landing.tsx` — hero with AI-generated images, features with interactive selector, animated counters, scroll animations (IntersectionObserver), floating particles, gradient text, pricing with hover effects, CTA, footer; fully i18n'd (52 languages); SEO meta tags set via useEffect
-- **i18n**: 52 languages supported — ru, en, tr, de, es, fr, pt, it, uk, pl, nl, sv, da, no, fi, cs, sk, hu, ro, bg, el, hr, sr, sl, bs, mk, sq, lt, lv, et, kk, uz, ky, tg, mn, az, ka, hy, ar, he, fa, zh, ja, ko, hi, bn, ta, th, vi, id, ms, sw; fallback: en; detection: localStorage → navigator → htmlTag; key: `radioflow-language`; searchable language switcher with grouped dropdown
-- **Auth files**: `server/auth.ts` (backend logic), `client/src/hooks/use-auth.ts` (frontend hook), `client/src/pages/auth.tsx` (login/register page at /auth route)
-- **Blocked users**: Users with `blocked=true` cannot log in (403 response)
+### Core Features
+- **AI-Powered Script Generation**: Generates dialogs, program scripts, and ads using Claude (primary) or OpenAI (fallback).
+- **Multi-Speaker Scripts**: Supports scripts with multiple speakers, including emotion tags for enhanced TTS and visual rendering.
+- **Schedule System**: Flexible templates for broadcast scheduling, host rotation, and integration with holiday calendars (static and custom).
+- **Language-Aware Generation**: AI prompts are localized to ensure scripts are generated in the user's preferred language.
+- **Automatic Weekly Pipeline**: Automates script generation, audio synthesis, and cloud storage upload for programs based on configurable settings.
+- **Services Status**: API endpoint and UI to display connectivity status of integrated external services.
+- **Web Research Integration**: Firecrawl (with Startpage fallback) for fetching web content to enrich AI prompts for program generation.
 
-### Admin Panel
-- **Route**: `/admin` — only accessible to users with `role="admin"`
-- **Backend middleware**: `requireAdmin` in `server/auth.ts` checks user role; `requireAuth` checks blocked status and destroys session if blocked
-- **Dashboard**: GET `/api/admin/dashboard` — total users, new registrations (week/month), active/blocked counts
-- **User management**: GET `/api/admin/users` (list with stats), PATCH `/api/admin/users/:id` (role/block with Zod validation), DELETE `/api/admin/users/:id`
-- **Usage tracking**: `usage_logs` table tracks script generation, audio generation, ad generation per user; GET `/api/admin/usage` returns aggregated stats and recent logs
-- **Support inbox**: `support_messages` table persists all support chat conversations; GET `/api/admin/support-messages` returns grouped by session with user info
-- **API key visibility**: Admin API Keys tab shows configured/not-set status for all service keys; keys managed via Settings page
-- **Self-protection**: Admin cannot modify/delete their own account via admin API
-- **Frontend**: `client/src/pages/admin.tsx` — tabs for Dashboard, Users, Usage, Support, API Keys; sidebar shows Admin link only for admin users
-- **Usage instrumentation**: `logUsage()` helper called on successful script generation (Claude/OpenAI), audio generation (dialog/program), and ad generation
-
-### AI Support Chat
-- **Endpoint**: `POST /api/support-chat` — accessible without authentication (placed before auth middleware)
-- **Backend**: `server/support-chat.ts` — uses Claude (if API key configured) or OpenAI fallback; in-memory conversation history per session
-- **System prompt**: Comprehensive knowledge of all platform features, setup steps, troubleshooting tips
-- **Frontend widget**: `client/src/components/support-chat.tsx` — floating button (bottom-right), expandable chat panel
-- **Voice input**: Web Speech API (SpeechRecognition) for voice-to-text, language-aware (ru-RU, en-US, tr-TR)
-- **i18n**: All widget labels/placeholders translated in en/ru/tr; AI auto-responds in user's current language
-- **Session management**: Conversation history kept in memory, cleared hourly; max 40 messages per session
-
-### Core Entities
-1. **Users** - Authentication with email, password (hashed), name, role (admin/user), blocked flag
-2. **Settings** - Application configuration (API keys, voice IDs, default prompts, dialog style, replicas count)
-3. **Dialogs** - Generated radio scripts with status tracking (pending, generating, ready, error); multi-turn `scriptText` format
-4. **Schedule Templates** - Per-weekday broadcast templates (name, weekdays, startHour, endHour, slotsPerHour, voiceIds)
-5. **Host Shifts** - Time-based host rotation within templates (templateId, startHour, endHour, voiceIds, label)
-
-### Schedule System
-- **Flexible Templates**: Each template covers specific weekdays with configurable broadcast hours and slot density (slots per hour)
-- **Host Rotation**: Host shifts define which voices are assigned to which time ranges within a template
-- **Holiday Calendar**: Static holiday data for Turkey and Russia (including Islamic holidays for 2025-2026) in `server/holidays.ts`, plus user-editable custom holidays in `custom_holidays` DB table
-- **Custom Holidays CRUD**: `GET/POST /api/custom-holidays`, `PATCH/DELETE /api/custom-holidays/:id` — merged with static holidays at runtime via `setCustomHolidays()` cache
-- **Slot Resolution**: `GET /api/resolve-slots?date=YYYY-MM-DD` resolves the template for a given date, returns slot times with assigned voices and holiday info
-- **Generator Integration**: Generator page uses resolved slots to show time labels, host names, and shift labels per slot
-- **Schedule View**: Calendar week view shows holiday markers on each day
-- **UI**: "Настройка" (Settings) tab in Podvodki page for managing templates, weekday assignments, and host shifts with visual timeline
-
-### AI Integration Pattern
-- **Claude (Anthropic)**: Primary AI for ALL text generation
-  - Dialog scripts, ad variants, prompt improvement, document extraction (PDF/images)
-  - API key stored in database settings, entered via admin UI
-  - Uses claude-sonnet-4-20250514 model
-  - Note: Claude API does NOT support direct audio input
-- **OpenAI** (via Replit AI Integrations): Fallback when Claude API key not configured
-  - Configured through environment variables `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL`
-- **Gemini** (via Replit AI Integrations): Voice transcription ONLY
-  - Uses gemini-2.5-flash model for audio-to-text transcription
-  - Only service that handles audio input (Claude doesn't support it)
-  - Configured through `AI_INTEGRATIONS_GEMINI_API_KEY` and `AI_INTEGRATIONS_GEMINI_BASE_URL`
-  - Costs are billed to Replit credits (no separate API key needed)
-- Includes batch processing utilities with rate limiting and retries
-- Image generation capabilities available through gpt-image-1 model
-- **Batch Program Generation**: Accepts a URL (ChatGPT share link, web page) + voice/text instructions to auto-generate 5-50 programs in batch. Uses cheerio for HTML content extraction. Programs distributed across days based on dailyCount settings.
-- **Multi-Speaker Script Support**: When a program type has 2+ assigned voices, scripts are generated in multi-speaker format:
-  - Format: `[SpeakerName]: [emotion_tag] text...` with one speaker per line
-  - Emotion tags: `[energetic]`, `[fast]`, `[surprised]`, `[thoughtful]`, `[happy]`, `[announcer]`, etc.
-  - Tags are stripped before TTS synthesis; they serve as editorial/visual markers
-  - Audio generation: parses script into segments, matches speaker names to voices via `personaName`, synthesizes each segment separately, concatenates into one MP3 file
-  - Frontend renders multi-speaker scripts with color-coded speaker names and styled emotion tags
-  - Supports fuzzy speaker-to-voice matching (partial name match as fallback)
-- **Dialog Style Settings**: Configurable dialog generation styles stored in `settings` table
-  - `dialogStyle`: "lively" (interruptions, humor, reactions), "moderate" (light discussion), "simple" (turn-by-turn)
-  - `dialogReplicas`: 3-8 replicas per dialog (default 4)
-  - AI generates JSON with `replicas` array (speaker + text per line) instead of old maleText/femaleText blocks
-  - Frontend renders multi-turn dialogs with color-coded speaker lines and inline emotion tags
-  - Backward compatible: old maleText/femaleText format still displayed if scriptText is empty
-  - Script editor: single textarea with `SpeakerName: [tag] text` format per line
+### AI Integration Details
+- **Claude (Anthropic)**: Primary for all text generation (scripts, ads, prompt improvement). Uses `claude-sonnet-4-20250514`.
+- **OpenAI**: Fallback for text generation when Claude is not configured.
+- **Gemini**: Used exclusively for voice transcription (audio-to-text) via Replit AI Integrations.
+- **Batch Processing**: Utilities for batch generation with rate limiting and retries.
 
 ## External Dependencies
 
 ### Database
-- **PostgreSQL**: Primary database accessed via `DATABASE_URL` environment variable
-- **Drizzle ORM**: Type-safe database operations with migration support via `drizzle-kit`
+- **PostgreSQL**: Primary data store.
 
 ### AI Services
-- **Anthropic Claude**: Primary AI for dialog script generation (API key stored in settings)
-- **OpenAI API** (via Replit AI Integrations): Fallback for dialog script generation
-- **ElevenLabs**: Text-to-speech service for audio generation (API key stored in settings)
+- **Anthropic Claude**: Main AI for text generation.
+- **OpenAI API**: Fallback AI for text generation.
+- **ElevenLabs**: Text-to-speech (TTS) service.
+- **Gemini**: Audio transcription.
 
 ### Cloud Storage
-- **Yandex Disk**: File storage for generated audio files (token stored in settings)
+- **Yandex Disk**: Storage for generated audio files.
 
-### Voice Configuration
-- Default male voice ID: `onwK4e9ZLuTAKqWW03F9`
-- Default female voice ID: `EXAVITQu4vr4xnSDxMaL`
-
-### Automatic Weekly Pipeline
-- **Auto-generation Settings**: Per program type: `autoGenerate`, `weeklyCount`, `autoVoice`, `autoUpload` fields
-- **Pipeline Endpoint**: `POST /api/programs/:typeId/auto-pipeline` — creates scripts, generates audio, uploads to Yandex Disk in sequence
-- **Scheduler**: Runs on startup (30s delay) then hourly. Checks which types have `autoGenerate=true`, calculates daily needs from `weeklyCount`, auto-triggers pipeline for any shortfall
-- **Manual Trigger**: `POST /api/run-scheduler` — forces immediate scheduler run
-- **UI Controls**: Settings dialog shows auto-generation toggle with weekly count, auto-voice, and auto-upload options. "Пайплайн" button visible when auto-generate is enabled
-
-### Firecrawl Integration (with Startpage fallback)
-- **API Key**: Stored in `FIRECRAWL_API_KEY` environment variable
-- **Search Endpoint**: `POST /api/firecrawl/search` — searches web via Firecrawl API, returns markdown content
-- **Research Endpoint**: `POST /api/firecrawl/research/:typeId` — runs topic-based research for a program type
-- **Search Fallback Chain**: Firecrawl → Startpage scraping (via `fallbackWebSearch`). Startpage parses `.result` elements with `h2/h3` titles, `a[href]` links, and `<p>` snippets
-- **Auto-Create Integration**: When `useFirecrawl=true` on a program type, auto-create fetches fresh web content based on `firecrawlTopics` array and injects it into the AI prompt as factual source material
-- **Schema Fields**: `useFirecrawl: boolean`, `firecrawlTopics: text[]` on `programTypes` table
-- **UI**: Settings dialog has Firecrawl section with topic management (add/remove badges), test search button, and toggle
-
-### Build and Development
-- Vite plugins for Replit integration (cartographer, dev-banner, runtime-error-modal)
-- esbuild for production server bundling with specific dependency allowlist
+### Web Scraping/Research
+- **Firecrawl**: For web content search and research to feed AI prompts.
