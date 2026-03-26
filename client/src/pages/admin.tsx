@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -463,8 +463,28 @@ export default function AdminPage() {
 
 function SupportSessionCard({ session }: { session: SupportSession }) {
   const [expanded, setExpanded] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const { toast } = useToast();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastMsg = session.messages[session.messages.length - 1];
   const userMsgCount = session.messages.filter(m => m.role === "user").length;
+
+  const replyMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/admin/support-reply", {
+        sessionId: session.sessionId,
+        message: replyText,
+      });
+    },
+    onSuccess: () => {
+      setReplyText("");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/support-messages"] });
+      toast({ title: "Reply sent" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
 
   return (
     <Card>
@@ -494,7 +514,7 @@ function SupportSessionCard({ session }: { session: SupportSession }) {
         </div>
       </CardHeader>
       {expanded && (
-        <CardContent className="pt-0">
+        <CardContent className="pt-0 space-y-3">
           <div className="space-y-2 max-h-80 overflow-y-auto">
             {session.messages.map((msg) => (
               <div
@@ -502,12 +522,14 @@ function SupportSessionCard({ session }: { session: SupportSession }) {
                 className={`p-3 rounded-lg text-sm ${
                   msg.role === "user"
                     ? "bg-blue-50 dark:bg-blue-950/30 ml-0 mr-12"
+                    : msg.role === "admin"
+                    ? "bg-green-50 dark:bg-green-950/30 ml-12 mr-0"
                     : "bg-muted ml-12 mr-0"
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <Badge variant={msg.role === "user" ? "default" : "secondary"} className="text-xs">
-                    {msg.role === "user" ? "User" : "AI"}
+                  <Badge variant={msg.role === "user" ? "default" : msg.role === "admin" ? "outline" : "secondary"} className="text-xs">
+                    {msg.role === "user" ? "User" : msg.role === "admin" ? "Admin" : "AI"}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
                     {new Date(msg.createdAt).toLocaleString()}
@@ -516,6 +538,24 @@ function SupportSessionCard({ session }: { session: SupportSession }) {
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               </div>
             ))}
+          </div>
+          <div className="flex gap-2">
+            <textarea
+              ref={inputRef}
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              placeholder="Type admin reply..."
+              className="flex-1 min-h-[60px] p-2 text-sm border rounded-md bg-background resize-none"
+              data-testid={`input-reply-${session.sessionId}`}
+            />
+            <Button
+              size="sm"
+              onClick={() => replyMutation.mutate()}
+              disabled={!replyText.trim() || replyMutation.isPending}
+              data-testid={`button-reply-${session.sessionId}`}
+            >
+              {replyMutation.isPending ? "..." : "Reply"}
+            </Button>
           </div>
         </CardContent>
       )}

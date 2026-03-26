@@ -146,6 +146,17 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   next();
 }
 
+export async function ensureAdminExists() {
+  const ADMIN_EMAILS = ["test@test.com", "mediauwin@gmail.com"];
+  for (const email of ADMIN_EMAILS) {
+    const user = await storage.getUserByEmail(email);
+    if (user && user.role !== "admin") {
+      await storage.updateUserRole(user.id, "admin");
+      console.log(`[admin-bootstrap] Promoted ${email} to admin`);
+    }
+  }
+}
+
 export async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Authentication required" });

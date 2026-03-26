@@ -876,6 +876,25 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/support-reply", requireAdmin, async (req, res) => {
+    try {
+      const { sessionId, message } = req.body;
+      if (!sessionId || !message) {
+        return res.status(400).json({ error: "sessionId and message are required" });
+      }
+      await storage.createSupportMessage({
+        userId: req.session.userId,
+        sessionId,
+        role: "admin",
+        content: message,
+      });
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error("Admin support reply error:", error);
+      return res.status(500).json({ error: "Failed to send reply" });
+    }
+  });
+
   app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
     try {
       const allUsers = await storage.getAllUsers();
@@ -5237,6 +5256,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
                     yandexPath: `${yandexFolder}/${fileName}`,
                   });
                   program.uploadedToYandex = true;
+                  logUsage(req.session.userId!, "file_upload", "yandex_disk");
                 }
               }
             } catch (uploadErr: any) {
