@@ -226,10 +226,45 @@ async function ensureDemoShowsExist(userId: string) {
   }
 }
 
+async function cleanupAlaniyaDefaults() {
+  try {
+    const allUsers = await db.select().from(users);
+    for (const user of allUsers) {
+      const userSettings = await db.select().from(settings).where(eq(settings.userId, user.id)).limit(1);
+      if (userSettings.length === 0) continue;
+      const s = userSettings[0];
+      const updates: Record<string, string> = {};
+
+      if (s.stationName === "Alanya FM" || s.stationName === "Алания FM") {
+        updates.stationName = "Radio FM";
+      }
+      if (s.stationWebsite === "https://alanyafm.com" || s.stationWebsite === "http://alanyafm.com") {
+        updates.stationWebsite = "http://radiofm.com";
+      }
+      if (s.stationLocation && (s.stationLocation.includes("Аланья") || s.stationLocation.includes("Alanya"))) {
+        updates.stationLocation = "";
+      }
+      if (s.defaultPrompt && (s.defaultPrompt.includes("Алания FM") || s.defaultPrompt.includes("Alanya FM"))) {
+        const lang = user.language || "en";
+        const { getDefaultPromptForLanguage } = await import("./storage");
+        updates.defaultPrompt = getDefaultPromptForLanguage(lang);
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await db.update(settings).set(updates).where(eq(settings.id, s.id));
+        console.log(`[seed] Cleaned up Alanya defaults for user ${user.email}: ${Object.keys(updates).join(", ")}`);
+      }
+    }
+  } catch (e: any) {
+    console.warn("[seed] cleanupAlaniyaDefaults error:", e.message);
+  }
+}
+
 export async function seedDemoIfNeeded() {
   try {
     await fixOrphanedProgramTypes();
     await ensureRuShowsExist();
+    await cleanupAlaniyaDefaults();
 
     const existing = await storage.getUserByEmail("demo@dallaswave.com");
     if (existing) {

@@ -14,7 +14,7 @@ const LANG_NAMES: Record<string, string> = {
   vi: "Vietnamese", id: "Indonesian", ms: "Malay", sw: "Swahili",
 };
 
-function getDefaultPromptForLanguage(lang: string): string {
+export function getDefaultPromptForLanguage(lang: string): string {
   const prompts: Record<string, string> = {
     ru: `Создай короткий диалог между ведущими радио "Radio FM" (мужчина и женщина).
 Тема: местная жизнь, культура, интересные факты.
