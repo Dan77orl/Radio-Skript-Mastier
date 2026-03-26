@@ -16,10 +16,12 @@ interface ChatMessage {
 }
 
 const sessionChats = new Map<string, ChatMessage[]>();
+const adminReplyTracker = new Map<string, Set<string>>();
 
 const CLEANUP_INTERVAL = 60 * 60 * 1000;
 setInterval(() => {
   sessionChats.clear();
+  adminReplyTracker.clear();
 }, CLEANUP_INTERVAL);
 
 const MAX_MESSAGE_LENGTH = 2000;
@@ -221,8 +223,13 @@ export async function handleSupportChat(req: Request, res: Response) {
         const adminReplies = dbMessages
           .filter(m => m.role === "admin")
           .slice(-5);
-        const existingContents = new Set(history.map(h => h.content));
-        return adminReplies.filter(r => !existingContents.has(r.content));
+        const seenIds = adminReplyTracker.get(sessionId) || new Set<string>();
+        const unseen = adminReplies.filter(r => !seenIds.has(r.id));
+        for (const r of unseen) {
+          seenIds.add(r.id);
+        }
+        adminReplyTracker.set(sessionId, seenIds);
+        return unseen;
       } catch (err) { console.error("[support-chat] Failed to fetch admin replies:", err); return []; }
     })();
 
