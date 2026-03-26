@@ -878,10 +878,15 @@ export async function registerRoutes(
 
   app.post("/api/admin/support-reply", requireAdmin, async (req, res) => {
     try {
-      const { sessionId, message } = req.body;
-      if (!sessionId || !message) {
-        return res.status(400).json({ error: "sessionId and message are required" });
+      const replySchema = z.object({
+        sessionId: z.string().min(1),
+        message: z.string().min(1).max(5000).transform(s => s.trim()),
+      });
+      const parsed = replySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0].message });
       }
+      const { sessionId, message } = parsed.data;
       await storage.createSupportMessage({
         userId: req.session.userId,
         sessionId,

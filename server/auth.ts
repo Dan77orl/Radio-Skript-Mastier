@@ -147,8 +147,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 }
 
 export async function ensureAdminExists() {
-  const ADMIN_EMAILS = ["test@test.com", "mediauwin@gmail.com"];
-  for (const email of ADMIN_EMAILS) {
+  const adminEmailsEnv = process.env.ADMIN_EMAILS;
+  if (!adminEmailsEnv) return;
+  const emails = adminEmailsEnv.split(",").map(e => e.trim()).filter(Boolean);
+  for (const email of emails) {
     const user = await storage.getUserByEmail(email);
     if (user && user.role !== "admin") {
       await storage.updateUserRole(user.id, "admin");

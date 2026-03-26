@@ -62,7 +62,7 @@ interface SupportSession {
 }
 
 export default function AdminPage() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -122,6 +122,14 @@ export default function AdminPage() {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     setLocation("/");
