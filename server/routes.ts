@@ -100,12 +100,30 @@ async function fetchNewsFromSource(source: { url: string; type: string }): Promi
   }
 }
 
+function getEffectiveElevenLabsKey(settings: any): string | null {
+  return settings?.elevenLabsApiKey || process.env.ELEVENLABS_API_KEY || null;
+}
+
+function getEffectiveAnthropicKey(settings: any): string | null {
+  return settings?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || null;
+}
+
+function withEffectiveKeys(settings: any): any {
+  if (!settings) return settings;
+  return {
+    ...settings,
+    elevenLabsApiKey: getEffectiveElevenLabsKey(settings),
+    anthropicApiKey: getEffectiveAnthropicKey(settings),
+  };
+}
+
 async function getAnthropicClient(userId?: string): Promise<Anthropic | null> {
   const settings = await storage.getSettings(userId);
-  if (!settings?.anthropicApiKey) {
+  const apiKey = getEffectiveAnthropicKey(settings);
+  if (!apiKey) {
     return null;
   }
-  return new Anthropic({ apiKey: settings.anthropicApiKey });
+  return new Anthropic({ apiKey });
 }
 
 function resolveStationCountry(stationLocation: string | null | undefined): string {

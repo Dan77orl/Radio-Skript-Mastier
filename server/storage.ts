@@ -221,37 +221,59 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSettings(userId?: string): Promise<Settings | undefined> {
+    let result: Settings | undefined;
+    if (userId) {
+      const [row] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+      if (row) {
+        result = row;
+      } else {
+        const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+        const lang = user?.language || "en";
+
+        const defaultPrompt = getDefaultPromptForLanguage(lang);
+        const dailyPrompt = getDefaultDailyPromptForLanguage(lang);
+
+        const [defaultSettings] = await db.insert(settings).values({
+          userId,
+          elevenLabsApiKey: null,
+          yandexDiskToken: null,
+          maleVoiceId: "onwK4e9ZLuTAKqWW03F9",
+          femaleVoiceId: "EXAVITQu4vr4xnSDxMaL",
+          dailyDialogsCount: 12,
+          defaultPrompt,
+          dailyPrompt,
+          stationName: "Radio FM",
+          stationWebsite: "http://radiofm.com",
+          stationLocation: "",
+        }).returning();
+        result = defaultSettings;
+      }
+    } else {
+      const [row] = await db.select().from(settings).limit(1);
+      result = row || undefined;
+    }
+
+    if (result) {
+      return {
+        ...result,
+        elevenLabsApiKey: result.elevenLabsApiKey || process.env.ELEVENLABS_API_KEY || null,
+        anthropicApiKey: result.anthropicApiKey || process.env.ANTHROPIC_API_KEY || null,
+      };
+    }
+    return result;
+  }
+
+  async getRawSettings(userId?: string): Promise<Settings | undefined> {
     if (userId) {
       const [result] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
-      if (result) return result;
-
-      const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-      const lang = user?.language || "en";
-
-      const defaultPrompt = getDefaultPromptForLanguage(lang);
-      const dailyPrompt = getDefaultDailyPromptForLanguage(lang);
-
-      const [defaultSettings] = await db.insert(settings).values({
-        userId,
-        elevenLabsApiKey: null,
-        yandexDiskToken: null,
-        maleVoiceId: "onwK4e9ZLuTAKqWW03F9",
-        femaleVoiceId: "EXAVITQu4vr4xnSDxMaL",
-        dailyDialogsCount: 12,
-        defaultPrompt,
-        dailyPrompt,
-        stationName: "Radio FM",
-        stationWebsite: "http://radiofm.com",
-        stationLocation: "",
-      }).returning();
-      return defaultSettings;
+      return result;
     }
     const [result] = await db.select().from(settings).limit(1);
     return result || undefined;
   }
 
   async saveSettings(newSettings: InsertSettings, userId?: string): Promise<Settings> {
-    const existing = await this.getSettings(userId);
+    const existing = await this.getRawSettings(userId);
     if (existing) {
       const merged: Record<string, unknown> = { userId: userId || existing.userId };
       for (const key of Object.keys(newSettings) as (keyof InsertSettings)[]) {
