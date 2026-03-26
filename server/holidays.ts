@@ -67,7 +67,7 @@ export function setCustomHolidays(holidays: { date: string; name: string; nameRu
   }));
 }
 
-export function getHolidaysForDate(dateString: string): Holiday[] {
+export function getHolidaysForDate(dateString: string, customHolidays?: Holiday[]): Holiday[] {
   const date = new Date(dateString);
   const month = (date.getMonth() + 1).toString().padStart(2, "0");
   const day = date.getDate().toString().padStart(2, "0");
@@ -91,7 +91,8 @@ export function getHolidaysForDate(dateString: string): Holiday[] {
     }
   }
 
-  for (const h of cachedCustomHolidays) {
+  const customs = customHolidays ?? cachedCustomHolidays;
+  for (const h of customs) {
     if (h.date === key) {
       results.push(h);
     }
@@ -100,7 +101,7 @@ export function getHolidaysForDate(dateString: string): Holiday[] {
   return results;
 }
 
-export function getHolidaysForMonth(year: number, month: number): Holiday[] {
+export function getHolidaysForMonth(year: number, month: number, customHolidays?: Holiday[]): Holiday[] {
   const monthStr = month.toString().padStart(2, "0");
   const results: Holiday[] = [];
 
@@ -119,7 +120,8 @@ export function getHolidaysForMonth(year: number, month: number): Holiday[] {
     }
   }
 
-  for (const h of cachedCustomHolidays) {
+  const customs = customHolidays ?? cachedCustomHolidays;
+  for (const h of customs) {
     if (h.date.startsWith(monthStr + "-")) {
       results.push({ ...h, date: `${year}-${h.date}` });
     }
@@ -128,7 +130,7 @@ export function getHolidaysForMonth(year: number, month: number): Holiday[] {
   return results;
 }
 
-export function getHolidaysForYear(year: number): Holiday[] {
+export function getHolidaysForYear(year: number, customHolidays?: Holiday[]): Holiday[] {
   const results: Holiday[] = [];
 
   for (const h of staticHolidays) {
@@ -142,7 +144,8 @@ export function getHolidaysForYear(year: number): Holiday[] {
     }
   }
 
-  for (const h of cachedCustomHolidays) {
+  const customs = customHolidays ?? cachedCustomHolidays;
+  for (const h of customs) {
     results.push({ ...h, date: `${year}-${h.date}` });
   }
 

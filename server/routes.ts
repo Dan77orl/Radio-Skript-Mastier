@@ -5192,9 +5192,21 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
     res.json({ status: "Scheduler triggered" });
   });
 
+  async function getUserCustomHolidays(userId: string) {
+    const raw = await storage.getCustomHolidays(userId);
+    return raw.map(h => ({
+      date: h.date,
+      name: h.name,
+      nameRu: h.nameRu,
+      country: h.country as "TR" | "RU" | "BOTH",
+      isPublic: h.isPublic ?? false,
+    }));
+  }
+
   app.get("/api/holidays", async (req, res) => {
     try {
       const { year, month, date, country } = req.query;
+      const userHolidays = await getUserCustomHolidays(req.session.userId!);
 
       let resolvedCountry: string | null = null;
       if (country && typeof country === "string") {
@@ -5210,7 +5222,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       };
 
       if (date && typeof date === "string") {
-        return res.json(filterByCountry(getHolidaysForDate(date)));
+        return res.json(filterByCountry(getHolidaysForDate(date, userHolidays)));
       }
       if (year) {
         const y = parseInt(year as string);
@@ -5218,11 +5230,11 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
         if (month) {
           const m = parseInt(month as string);
           if (isNaN(m) || m < 1 || m > 12) return res.status(400).json({ error: "Invalid month" });
-          return res.json(filterByCountry(getHolidaysForMonth(y, m)));
+          return res.json(filterByCountry(getHolidaysForMonth(y, m, userHolidays)));
         }
-        return res.json(filterByCountry(getHolidaysForYear(y)));
+        return res.json(filterByCountry(getHolidaysForYear(y, userHolidays)));
       }
-      return res.json(filterByCountry(getHolidaysForYear(new Date().getFullYear())));
+      return res.json(filterByCountry(getHolidaysForYear(new Date().getFullYear(), userHolidays)));
     } catch (error) {
       res.status(500).json({ error: "Failed to get holidays" });
     }
@@ -5384,6 +5396,10 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       if (!parsed.voiceIds?.length) {
         return res.status(400).json({ error: "voiceIds must not be empty" });
       }
+      const template = await storage.getScheduleTemplate(parsed.templateId, req.session.userId!);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
       const shift = await storage.createHostShift({ ...parsed, userId: req.session.userId });
       res.json(shift);
     } catch (error: any) {
@@ -5438,7 +5454,8 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       const template = await storage.getTemplateForWeekday(weekday, req.session.userId!);
       const settings = await storage.getSettings(req.session.userId);
 
-      const allHolidays = getHolidaysForDate(date);
+      const userHolidays = await getUserCustomHolidays(req.session.userId!);
+      const allHolidays = getHolidaysForDate(date, userHolidays);
       const stationCountry = resolveStationCountry(settings?.stationLocation);
       const holidays = allHolidays.filter(h => h.country === stationCountry || h.country === "BOTH");
 
