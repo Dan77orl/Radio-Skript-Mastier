@@ -175,6 +175,8 @@
     "empty": "Empty",
     "maleVoice": "Male voice",
     "femaleVoice": "Female voice",
+    "scriptPlaceholderLine": "Line...",
+    "scriptPlaceholderResponse": "Response...",
     "listen": "Listen",
     "notGenerated": "Dialog not yet generated. Click \"Generate all slots\" above.",
     "dayStats": "Day statistics",
@@ -568,7 +570,8 @@
     "voices": "Voices",
     "inactive": "Inactive",
     "noPresets": "No presets",
-    "noPresetsDesc": "Create your first preset for quick ad creation"
+    "noPresetsDesc": "Create your first preset for quick ad creation",
+    "fromFile": "From file"
   },
   "shows": {
     "title": "Shows",
@@ -779,7 +782,26 @@
     "audioError": "Voice error",
     "voiceIsolateError": "Voice isolator error",
     "pipelineErrorMsg": "Pipeline error",
-    "noTypeDesc": "Create show types for content generation"
+    "noTypeDesc": "Create show types for content generation",
+    "analyzePrompt": "Analyze prompt",
+    "analyzing": "Analyzing...",
+    "analysisError": "Analysis error",
+    "analysisResult": "Analysis result",
+    "hostSpeaker": "Host:",
+    "referenceContent": "Reference content:",
+    "detected": "Detected",
+    "notDetected": "Not detected",
+    "links": "Links ({{count}}):",
+    "chars": "{{count}} chars",
+    "cannotRead": "Could not read",
+    "errorStatus": "Error: {{status}}",
+    "totalLoaded": "Total loaded: {{count}} characters",
+    "noPromptData": "No links, reference content, or host name found in the prompt. The system will use the default generation format.",
+    "linkNotReadable": "If a link cannot be read — paste the episode text directly into the prompt instead of the link. Copy the content from ChatGPT/Claude and paste as text.",
+    "expandedPrompt": "Expanded prompt (as the system sees it)",
+    "scriptTemplateOpening": "Opening: [{{name}}] — announces the show, introduces the host",
+    "scriptTemplateMain": "Main part: [{{name}}] — hosts the entire episode",
+    "scriptTemplateClosing": "Closing: [{{name}}] — says goodbye to listeners"
   },
   "automations": {
     "title": "Automations",
@@ -1094,5 +1116,19 @@
     "guideDesc": "Places and activities recommendations",
     "guideSlot1": "Recommendation of the day: interesting place, restaurant or event",
     "guidePrompt": "Create a local recommendation for \"{stationName}\" radio.\nTopics: interesting places, restaurants, cafes, events, activities\nStyle: friendly, like advice from a local friend\nDuration: 25-35 seconds when read aloud\nInclude: place name, why it's worth visiting, practical tips"
-  }
+  },
+  "voiceInputComp": {
+    "micOff": "Microphone off",
+    "micOffDesc": "Auto-off after 15 seconds",
+    "transcriptionError": "Transcription error",
+    "transcriptionFailed": "Could not recognize speech",
+    "transcribed": "Recognized",
+    "recording": "Recording...",
+    "recordingDesc": "Speak into the microphone. Will turn off in 15 sec.",
+    "micError": "Microphone error",
+    "micErrorDesc": "Allow microphone access in the browser",
+    "voiceInputTitle": "Voice input (Gemini)",
+    "stopRecordingTitle": "Stop recording"
+  },
+  "themeToggle": "Toggle theme"
 }

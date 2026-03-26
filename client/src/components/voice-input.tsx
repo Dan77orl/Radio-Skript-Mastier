@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, MicOff, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "react-i18next";
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
@@ -19,6 +20,7 @@ export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProp
   const streamRef = useRef<MediaStream | null>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const resetSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -28,12 +30,12 @@ export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProp
       if (isRecording && mediaRecorderRef.current) {
         stopRecording();
         toast({
-          title: "Микрофон отключен",
-          description: "Автоотключение после 15 секунд",
+          title: t("voiceInputComp.micOff"),
+          description: t("voiceInputComp.micOffDesc"),
         });
       }
     }, SILENCE_TIMEOUT_MS);
-  }, [isRecording, toast]);
+  }, [isRecording, toast, t]);
 
   const sendAudioForTranscription = async (audioBlob: Blob) => {
     setIsProcessing(true);
@@ -48,14 +50,14 @@ export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProp
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Ошибка транскрипции");
+        throw new Error(error.error || t("voiceInputComp.transcriptionError"));
       }
 
       const data = await response.json();
       if (data.transcript) {
         onTranscript(data.transcript);
         toast({
-          title: "Распознано",
+          title: t("voiceInputComp.transcribed"),
           description: data.transcript.length > 50 
             ? data.transcript.substring(0, 50) + "..." 
             : data.transcript,
@@ -64,8 +66,8 @@ export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProp
     } catch (error) {
       console.error("Transcription error:", error);
       toast({
-        title: "Ошибка транскрипции",
-        description: error instanceof Error ? error.message : "Не удалось распознать речь",
+        title: t("voiceInputComp.transcriptionError"),
+        description: error instanceof Error ? error.message : t("voiceInputComp.transcriptionFailed"),
         variant: "destructive",
       });
     } finally {
@@ -107,14 +109,14 @@ export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProp
       resetSilenceTimer();
       
       toast({
-        title: "Запись...",
-        description: "Говорите в микрофон. Отключится через 15 сек.",
+        title: t("voiceInputComp.recording"),
+        description: t("voiceInputComp.recordingDesc"),
       });
     } catch (error) {
       console.error("Failed to start recording:", error);
       toast({
-        title: "Ошибка микрофона",
-        description: "Разрешите доступ к микрофону в браузере",
+        title: t("voiceInputComp.micError"),
+        description: t("voiceInputComp.micErrorDesc"),
         variant: "destructive",
       });
     }
@@ -150,7 +152,7 @@ export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProp
       disabled={disabled || isProcessing}
       className={className}
       data-testid="button-voice-input"
-      title={isRecording ? "Остановить запись" : "Голосовой ввод (Gemini)"}
+      title={isRecording ? t("voiceInputComp.stopRecordingTitle") : t("voiceInputComp.voiceInputTitle")}
     >
       {isProcessing ? (
         <Loader2 className="h-4 w-4 animate-spin" />

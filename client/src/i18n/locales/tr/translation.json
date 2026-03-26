@@ -175,6 +175,8 @@
     "empty": "Boş",
     "maleVoice": "Erkek ses",
     "femaleVoice": "Kadın ses",
+    "scriptPlaceholderLine": "Replik...",
+    "scriptPlaceholderResponse": "Yanıt...",
     "listen": "Dinle",
     "notGenerated": "Diyalog henüz oluşturulmadı. Yukarıdaki \"Tüm slotları oluştur\" düğmesine tıklayın.",
     "dayStats": "Gün istatistikleri",
@@ -554,7 +556,8 @@
     "voices": "Sesler",
     "inactive": "Pasif",
     "noPresets": "Şablon yok",
-    "noPresetsDesc": "Hızlı reklam oluşturmak için ilk şablonunuzu oluşturun"
+    "noPresetsDesc": "Hızlı reklam oluşturmak için ilk şablonunuzu oluşturun",
+    "fromFile": "Dosyadan"
   },
   "shows": {
     "title": "Programlar",
@@ -761,7 +764,26 @@
     "audioError": "Ses hatası",
     "voiceIsolateError": "Ses izolasyon hatası",
     "pipelineErrorMsg": "İşlem hattı hatası",
-    "noTypeDesc": "İçerik oluşturmak için program türleri oluşturun"
+    "noTypeDesc": "İçerik oluşturmak için program türleri oluşturun",
+    "analyzePrompt": "İstemi analiz et",
+    "analyzing": "Analiz ediliyor...",
+    "analysisError": "Analiz hatası",
+    "analysisResult": "Analiz sonucu",
+    "hostSpeaker": "Sunucu:",
+    "referenceContent": "Referans içerik:",
+    "detected": "Tespit edildi",
+    "notDetected": "Tespit edilmedi",
+    "links": "Bağlantılar ({{count}}):",
+    "chars": "{{count}} karakter",
+    "cannotRead": "Okunamadı",
+    "errorStatus": "Hata: {{status}}",
+    "totalLoaded": "Toplam yüklenen: {{count}} karakter",
+    "noPromptData": "İstemde bağlantı, referans içerik veya sunucu adı bulunamadı. Sistem standart oluşturma formatını kullanacak.",
+    "linkNotReadable": "Bağlantı okunamıyorsa — bölüm metnini doğrudan isteme yapıştırın. ChatGPT/Claude'dan içeriği kopyalayıp metin olarak yapıştırın.",
+    "expandedPrompt": "Genişletilmiş istem (sistemin gördüğü şekliyle)",
+    "scriptTemplateOpening": "Açılış: [{{name}}] — programı duyurur, sunucuyu tanıtır",
+    "scriptTemplateMain": "Ana bölüm: [{{name}}] — tüm bölümü sunar",
+    "scriptTemplateClosing": "Kapanış: [{{name}}] — dinleyicilerle vedalaşır"
   },
   "automations": {
     "title": "Otomasyonlar",
@@ -1076,5 +1098,19 @@
     "guideDesc": "Mekan ve etkinlik önerileri",
     "guideSlot1": "Günün önerisi: ilginç bir mekan, restoran veya etkinlik",
     "guidePrompt": "\"{stationName}\" radyosu için yerel bir öneri oluştur.\nKonular: ilginç mekanlar, restoranlar, kafeler, etkinlikler, aktiviteler\nTarz: samimi, yerel bir arkadaşın tavsiyesi gibi\nSüre: sesli okunduğunda 25-35 saniye\nDahil et: mekan adı, neden ziyaret edilmeli, pratik ipuçları"
-  }
+  },
+  "voiceInputComp": {
+    "micOff": "Mikrofon kapalı",
+    "micOffDesc": "15 saniye sonra otomatik kapanma",
+    "transcriptionError": "Transkripsiyon hatası",
+    "transcriptionFailed": "Konuşma tanınamadı",
+    "transcribed": "Tanındı",
+    "recording": "Kayıt...",
+    "recordingDesc": "Mikrofona konuşun. 15 sn sonra kapanacak.",
+    "micError": "Mikrofon hatası",
+    "micErrorDesc": "Tarayıcıda mikrofon erişimine izin verin",
+    "voiceInputTitle": "Sesli giriş (Gemini)",
+    "stopRecordingTitle": "Kaydı durdur"
+  },
+  "themeToggle": "Temayı değiştir"
 }

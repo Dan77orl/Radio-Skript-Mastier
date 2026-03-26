@@ -686,7 +686,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                         value={editScriptText}
                                         onChange={(e) => setEditScriptText(e.target.value)}
                                         className="min-h-[160px] bg-background font-mono text-sm"
-                                        placeholder={`${t("generator.maleVoice")}: [energetic] Реплика...\n${t("generator.femaleVoice")}: [happy] Ответ...`}
+                                        placeholder={`${t("generator.maleVoice")}: [energetic] ${t("generator.scriptPlaceholderLine")}\n${t("generator.femaleVoice")}: [happy] ${t("generator.scriptPlaceholderResponse")}`}
                                         data-testid={`textarea-script-${slotNumber}`}
                                       />
                                       <p className="text-xs text-muted-foreground mt-1">{t("generator.scriptFormatHint")}</p>

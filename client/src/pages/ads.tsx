@@ -463,7 +463,7 @@ export default function AdsPage() {
       setExtractedFiles(prev => [...prev, { filename: data.filename, text: data.text }]);
       
       const currentPrompt = form.getValues("prompt");
-      const separator = currentPrompt ? "\n\n--- Из файла " + data.filename + " ---\n" : "";
+      const separator = currentPrompt ? `\n\n--- ${t("ads.fromFile")}: ` + data.filename + " ---\n" : "";
       form.setValue("prompt", currentPrompt + separator + data.text);
       
       toast({ 
@@ -489,7 +489,7 @@ export default function AdsPage() {
   };
 
   const insertVoiceText = (currentValue: string, newText: string): string => {
-    const fileMarkerPattern = /\n\n--- Из файла /;
+    const fileMarkerPattern = /\n\n--- (?:Из файла|From file|Dosyadan|[^-]+): /;
     const match = currentValue.match(fileMarkerPattern);
     
     if (match && match.index !== undefined) {

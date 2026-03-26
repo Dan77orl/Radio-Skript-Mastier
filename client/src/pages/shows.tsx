@@ -1491,7 +1491,7 @@ export default function ShowsPage() {
                     const data = await res.json();
                     setPromptAnalysis(data);
                   } catch (err: any) {
-                    toast({ title: "Ошибка анализа", description: err.message, variant: "destructive" });
+                    toast({ title: t("shows.analysisError"), description: err.message, variant: "destructive" });
                   } finally {
                     setIsAnalyzing(false);
                   }
@@ -1499,40 +1499,40 @@ export default function ShowsPage() {
                 data-testid="button-analyze-prompt"
               >
                 {isAnalyzing ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Анализ...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t("shows.analyzing")}</>
                 ) : (
-                  <><Eye className="mr-2 h-4 w-4" />Анализ промпта</>
+                  <><Eye className="mr-2 h-4 w-4" />{t("shows.analyzePrompt")}</>
                 )}
               </Button>
             </div>
 
             {promptAnalysis && (
               <div className="border rounded-lg p-4 space-y-3 bg-muted/30 text-sm">
-                <div className="font-semibold text-base">Результат анализа</div>
+                <div className="font-semibold text-base">{t("shows.analysisResult")}</div>
 
                 {promptAnalysis.speaker && (
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">Ведущий(ая):</span>
+                    <span className="text-muted-foreground">{t("shows.hostSpeaker")}</span>
                     <span className="font-medium text-green-600 dark:text-green-400">{promptAnalysis.speaker}</span>
                   </div>
                 )}
 
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Эталонный контент:</span>
+                  <span className="text-muted-foreground">{t("shows.referenceContent")}</span>
                   {promptAnalysis.hasEpisodeContent ? (
                     <span className="font-medium text-green-600 dark:text-green-400 flex items-center gap-1">
-                      <CheckCircle2 className="h-4 w-4" /> Обнаружен
+                      <CheckCircle2 className="h-4 w-4" /> {t("shows.detected")}
                     </span>
                   ) : (
                     <span className="text-muted-foreground flex items-center gap-1">
-                      <XCircle className="h-4 w-4" /> Не обнаружен
+                      <XCircle className="h-4 w-4" /> {t("shows.notDetected")}
                     </span>
                   )}
                 </div>
 
                 {promptAnalysis.urls.length > 0 && (
                   <div className="space-y-2">
-                    <div className="text-muted-foreground">Ссылки ({promptAnalysis.urls.length}):</div>
+                    <div className="text-muted-foreground">{t("shows.links", { count: promptAnalysis.urls.length })}</div>
                     {promptAnalysis.urls.map((u, i) => (
                       <div key={i} className="border rounded p-3 space-y-1 bg-background">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -1540,15 +1540,15 @@ export default function ShowsPage() {
                           <span className="text-xs font-mono break-all">{u.url}</span>
                           {u.status === "ok" ? (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-                              {u.contentLength.toLocaleString()} симв.
+                              {t("shows.chars", { count: u.contentLength.toLocaleString() })}
                             </span>
                           ) : u.status.startsWith("empty") ? (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">
-                              Не удалось прочитать
+                              {t("shows.cannotRead")}
                             </span>
                           ) : (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">
-                              Ошибка: {u.status}
+                              {t("shows.errorStatus", { status: u.status })}
                             </span>
                           )}
                         </div>
@@ -1561,7 +1561,7 @@ export default function ShowsPage() {
                     ))}
                     {promptAnalysis.totalContentLength > 0 && (
                       <div className="text-xs text-muted-foreground">
-                        Всего загружено: {promptAnalysis.totalContentLength.toLocaleString()} символов
+                        {t("shows.totalLoaded", { count: promptAnalysis.totalContentLength.toLocaleString() })}
                       </div>
                     )}
                   </div>
@@ -1569,19 +1569,19 @@ export default function ShowsPage() {
 
                 {promptAnalysis.urls.length === 0 && !promptAnalysis.hasEpisodeContent && !promptAnalysis.speaker && (
                   <div className="text-muted-foreground">
-                    В промпте не обнаружено ссылок, эталонного контента или имени ведущего. Система будет использовать стандартный формат генерации.
+                    {t("shows.noPromptData")}
                   </div>
                 )}
 
                 {promptAnalysis.urls.some(u => u.status !== "ok") && (
                   <div className="text-xs text-muted-foreground bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded p-2">
-                    Если ссылка не читается — вставьте текст выпусков напрямую в промпт вместо ссылки. Скопируйте содержимое из ChatGPT/Claude и вставьте как текст.
+                    {t("shows.linkNotReadable")}
                   </div>
                 )}
 
                 <details className="mt-2">
                   <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
-                    Развёрнутый промпт (как видит система)
+                    {t("shows.expandedPrompt")}
                   </summary>
                   <pre className="mt-2 text-xs bg-background border rounded p-3 whitespace-pre-wrap max-h-64 overflow-y-auto">
                     {promptAnalysis.expandedPrompt}
@@ -1816,7 +1816,7 @@ export default function ShowsPage() {
                     onClick={() => {
                       const assignedVoices = voices.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(settingsType.id));
                       const names = assignedVoices.map(v => getCleanVoiceName(v));
-                      const template = `Открытие: [${names[0]}] — объявляет передачу, представляет ведущего\nОсновная часть: [${names.length > 1 ? names[1] : names[0]}] — ведёт весь выпуск\nЗакрытие: [${names[0]}] — прощается со слушателями`;
+                      const template = `${t("shows.scriptTemplateOpening", { name: names[0] })}\n${t("shows.scriptTemplateMain", { name: names.length > 1 ? names[1] : names[0] })}\n${t("shows.scriptTemplateClosing", { name: names[0] })}`;
                       setSettingsType(prev => prev ? { ...prev, scriptTemplate: template } : null);
                     }}
                     data-testid="button-generate-script-template"
