@@ -33,6 +33,12 @@ export async function registerUser(req: Request, res: Response) {
       name,
     });
 
+    const adminEmails = (process.env.ADMIN_EMAILS || "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
+    if (adminEmails.includes(email.toLowerCase()) && user.role !== "admin") {
+      await storage.updateUserRole(user.id, "admin");
+      user.role = "admin";
+    }
+
     req.session.userId = user.id;
 
     return res.status(201).json({
