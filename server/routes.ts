@@ -747,7 +747,8 @@ export async function registerRoutes(
         .filter(m => m.role === "admin")
         .map(m => ({ content: m.content, createdAt: m.createdAt }));
       return res.json({ replies: adminReplies });
-    } catch {
+    } catch (err) {
+      console.error("[support-chat] Failed to fetch admin replies for user:", err);
       return res.json({ replies: [] });
     }
   });
@@ -854,7 +855,9 @@ export async function registerRoutes(
             storageUsed += stat.size;
           }
         }
-      } catch {}
+      } catch (err) {
+        console.error("[admin-usage] Failed to calculate storage:", err);
+      }
 
       return res.json({ stats, logs, storageUsedBytes: storageUsed });
     } catch (error) {
@@ -878,10 +881,14 @@ export async function registerRoutes(
         const key = msg.sessionId || msg.id;
         if (!sessions[key]) {
           sessions[key] = {
-            userId: msg.userId,
-            user: msg.userId ? userMap[msg.userId] || null : null,
+            userId: null,
+            user: null,
             messages: [],
           };
+        }
+        if (msg.role !== "admin" && msg.userId && !sessions[key].userId) {
+          sessions[key].userId = msg.userId;
+          sessions[key].user = userMap[msg.userId] || null;
         }
         sessions[key].messages.push(msg);
       }

@@ -207,7 +207,8 @@ export async function handleSupportChat(req: Request, res: Response) {
             content: m.content,
           }));
         sessionChats.set(sessionId, restored);
-      } catch {
+      } catch (err) {
+        console.error("[support-chat] Failed to restore session history:", err);
         sessionChats.set(sessionId, []);
       }
     }
@@ -222,7 +223,7 @@ export async function handleSupportChat(req: Request, res: Response) {
           .slice(-5);
         const existingContents = new Set(history.map(h => h.content));
         return adminReplies.filter(r => !existingContents.has(r.content));
-      } catch { return []; }
+      } catch (err) { console.error("[support-chat] Failed to fetch admin replies:", err); return []; }
     })();
 
     for (const ar of pendingAdminReplies) {
@@ -242,7 +243,9 @@ export async function handleSupportChat(req: Request, res: Response) {
         role: "user",
         content: message.trim(),
       });
-    } catch (e) {}
+    } catch (e) {
+      console.error("[support-chat] Failed to persist user message:", e);
+    }
 
     const systemPrompt = getSystemPrompt(lang);
 
@@ -283,7 +286,9 @@ export async function handleSupportChat(req: Request, res: Response) {
         role: "assistant",
         content: assistantReply,
       });
-    } catch (e) {}
+    } catch (e) {
+      console.error("[support-chat] Failed to persist assistant message:", e);
+    }
 
     res.json({ reply: assistantReply });
   } catch (error) {

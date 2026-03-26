@@ -477,49 +477,114 @@ export default function AdminPage() {
         </TabsContent>
 
         <TabsContent value="apikeys" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Service API Keys</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[
-                    { name: "Anthropic (Claude)", key: "anthropicApiKey" },
-                    { name: "ElevenLabs (TTS)", key: "elevenLabsApiKey" },
-                    { name: "Yandex Disk", key: "yandexDiskToken" },
-                    { name: "Freesound", key: "freesoundApiKey" },
-                  ].map((service) => (
-                    <TableRow key={service.key}>
-                      <TableCell className="font-medium">{service.name}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={settingsData && (settingsData as Record<string, string>)[service.key] && (settingsData as Record<string, string>)[service.key] !== "" ? "default" : "secondary"}
-                          data-testid={`badge-apikey-${service.key}`}
-                        >
-                          {settingsData && (settingsData as Record<string, string>)[service.key] && (settingsData as Record<string, string>)[service.key] !== ""
-                            ? "Configured"
-                            : "Not set"}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <p className="text-sm text-muted-foreground mt-4">
-                API keys can be managed in the Settings page. Keys are visible only to admin users.
-              </p>
-            </CardContent>
-          </Card>
+          <ApiKeysTab settings={settingsData as Record<string, string> | undefined} />
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+const API_KEY_SERVICES = [
+  { name: "Anthropic (Claude)", key: "anthropicApiKey" },
+  { name: "ElevenLabs (TTS)", key: "elevenLabsApiKey" },
+  { name: "Yandex Disk", key: "yandexDiskToken" },
+  { name: "Freesound", key: "freesoundApiKey" },
+];
+
+function ApiKeysTab({ settings }: { settings: Record<string, string> | undefined }) {
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [keyValue, setKeyValue] = useState("");
+  const { toast } = useToast();
+
+  const saveMutation = useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: string }) => {
+      await apiRequest("POST", "/api/settings", { [key]: value });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      setEditingKey(null);
+      setKeyValue("");
+      toast({ title: "API key updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Service API Keys</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Service</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {API_KEY_SERVICES.map((service) => {
+              const isConfigured = settings && settings[service.key] && settings[service.key] !== "";
+              const isEditing = editingKey === service.key;
+              return (
+                <TableRow key={service.key}>
+                  <TableCell className="font-medium">{service.name}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={isConfigured ? "default" : "secondary"}
+                      data-testid={`badge-apikey-${service.key}`}
+                    >
+                      {isConfigured ? "Configured" : "Not set"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {isEditing ? (
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="password"
+                          value={keyValue}
+                          onChange={(e) => setKeyValue(e.target.value)}
+                          placeholder="Enter new key..."
+                          className="flex-1 p-1 text-sm border rounded bg-background min-w-[200px]"
+                          data-testid={`input-apikey-${service.key}`}
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => saveMutation.mutate({ key: service.key, value: keyValue })}
+                          disabled={!keyValue.trim() || saveMutation.isPending}
+                          data-testid={`button-save-apikey-${service.key}`}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => { setEditingKey(null); setKeyValue(""); }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { setEditingKey(service.key); setKeyValue(""); }}
+                        data-testid={`button-edit-apikey-${service.key}`}
+                      >
+                        {isConfigured ? "Update" : "Set Key"}
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }
 
