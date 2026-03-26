@@ -40,6 +40,7 @@ export async function registerUser(req: Request, res: Response) {
       email: user.email,
       name: user.name,
       language: user.language || null,
+      role: user.role || "user",
     });
   } catch (error) {
     console.error("Registration error:", error);
@@ -73,6 +74,7 @@ export async function loginUser(req: Request, res: Response) {
       email: user.email,
       name: user.name,
       language: user.language || null,
+      role: user.role || "user",
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -105,6 +107,7 @@ export async function getCurrentUser(req: Request, res: Response) {
     email: user.email,
     name: user.name,
     language: user.language || null,
+    role: user.role || "user",
   });
 }
 

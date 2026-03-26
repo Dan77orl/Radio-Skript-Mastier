@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Save, Key, Mic, Settings2, Eye, EyeOff, Loader2, CheckCircle, AlertCircle, HardDrive, Radio, Upload, Globe, X, FileText, User, BookOpen } from "lucide-react";
 import { VoiceInput } from "@/components/voice-input";
+import { useAuth } from "@/hooks/use-auth";
 import type { Settings } from "@shared/schema";
 
 const settingsFormSchema = z.object({
@@ -41,6 +42,8 @@ type SettingsFormValues = z.infer<typeof settingsFormSchema>;
 export default function SettingsPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user: authUser } = useAuth();
+  const isAdmin = authUser?.role === "admin";
   const [showApiKey, setShowApiKey] = useState(false);
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showYandexToken, setShowYandexToken] = useState(false);
@@ -276,12 +279,14 @@ export default function SettingsPage() {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
-          <Tabs defaultValue="api-keys" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3" data-testid="tabs-settings">
-              <TabsTrigger value="api-keys" data-testid="tab-api-keys">
-                <Key className="mr-2 h-4 w-4" />
-                {t("settings.apiKeys")}
-              </TabsTrigger>
+          <Tabs defaultValue={isAdmin ? "api-keys" : "knowledge"} className="space-y-6">
+            <TabsList className={`grid w-full ${isAdmin ? "grid-cols-3" : "grid-cols-2"}`} data-testid="tabs-settings">
+              {isAdmin && (
+                <TabsTrigger value="api-keys" data-testid="tab-api-keys">
+                  <Key className="mr-2 h-4 w-4" />
+                  {t("settings.apiKeys")}
+                </TabsTrigger>
+              )}
               <TabsTrigger value="knowledge" data-testid="tab-knowledge">
                 <BookOpen className="mr-2 h-4 w-4" />
                 {t("settings.knowledge")}
@@ -292,7 +297,7 @@ export default function SettingsPage() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="api-keys" className="space-y-6">
+            {isAdmin && <TabsContent value="api-keys" className="space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -548,7 +553,7 @@ export default function SettingsPage() {
                   />
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent>}
 
             <TabsContent value="knowledge" className="space-y-6">
               <Card>

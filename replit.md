@@ -34,12 +34,21 @@ Preferred communication style: Simple, everyday language.
 - **Type Sharing**: Database schemas and types defined in `/shared/schema.ts` are used by both frontend and backend
 - **Storage Interface**: Abstract `IStorage` interface allowing for different storage implementations
 
+### Multi-Tenant Data Isolation
+- **userId column**: All shared tables (dialogs, voices, ads, adPresets, programs, programTypes, newsSources, newsItems, automations, scheduleTemplates, hostShifts, customHolidays, promptTemplates) have a `userId` foreign key
+- **Storage layer**: All collection methods (getDialogs, getVoices, getAds, etc.) require `userId` parameter and filter by it
+- **API routes**: All storage calls in `server/routes.ts` pass `req.session.userId` to ensure tenant isolation
+- **Role-based access**: Users have a `role` field ("admin" or "user"); admin users see full settings including API keys
+- **Settings protection**: GET `/api/settings` masks API keys (ElevenLabs, Anthropic, Yandex, Freesound) for non-admin users; POST `/api/settings` strips API key fields from non-admin requests
+- **Frontend**: Settings page hides "API Keys" tab for non-admin users; `useAuth()` hook exposes `role` field
+
 ### Authentication System
 - **Session-based auth**: express-session with connect-pg-simple for PostgreSQL session storage
 - **Password hashing**: bcryptjs for secure password storage
 - **Auth endpoints**: POST `/api/auth/register`, POST `/api/auth/login`, POST `/api/auth/logout`, GET `/api/auth/me`
 - **Auth middleware**: All `/api/*` routes (except `/api/auth/*`) require authentication, returning 401 for unauthenticated requests
 - **Frontend auth flow**: `useAuth()` hook checks `/api/auth/me`; unauthenticated users see landing page at "/"; auth page at "/auth"; authenticated users see admin dashboard
+- **Role system**: `role` field on users table — "admin" (full access including API keys) or "user" (default, API keys hidden)
 - **Landing page**: `client/src/pages/landing.tsx` — hero with AI-generated images, features with interactive selector, animated counters, scroll animations (IntersectionObserver), floating particles, gradient text, pricing with hover effects, CTA, footer; fully i18n'd (52 languages); SEO meta tags set via useEffect
 - **i18n**: 52 languages supported — ru, en, tr, de, es, fr, pt, it, uk, pl, nl, sv, da, no, fi, cs, sk, hu, ro, bg, el, hr, sr, sl, bs, mk, sq, lt, lv, et, kk, uz, ky, tg, mn, az, ka, hy, ar, he, fa, zh, ja, ko, hi, bn, ta, th, vi, id, ms, sw; fallback: en; detection: localStorage → navigator → htmlTag; key: `radioflow-language`; searchable language switcher with grouped dropdown
 - **Auth files**: `server/auth.ts` (backend logic), `client/src/hooks/use-auth.ts` (frontend hook), `client/src/pages/auth.tsx` (login/register page at /auth route)

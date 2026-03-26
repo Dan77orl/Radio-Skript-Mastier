@@ -1,6 +1,6 @@
 import { users, settings, dialogs, newsSources, newsItems, ads, adPresets, voices, programTypes, programs, automations, automationRuns, scheduleTemplates, hostShifts, customHolidays, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdPreset, type InsertAdPreset, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun, type ScheduleTemplate, type InsertScheduleTemplate, type HostShift, type InsertHostShift, type CustomHoliday, type InsertCustomHoliday } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc, sql, or, isNull } from "drizzle-orm";
+import { eq, desc, asc, sql, and, or, isNull } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -12,36 +12,36 @@ export interface IStorage {
   getSettings(userId?: string): Promise<Settings | undefined>;
   saveSettings(settings: InsertSettings, userId?: string): Promise<Settings>;
   
-  getDialogs(): Promise<Dialog[]>;
+  getDialogs(userId: string): Promise<Dialog[]>;
   getDialog(id: string): Promise<Dialog | undefined>;
   createDialog(dialog: InsertDialog): Promise<Dialog>;
   updateDialog(id: string, dialog: Partial<InsertDialog>): Promise<Dialog | undefined>;
   deleteDialog(id: string): Promise<boolean>;
   
-  getNewsSources(): Promise<NewsSource[]>;
+  getNewsSources(userId: string): Promise<NewsSource[]>;
   getNewsSource(id: string): Promise<NewsSource | undefined>;
   createNewsSource(source: InsertNewsSource): Promise<NewsSource>;
   updateNewsSource(id: string, source: Partial<InsertNewsSource>): Promise<NewsSource | undefined>;
   deleteNewsSource(id: string): Promise<boolean>;
   
-  getAds(): Promise<Ad[]>;
+  getAds(userId: string): Promise<Ad[]>;
   getAd(id: string): Promise<Ad | undefined>;
   createAd(ad: InsertAd): Promise<Ad>;
   updateAd(id: string, ad: Partial<InsertAd>): Promise<Ad | undefined>;
   deleteAd(id: string): Promise<boolean>;
   
-  getAdPresets(): Promise<AdPreset[]>;
+  getAdPresets(userId: string): Promise<AdPreset[]>;
   getAdPreset(id: string): Promise<AdPreset | undefined>;
   createAdPreset(preset: InsertAdPreset): Promise<AdPreset>;
   updateAdPreset(id: string, preset: Partial<InsertAdPreset>): Promise<AdPreset | undefined>;
   deleteAdPreset(id: string): Promise<boolean>;
   
-  getVoices(): Promise<Voice[]>;
+  getVoices(userId: string): Promise<Voice[]>;
   getVoice(id: string): Promise<Voice | undefined>;
   createVoice(voice: InsertVoice): Promise<Voice>;
   updateVoice(id: string, voice: Partial<InsertVoice>): Promise<Voice | undefined>;
   deleteVoice(id: string): Promise<boolean>;
-  getVoicesCount(): Promise<number>;
+  getVoicesCount(userId: string): Promise<number>;
   
   getProgramTypes(userId?: string): Promise<ProgramType[]>;
   getProgramType(id: string): Promise<ProgramType | undefined>;
@@ -49,14 +49,14 @@ export interface IStorage {
   updateProgramType(id: string, programType: Partial<InsertProgramType>): Promise<ProgramType | undefined>;
   deleteProgramType(id: string): Promise<boolean>;
   
-  getPrograms(): Promise<Program[]>;
+  getPrograms(userId: string): Promise<Program[]>;
   getProgramsByType(typeId: string): Promise<Program[]>;
   getProgram(id: string): Promise<Program | undefined>;
   createProgram(program: InsertProgram): Promise<Program>;
   updateProgram(id: string, program: Partial<InsertProgram>): Promise<Program | undefined>;
   deleteProgram(id: string): Promise<boolean>;
   
-  getAutomations(): Promise<Automation[]>;
+  getAutomations(userId: string): Promise<Automation[]>;
   getAutomation(id: string): Promise<Automation | undefined>;
   createAutomation(automation: InsertAutomation): Promise<Automation>;
   updateAutomation(id: string, automation: Partial<InsertAutomation>): Promise<Automation | undefined>;
@@ -66,18 +66,18 @@ export interface IStorage {
   createAutomationRun(run: InsertAutomationRun): Promise<AutomationRun>;
   updateAutomationRun(id: string, run: Partial<InsertAutomationRun>): Promise<AutomationRun | undefined>;
   
-  getNewsItems(limit?: number): Promise<NewsItem[]>;
-  getUnusedNewsItems(limit?: number): Promise<NewsItem[]>;
+  getNewsItems(userId: string, limit?: number): Promise<NewsItem[]>;
+  getUnusedNewsItems(userId: string, limit?: number): Promise<NewsItem[]>;
   createNewsItem(item: InsertNewsItem): Promise<NewsItem>;
   markNewsItemUsed(id: string): Promise<void>;
   clearOldNewsItems(daysOld: number): Promise<void>;
 
-  getScheduleTemplates(): Promise<ScheduleTemplate[]>;
+  getScheduleTemplates(userId: string): Promise<ScheduleTemplate[]>;
   getScheduleTemplate(id: string): Promise<ScheduleTemplate | undefined>;
   createScheduleTemplate(template: InsertScheduleTemplate): Promise<ScheduleTemplate>;
   updateScheduleTemplate(id: string, template: Partial<InsertScheduleTemplate>): Promise<ScheduleTemplate | undefined>;
   deleteScheduleTemplate(id: string): Promise<boolean>;
-  getTemplateForWeekday(weekday: number): Promise<ScheduleTemplate | undefined>;
+  getTemplateForWeekday(weekday: number, userId: string): Promise<ScheduleTemplate | undefined>;
 
   getHostShifts(templateId: string): Promise<HostShift[]>;
   getHostShift(id: string): Promise<HostShift | undefined>;
@@ -86,7 +86,8 @@ export interface IStorage {
   deleteHostShift(id: string): Promise<boolean>;
   deleteHostShiftsByTemplate(templateId: string): Promise<void>;
 
-  getCustomHolidays(): Promise<CustomHoliday[]>;
+  getCustomHolidays(userId: string): Promise<CustomHoliday[]>;
+  getAllCustomHolidays(): Promise<CustomHoliday[]>;
   createCustomHoliday(holiday: InsertCustomHoliday): Promise<CustomHoliday>;
   updateCustomHoliday(id: string, holiday: Partial<InsertCustomHoliday>): Promise<CustomHoliday | undefined>;
   deleteCustomHoliday(id: string): Promise<boolean>;
@@ -164,8 +165,10 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getDialogs(): Promise<Dialog[]> {
-    return db.select().from(dialogs).orderBy(desc(dialogs.createdAt));
+  async getDialogs(userId: string): Promise<Dialog[]> {
+    return db.select().from(dialogs)
+      .where(eq(dialogs.userId, userId))
+      .orderBy(desc(dialogs.createdAt));
   }
 
   async getDialog(id: string): Promise<Dialog | undefined> {
@@ -191,8 +194,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getNewsSources(): Promise<NewsSource[]> {
-    return db.select().from(newsSources).orderBy(desc(newsSources.createdAt));
+  async getNewsSources(userId: string): Promise<NewsSource[]> {
+    return db.select().from(newsSources)
+      .where(eq(newsSources.userId, userId))
+      .orderBy(desc(newsSources.createdAt));
   }
 
   async getNewsSource(id: string): Promise<NewsSource | undefined> {
@@ -218,8 +223,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAds(): Promise<Ad[]> {
-    return db.select().from(ads).orderBy(desc(ads.createdAt));
+  async getAds(userId: string): Promise<Ad[]> {
+    return db.select().from(ads)
+      .where(eq(ads.userId, userId))
+      .orderBy(desc(ads.createdAt));
   }
 
   async getAd(id: string): Promise<Ad | undefined> {
@@ -245,8 +252,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAdPresets(): Promise<AdPreset[]> {
-    return db.select().from(adPresets).orderBy(asc(adPresets.sortOrder));
+  async getAdPresets(userId: string): Promise<AdPreset[]> {
+    return db.select().from(adPresets)
+      .where(eq(adPresets.userId, userId))
+      .orderBy(asc(adPresets.sortOrder));
   }
 
   async getAdPreset(id: string): Promise<AdPreset | undefined> {
@@ -272,8 +281,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getVoices(): Promise<Voice[]> {
-    return db.select().from(voices).orderBy(asc(voices.sortOrder));
+  async getVoices(userId: string): Promise<Voice[]> {
+    return db.select().from(voices)
+      .where(eq(voices.userId, userId))
+      .orderBy(asc(voices.sortOrder));
   }
 
   async getVoice(id: string): Promise<Voice | undefined> {
@@ -299,8 +310,9 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getVoicesCount(): Promise<number> {
-    const result = await db.select({ count: sql<number>`count(*)::int` }).from(voices);
+  async getVoicesCount(userId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(voices)
+      .where(eq(voices.userId, userId));
     return result[0]?.count || 0;
   }
 
@@ -336,8 +348,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getPrograms(): Promise<Program[]> {
-    return db.select().from(programs).orderBy(desc(programs.createdAt));
+  async getPrograms(userId: string): Promise<Program[]> {
+    return db.select().from(programs)
+      .where(eq(programs.userId, userId))
+      .orderBy(desc(programs.createdAt));
   }
 
   async getProgramsByType(typeId: string): Promise<Program[]> {
@@ -367,8 +381,10 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAutomations(): Promise<Automation[]> {
-    return db.select().from(automations).orderBy(desc(automations.createdAt));
+  async getAutomations(userId: string): Promise<Automation[]> {
+    return db.select().from(automations)
+      .where(eq(automations.userId, userId))
+      .orderBy(desc(automations.createdAt));
   }
 
   async getAutomation(id: string): Promise<Automation | undefined> {
@@ -414,15 +430,16 @@ export class DatabaseStorage implements IStorage {
     return updated || undefined;
   }
 
-  async getNewsItems(limit: number = 50): Promise<NewsItem[]> {
+  async getNewsItems(userId: string, limit: number = 50): Promise<NewsItem[]> {
     return db.select().from(newsItems)
+      .where(eq(newsItems.userId, userId))
       .orderBy(desc(newsItems.publishedAt))
       .limit(limit);
   }
 
-  async getUnusedNewsItems(limit: number = 10): Promise<NewsItem[]> {
+  async getUnusedNewsItems(userId: string, limit: number = 10): Promise<NewsItem[]> {
     return db.select().from(newsItems)
-      .where(eq(newsItems.isUsed, false))
+      .where(and(eq(newsItems.userId, userId), eq(newsItems.isUsed, false)))
       .orderBy(desc(newsItems.publishedAt))
       .limit(limit);
   }
@@ -445,8 +462,10 @@ export class DatabaseStorage implements IStorage {
       .where(sql`${newsItems.createdAt} < ${cutoffDate}`);
   }
 
-  async getScheduleTemplates(): Promise<ScheduleTemplate[]> {
-    return db.select().from(scheduleTemplates).orderBy(asc(scheduleTemplates.sortOrder));
+  async getScheduleTemplates(userId: string): Promise<ScheduleTemplate[]> {
+    return db.select().from(scheduleTemplates)
+      .where(eq(scheduleTemplates.userId, userId))
+      .orderBy(asc(scheduleTemplates.sortOrder));
   }
 
   async getScheduleTemplate(id: string): Promise<ScheduleTemplate | undefined> {
@@ -473,9 +492,9 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getTemplateForWeekday(weekday: number): Promise<ScheduleTemplate | undefined> {
+  async getTemplateForWeekday(weekday: number, userId: string): Promise<ScheduleTemplate | undefined> {
     const all = await db.select().from(scheduleTemplates)
-      .where(eq(scheduleTemplates.isActive, true))
+      .where(and(eq(scheduleTemplates.isActive, true), eq(scheduleTemplates.userId, userId)))
       .orderBy(asc(scheduleTemplates.sortOrder));
     return all.find(t => t.weekdays?.includes(weekday));
   }
@@ -513,8 +532,15 @@ export class DatabaseStorage implements IStorage {
     await db.delete(hostShifts).where(eq(hostShifts.templateId, templateId));
   }
 
-  async getCustomHolidays(): Promise<CustomHoliday[]> {
-    return db.select().from(customHolidays).orderBy(asc(customHolidays.date));
+  async getCustomHolidays(userId: string): Promise<CustomHoliday[]> {
+    return db.select().from(customHolidays)
+      .where(eq(customHolidays.userId, userId))
+      .orderBy(asc(customHolidays.date));
+  }
+
+  async getAllCustomHolidays(): Promise<CustomHoliday[]> {
+    return db.select().from(customHolidays)
+      .orderBy(asc(customHolidays.date));
   }
 
   async createCustomHoliday(holiday: InsertCustomHoliday): Promise<CustomHoliday> {

@@ -127,7 +127,7 @@ interface StationContext {
 
 async function buildStationContext(userId?: string): Promise<StationContext> {
   const settings = await storage.getSettings(userId);
-  const voices = await storage.getVoices();
+  const voices = userId ? await storage.getVoices(userId) : [];
   
   const stationName = settings?.stationName || "Alanya FM";
   const stationDescription = settings?.stationDescription || "русскоязычная радиостанция для экспатов в Аланье, Турция";
@@ -739,7 +739,19 @@ export async function registerRoutes(
   app.get("/api/settings", async (req, res) => {
     try {
       const settings = await storage.getSettings(req.session.userId);
-      res.json(settings || {});
+      if (!settings) return res.json({});
+      const user = await storage.getUser(req.session.userId!);
+      if (user?.role !== "admin") {
+        const { elevenLabsApiKey, anthropicApiKey, yandexDiskToken, freesoundApiKey, ...safeSettings } = settings;
+        return res.json({
+          ...safeSettings,
+          elevenLabsApiKey: elevenLabsApiKey ? "••••••••" : "",
+          anthropicApiKey: anthropicApiKey ? "••••••••" : "",
+          yandexDiskToken: yandexDiskToken ? "••••••••" : "",
+          freesoundApiKey: freesoundApiKey ? "••••••••" : "",
+        });
+      }
+      res.json(settings);
     } catch (error) {
       console.error("Error getting settings:", error);
       res.status(500).json({ error: "Failed to get settings" });
@@ -752,7 +764,25 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.message });
       }
-      const settings = await storage.saveSettings(parsed.data, req.session.userId);
+      const user = await storage.getUser(req.session.userId!);
+      const data = { ...parsed.data };
+      if (user?.role !== "admin") {
+        delete (data as any).elevenLabsApiKey;
+        delete (data as any).anthropicApiKey;
+        delete (data as any).yandexDiskToken;
+        delete (data as any).freesoundApiKey;
+      }
+      const settings = await storage.saveSettings(data, req.session.userId);
+      if (user?.role !== "admin") {
+        const { elevenLabsApiKey, anthropicApiKey, yandexDiskToken, freesoundApiKey, ...safe } = settings;
+        return res.json({
+          ...safe,
+          elevenLabsApiKey: elevenLabsApiKey ? "••••••••" : "",
+          anthropicApiKey: anthropicApiKey ? "••••••••" : "",
+          yandexDiskToken: yandexDiskToken ? "••••••••" : "",
+          freesoundApiKey: freesoundApiKey ? "••••••••" : "",
+        });
+      }
       res.json(settings);
     } catch (error) {
       console.error("Error saving settings:", error);
@@ -805,7 +835,7 @@ export async function registerRoutes(
 
   app.get("/api/dialogs", async (req, res) => {
     try {
-      const dialogs = await storage.getDialogs();
+      const dialogs = await storage.getDialogs(req.session.userId!);
       res.json(dialogs);
     } catch (error) {
       console.error("Error getting dialogs:", error);
@@ -1159,7 +1189,7 @@ ${styleInstructions}
         return res.status(400).json({ error: "ElevenLabs API key not configured. Please add it in Settings." });
       }
 
-      const voicesList = await storage.getVoices();
+      const voicesList = await storage.getVoices(req.session.userId!);
 
       let maleVoiceId: string | undefined;
       let femaleVoiceId: string | undefined;
@@ -1239,6 +1269,7 @@ ${styleInstructions}
       await fs.unlink(femaleFile).catch(() => {});
 
       const dialog = await storage.createDialog({
+        userId: req.session.userId,
         title: title || "Подводка",
         prompt: "",
         scriptText: `${maleText}\n\n${femaleText}`,
@@ -1281,7 +1312,7 @@ ${styleInstructions}
         return res.status(400).json({ error: "Date is required" });
       }
 
-      const existingDialogs = await storage.getDialogs();
+      const existingDialogs = await storage.getDialogs(req.session.userId!);
       const existingForDate = existingDialogs.filter(d => d.scheduledDate === date);
       const existingBySlot = new Map<number, string>();
       existingForDate.forEach(d => {
@@ -1292,13 +1323,13 @@ ${styleInstructions}
 
       const settings = await storage.getSettings(req.session.userId);
       const ctx = await buildStationContext(req.session.userId);
-      const newsItems = await storage.getNewsItems(10);
-      const unusedNews = newsItems.filter(n => !n.isUsed).slice(0, 5);
+      const newsItemsList = await storage.getNewsItems(req.session.userId!, 10);
+      const unusedNews = newsItemsList.filter(n => !n.isUsed).slice(0, 5);
       
       const dateObj = new Date(date);
       const jsDay = dateObj.getDay();
       const isoWeekday = jsDay === 0 ? 7 : jsDay;
-      const template = await storage.getTemplateForWeekday(isoWeekday);
+      const template = await storage.getTemplateForWeekday(isoWeekday, req.session.userId!);
       const shifts = template ? await storage.getHostShifts(template.id) : [];
 
       const tplStartHour = template?.startHour ?? 7;
@@ -1322,7 +1353,7 @@ ${styleInstructions}
       const dialogStyle = (settings as any)?.dialogStyle || "lively";
       const dialogReplicas = (settings as any)?.dialogReplicas || 4;
 
-      const allVoices = await storage.getVoices();
+      const allVoices = await storage.getVoices(req.session.userId!);
       const generatedDialogs = [];
 
       for (let slotNumber = 1; slotNumber <= totalSlots; slotNumber++) {
@@ -1557,6 +1588,7 @@ ${dialogStyle === "lively" ? `СТИЛЬ ДИАЛОГА — ЖИВАЯ СТУД�
             });
           } else {
             dialog = await storage.createDialog({
+              userId: req.session.userId,
               title,
               prompt: userPrompt,
               scriptText: scriptText || `${maleText}\n\n${femaleText}`,
@@ -1609,7 +1641,7 @@ ${dialogStyle === "lively" ? `СТИЛЬ ДИАЛОГА — ЖИВАЯ СТУД�
       let maleHost = ctx.malePersona;
       let femaleHost = ctx.femalePersona;
       if (dialog.hostVoiceIds && dialog.hostVoiceIds.length > 0) {
-        const voicesList = await storage.getVoices();
+        const voicesList = await storage.getVoices(req.session.userId!);
         for (const vid of dialog.hostVoiceIds) {
           const voice = voicesList.find(v => v.id === vid);
           if (voice?.gender === "male") maleHost = getCleanVoiceName(voice);
@@ -1696,7 +1728,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
         return res.status(400).json({ error: "Date is required" });
       }
 
-      const dialogs = await storage.getDialogs();
+      const dialogs = await storage.getDialogs(req.session.userId!);
       const dialogsForDate = dialogs.filter(d => 
         d.scheduledDate === date && 
         d.maleText && 
@@ -1713,7 +1745,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
         return res.status(400).json({ error: "ElevenLabs API key not configured" });
       }
 
-      const voicesList = await storage.getVoices();
+      const voicesList = await storage.getVoices(req.session.userId!);
       const defaultMaleVoice = voicesList.find(v => v.gender === "male" && v.isActive);
       const defaultFemaleVoice = voicesList.find(v => v.gender === "female" && v.isActive);
       
@@ -1817,7 +1849,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
 
   app.get("/api/news-sources", async (req, res) => {
     try {
-      const sources = await storage.getNewsSources();
+      const sources = await storage.getNewsSources(req.session.userId!);
       res.json(sources);
     } catch (error) {
       console.error("Error getting news sources:", error);
@@ -1831,7 +1863,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.message });
       }
-      const source = await storage.createNewsSource(parsed.data);
+      const source = await storage.createNewsSource({ ...parsed.data, userId: req.session.userId });
       res.json(source);
     } catch (error) {
       console.error("Error creating news source:", error);
@@ -1868,7 +1900,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
   app.get("/api/news-items", async (req, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 50;
-      const items = await storage.getNewsItems(limit);
+      const items = await storage.getNewsItems(req.session.userId!, limit);
       res.json(items);
     } catch (error) {
       console.error("Error getting news items:", error);
@@ -1889,6 +1921,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
       for (const item of fetchedItems) {
         try {
           const saved = await storage.createNewsItem({
+            userId: req.session.userId,
             sourceId: source.id,
             title: item.title,
             summary: item.summary || null,
@@ -2010,7 +2043,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
       const dateObj = new Date(date);
       const jsDay = dateObj.getDay();
       const weekday = jsDay === 0 ? 7 : jsDay;
-      const template = await storage.getTemplateForWeekday(weekday);
+      const template = await storage.getTemplateForWeekday(weekday, req.session.userId!);
 
       let dailyCount: number;
       if (count) {
@@ -2099,6 +2132,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
       for (let i = 0; i < dialogsData.dialogs.length; i++) {
         const dialog = dialogsData.dialogs[i];
         const created = await storage.createDialog({
+          userId: req.session.userId,
           title: dialog.title || `Подводка ${i + 1}`,
           prompt: basePrompt,
           maleText: dialog.maleText,
@@ -2127,7 +2161,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
       const { sourceId } = req.body;
       const sources = sourceId 
         ? [await storage.getNewsSource(sourceId)].filter(Boolean)
-        : await storage.getNewsSources();
+        : await storage.getNewsSources(req.session.userId!);
       
       const activeSources = sources.filter(s => s?.isActive);
       
@@ -2171,7 +2205,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
 
   app.get("/api/ad-presets", async (req, res) => {
     try {
-      const presets = await storage.getAdPresets();
+      const presets = await storage.getAdPresets(req.session.userId!);
       res.json(presets);
     } catch (error) {
       console.error("Error getting ad presets:", error);
@@ -2198,7 +2232,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.message });
       }
-      const preset = await storage.createAdPreset(parsed.data);
+      const preset = await storage.createAdPreset({ ...parsed.data, userId: req.session.userId });
       res.json(preset);
     } catch (error) {
       console.error("Error creating ad preset:", error);
@@ -2239,7 +2273,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
 
   app.get("/api/ads", async (req, res) => {
     try {
-      const adsList = await storage.getAds();
+      const adsList = await storage.getAds(req.session.userId!);
       res.json(adsList);
     } catch (error) {
       console.error("Error getting ads:", error);
@@ -2253,7 +2287,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.message });
       }
-      const ad = await storage.createAd(parsed.data);
+      const ad = await storage.createAd({ ...parsed.data, userId: req.session.userId });
       res.json(ad);
     } catch (error) {
       console.error("Error creating ad:", error);
@@ -2333,6 +2367,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         const parsed = JSON.parse(jsonMatch[0]);
         
         const ad = await storage.createAd({
+          userId: req.session.userId,
           title: parsed.title || "Реклама",
           clientName: clientName || null,
           prompt: prompt,
@@ -2363,6 +2398,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const parsed = JSON.parse(content);
       
       const ad = await storage.createAd({
+        userId: req.session.userId,
         title: parsed.title || "Реклама",
         clientName: clientName || null,
         prompt: prompt,
@@ -2837,7 +2873,7 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.get("/api/voices", async (req, res) => {
     try {
-      const voicesList = await storage.getVoices();
+      const voicesList = await storage.getVoices(req.session.userId!);
       res.json(voicesList);
     } catch (error) {
       console.error("Error getting voices:", error);
@@ -2851,7 +2887,7 @@ ${instructions || "Создай альтернативный вариант с �
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.message });
       }
-      const voice = await storage.createVoice(parsed.data);
+      const voice = await storage.createVoice({ ...parsed.data, userId: req.session.userId });
       res.json(voice);
     } catch (error) {
       console.error("Error creating voice:", error);
@@ -3082,7 +3118,7 @@ ${instructions || "Создай альтернативный вариант с �
       const typeId = req.query.typeId as string | undefined;
       const programsList = typeId 
         ? await storage.getProgramsByType(typeId)
-        : await storage.getPrograms();
+        : await storage.getPrograms(req.session.userId!);
       res.json(programsList);
     } catch (error) {
       console.error("Error fetching programs:", error);
@@ -3105,7 +3141,7 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.post("/api/programs", async (req, res) => {
     try {
-      const program = await storage.createProgram(req.body);
+      const program = await storage.createProgram({ ...req.body, userId: req.session.userId });
       res.json(program);
     } catch (error) {
       console.error("Error creating program:", error);
@@ -3528,7 +3564,7 @@ ${existingList}
       let prompt = expandedPrompt;
       const hasUrlContent = !!fetchedContent;
 
-      const voicesList = await storage.getVoices();
+      const voicesList = await storage.getVoices(req.session.userId!);
       const assignedVoices = resolveAssignedVoices(voicesList, programType);
       const isMultiSpeaker = assignedVoices.length >= 2;
 
@@ -3746,6 +3782,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         : title;
 
       const program = await storage.createProgram({
+        userId: req.session.userId,
         programTypeId: programType.id,
         title: finalTitle,
         prompt,
@@ -3867,7 +3904,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const ctx = await buildStationContext(req.session.userId);
       const anthropic = await getAnthropicClient(req.session.userId);
 
-      const voicesList = await storage.getVoices();
+      const voicesList = await storage.getVoices(req.session.userId!);
       const assignedVoices = resolveAssignedVoices(voicesList, programType);
       const isMultiSpeaker = assignedVoices.length >= 2;
 
@@ -4099,6 +4136,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
         try {
           const program = await storage.createProgram({
+            userId: req.session.userId,
             programTypeId: programType.id,
             title: item.title,
             prompt: prompt.substring(0, 500),
@@ -4143,7 +4181,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       let scriptText: string;
 
       const ctx = await buildStationContext(req.session.userId);
-      const voicesList = await storage.getVoices();
+      const voicesList = await storage.getVoices(req.session.userId!);
       const assignedVoices = resolveAssignedVoices(voicesList, programType);
       const isMultiSpeaker = assignedVoices.length >= 2;
 
@@ -4264,7 +4302,7 @@ ${programType.scriptTemplate}
         return res.status(400).json({ error: "ElevenLabs API key not configured" });
       }
 
-      const voicesList = await storage.getVoices();
+      const voicesList = await storage.getVoices(req.session.userId!);
       const programType = await storage.getProgramType(program.programTypeId);
 
       const generateVoiceSegment = async (text: string, voiceId: string): Promise<Buffer> => {
@@ -4504,7 +4542,7 @@ ${programType.scriptTemplate}
 
   app.get("/api/automations", async (req, res) => {
     try {
-      const automationsList = await storage.getAutomations();
+      const automationsList = await storage.getAutomations(req.session.userId!);
       res.json(automationsList);
     } catch (error) {
       console.error("Error getting automations:", error);
@@ -4536,7 +4574,7 @@ ${programType.scriptTemplate}
         itemsCount: typeof req.body.itemsCount === "number" ? req.body.itemsCount : 1,
         isActive: req.body.isActive !== false,
       };
-      const automation = await storage.createAutomation(data);
+      const automation = await storage.createAutomation({ ...data, userId: req.session.userId });
       res.json(automation);
     } catch (error) {
       console.error("Error creating automation:", error);
@@ -4608,7 +4646,7 @@ ${programType.scriptTemplate}
           const itemsCount = automation.itemsCount || 1;
 
           const weather = await fetchAlanayWeather();
-          const newsItems = await storage.getNewsItems();
+          const newsItems = await storage.getNewsItems(req.session.userId!);
           const unusedNews = newsItems.filter(n => !n.isUsed).slice(0, 10);
 
           const tomorrowDate = new Date();
@@ -4648,7 +4686,7 @@ ${programType.scriptTemplate}
           }
 
           if (automation.automationType === "dialog") {
-            const voicesList = await storage.getVoices();
+            const voicesList = await storage.getVoices(req.session.userId!);
             const selectedVoices = automation.voiceIds?.length 
               ? voicesList.filter(v => automation.voiceIds?.includes(v.id))
               : voicesList.filter(v => v.isActive);
@@ -4674,6 +4712,7 @@ ${programType.scriptTemplate}
               const enhancedPrompt = stationContext + basePrompt + contextInfo + personaContext;
               
               const dialog = await storage.createDialog({
+                userId: req.session.userId,
                 title: `Подводка ${tomorrowStr} #${i + 1}`,
                 prompt: enhancedPrompt,
                 status: "pending",
@@ -4704,6 +4743,7 @@ ${programType.scriptTemplate}
               const enhancedPrompt = stationContext + basePrompt + contextInfo;
               
               await storage.createProgram({
+                userId: req.session.userId,
                 programTypeId: programType.id,
                 title: `${programType.name} ${tomorrowStr} #${i + 1}`,
                 prompt: enhancedPrompt,
@@ -5188,7 +5228,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
   async function refreshCustomHolidays() {
     try {
-      const custom = await storage.getCustomHolidays();
+      const custom = await storage.getAllCustomHolidays();
       setCustomHolidays(custom);
     } catch (e) {
       console.warn("[holidays] Could not load custom holidays:", (e as any).message);
@@ -5196,9 +5236,9 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
   }
   refreshCustomHolidays();
 
-  app.get("/api/custom-holidays", async (_req, res) => {
+  app.get("/api/custom-holidays", async (req, res) => {
     try {
-      const holidays = await storage.getCustomHolidays();
+      const holidays = await storage.getCustomHolidays(req.session.userId!);
       res.json(holidays);
     } catch (error) {
       res.status(500).json({ error: "Failed to get custom holidays" });
@@ -5213,7 +5253,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       if (!MMDD_REGEX.test(data.date)) {
         return res.status(400).json({ error: "Date must be in MM-DD format" });
       }
-      const holiday = await storage.createCustomHoliday(data);
+      const holiday = await storage.createCustomHoliday({ ...data, userId: req.session.userId });
       await refreshCustomHolidays();
       res.json(holiday);
     } catch (error) {
@@ -5246,9 +5286,9 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
     }
   });
 
-  app.get("/api/schedule-templates", async (_req, res) => {
+  app.get("/api/schedule-templates", async (req, res) => {
     try {
-      const templates = await storage.getScheduleTemplates();
+      const templates = await storage.getScheduleTemplates(req.session.userId!);
       res.json(templates);
     } catch (error) {
       res.status(500).json({ error: "Failed to get schedule templates" });
@@ -5277,7 +5317,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       if (!parsed.weekdays?.length || !parsed.weekdays.every(d => d >= 1 && d <= 7)) {
         return res.status(400).json({ error: "weekdays must contain values 1-7" });
       }
-      const template = await storage.createScheduleTemplate(parsed);
+      const template = await storage.createScheduleTemplate({ ...parsed, userId: req.session.userId });
       res.json(template);
     } catch (error: any) {
       if (error?.name === "ZodError") {
@@ -5338,7 +5378,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       if (!parsed.voiceIds?.length) {
         return res.status(400).json({ error: "voiceIds must not be empty" });
       }
-      const shift = await storage.createHostShift(parsed);
+      const shift = await storage.createHostShift({ ...parsed, userId: req.session.userId });
       res.json(shift);
     } catch (error: any) {
       if (error?.name === "ZodError") {
@@ -5389,7 +5429,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       const jsDay = dateObj.getDay();
       const weekday = jsDay === 0 ? 7 : jsDay;
 
-      const template = await storage.getTemplateForWeekday(weekday);
+      const template = await storage.getTemplateForWeekday(weekday, req.session.userId!);
       const settings = await storage.getSettings(req.session.userId);
 
       const allHolidays = getHolidaysForDate(date);

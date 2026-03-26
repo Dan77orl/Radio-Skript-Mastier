@@ -7,6 +7,7 @@ interface AuthUser {
   email: string;
   name: string | null;
   language?: string | null;
+  role?: string | null;
 }
 
 export function useAuth() {
