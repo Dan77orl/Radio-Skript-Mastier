@@ -2,6 +2,94 @@ import { users, settings, dialogs, newsSources, newsItems, ads, adPresets, voice
 import { db } from "./db";
 import { eq, desc, asc, sql, and, or, isNull } from "drizzle-orm";
 
+function getDefaultPromptForLanguage(lang: string): string {
+  const prompts: Record<string, string> = {
+    ru: `Создай короткий диалог между ведущими радио "Radio FM" (мужчина и женщина).
+Тема: местная жизнь, культура, интересные факты.
+Стиль: дружелюбный, непринужденный, с юмором.
+Длительность: 30-50 секунд при чтении.
+Обязательно включи: приветствие слушателей, интересный факт или полезный совет.`,
+    tr: `"Radio FM" radyo sunucuları (erkek ve kadın) arasında kısa bir diyalog oluştur.
+Konu: yerel yaşam, kültür, ilginç bilgiler.
+Tarz: samimi, rahat, espritüel.
+Süre: sesli okunduğunda 30-50 saniye.
+Mutlaka dahil et: dinleyicilere selamlama, ilginç bir bilgi veya faydalı bir ipucu.`,
+    de: `Erstelle einen kurzen Dialog zwischen den Radiomoderatoren (Mann und Frau) von "Radio FM".
+Thema: lokales Leben, Kultur, interessante Fakten.
+Stil: freundlich, ungezwungen, mit Humor.
+Dauer: 30-50 Sekunden beim Vorlesen.
+Muss enthalten: Begrüßung der Zuhörer, eine interessante Tatsache oder ein nützlicher Tipp.`,
+    es: `Crea un diálogo corto entre los presentadores de radio (hombre y mujer) de "Radio FM".
+Tema: vida local, cultura, datos interesantes.
+Estilo: amigable, informal, con humor.
+Duración: 30-50 segundos al leer en voz alta.
+Debe incluir: saludo a los oyentes, un dato interesante o consejo útil.`,
+    fr: `Crée un court dialogue entre les animateurs radio (homme et femme) de "Radio FM".
+Sujet : vie locale, culture, faits intéressants.
+Style : amical, décontracté, avec humour.
+Durée : 30-50 secondes à la lecture.
+Doit inclure : salutation aux auditeurs, un fait intéressant ou un conseil utile.`,
+  };
+  return prompts[lang] || `Create a short dialog between radio hosts (male and female) of "Radio FM".
+Topic: local life, culture, interesting facts.
+Style: friendly, casual, with humor.
+Duration: 30-50 seconds when read aloud.
+Must include: greeting to listeners, an interesting fact or useful tip.`;
+}
+
+function getDefaultDailyPromptForLanguage(lang: string): string {
+  const prompts: Record<string, string> = {
+    ru: `Сегодня создаём диалоги для радио. Учитывай:
+- День недели и время суток для каждого слота
+- Актуальные события и праздники
+- Местные новости и погоду
+- Стиль: дружелюбный, с юмором
+- Для утренних слотов: бодрящие темы, приветствие дня
+- Для дневных слотов: полезные советы, интересные факты
+- Для вечерних слотов: расслабляющие темы, итоги дня`,
+    tr: `Bugün radyo için diyaloglar oluşturuyoruz. Dikkate al:
+- Her slot için haftanın günü ve günün saati
+- Güncel olaylar ve tatiller
+- Yerel haberler ve hava durumu
+- Tarz: samimi, espritüel
+- Sabah slotları: enerji veren konular, güne merhaba
+- Gündüz slotları: faydalı ipuçları, ilginç bilgiler
+- Akşam slotları: rahatlatıcı konular, günün özeti`,
+    de: `Heute erstellen wir Dialoge fürs Radio. Berücksichtige:
+- Wochentag und Tageszeit für jeden Slot
+- Aktuelle Ereignisse und Feiertage
+- Lokale Nachrichten und Wetter
+- Stil: freundlich, mit Humor
+- Für Morgen-Slots: belebende Themen, Begrüßung des Tages
+- Für Tages-Slots: nützliche Tipps, interessante Fakten
+- Für Abend-Slots: entspannende Themen, Tagesrückblick`,
+    es: `Hoy creamos diálogos para la radio. Considera:
+- Día de la semana y hora del día para cada slot
+- Eventos actuales y festividades
+- Noticias locales y clima
+- Estilo: amigable, con humor
+- Para slots matutinos: temas energizantes, saludo al día
+- Para slots diurnos: consejos útiles, datos interesantes
+- Para slots nocturnos: temas relajantes, resumen del día`,
+    fr: `Aujourd'hui nous créons des dialogues pour la radio. Considère :
+- Le jour de la semaine et l'heure pour chaque créneau
+- Les événements actuels et les fêtes
+- Les nouvelles locales et la météo
+- Style : amical, avec humour
+- Pour les créneaux du matin : sujets énergisants, salut à la journée
+- Pour les créneaux de la journée : conseils utiles, faits intéressants
+- Pour les créneaux du soir : sujets relaxants, résumé de la journée`,
+  };
+  return prompts[lang] || `Today we are creating dialogs for the radio. Consider:
+- Day of the week and time of day for each slot
+- Current events and holidays
+- Local news and weather
+- Style: friendly, with humor
+- For morning slots: energizing topics, greeting the day
+- For daytime slots: useful tips, interesting facts
+- For evening slots: relaxing topics, day summary`;
+}
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -136,6 +224,13 @@ export class DatabaseStorage implements IStorage {
     if (userId) {
       const [result] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
       if (result) return result;
+
+      const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const lang = user?.language || "en";
+
+      const defaultPrompt = getDefaultPromptForLanguage(lang);
+      const dailyPrompt = getDefaultDailyPromptForLanguage(lang);
+
       const [defaultSettings] = await db.insert(settings).values({
         userId,
         elevenLabsApiKey: null,
@@ -143,11 +238,11 @@ export class DatabaseStorage implements IStorage {
         maleVoiceId: "onwK4e9ZLuTAKqWW03F9",
         femaleVoiceId: "EXAVITQu4vr4xnSDxMaL",
         dailyDialogsCount: 12,
-        defaultPrompt: `Создай короткий диалог между ведущими радио "Алания FM" (мужчина и женщина). 
-Тема: жизнь экспатов в Аланье, Турция. 
-Стиль: дружелюбный, непринужденный, с юмором.
-Длительность: 30-50 секунд при чтении.
-Обязательно включи: приветствие слушателей, интересный факт или совет про жизнь в Турции.`,
+        defaultPrompt,
+        dailyPrompt,
+        stationName: "Radio FM",
+        stationWebsite: "http://radiofm.com",
+        stationLocation: "",
       }).returning();
       return defaultSettings;
     }

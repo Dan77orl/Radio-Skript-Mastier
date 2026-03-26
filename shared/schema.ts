@@ -44,26 +44,26 @@ export const settings = pgTable("settings", {
   femaleVoiceId: text("female_voice_id").default("EXAVITQu4vr4xnSDxMaL"),
   dailyDialogsCount: integer("daily_dialogs_count").default(12),
   aiProvider: text("ai_provider").default("anthropic"),
-  defaultPrompt: text("default_prompt").default(`Создай короткий диалог между ведущими радио "Алания FM" (мужчина и женщина). 
-Тема: жизнь экспатов в Аланье, Турция. 
-Стиль: дружелюбный, непринужденный, с юмором.
-Длительность: 30-50 секунд при чтении.
-Обязательно включи: приветствие слушателей, интересный факт или совет про жизнь в Турции.`),
-  dailyPrompt: text("daily_prompt").default(`Сегодня создаём диалоги для радио. Учитывай:
-- День недели и время суток для каждого слота
-- Актуальные события и праздники
-- Местные новости и погоду
-- Стиль: дружелюбный, с юмором
-- Для утренних слотов: бодрящие темы, приветствие дня
-- Для дневных слотов: полезные советы, интересные факты
-- Для вечерних слотов: расслабляющие темы, итоги дня`),
+  defaultPrompt: text("default_prompt").default(`Create a short dialog between radio hosts (male and female) of "Radio FM".
+Topic: local life, culture, interesting facts.
+Style: friendly, casual, with humor.
+Duration: 30-50 seconds when read aloud.
+Must include: greeting to listeners, an interesting fact or useful tip.`),
+  dailyPrompt: text("daily_prompt").default(`Today we are creating dialogs for the radio. Consider:
+- Day of the week and time of day for each slot
+- Current events and holidays
+- Local news and weather
+- Style: friendly, with humor
+- For morning slots: energizing topics, greeting the day
+- For daytime slots: useful tips, interesting facts
+- For evening slots: relaxing topics, day summary`),
   slotPrompts: text("slot_prompts").array(),
   accumulatedLearnings: text("accumulated_learnings"),
-  stationName: text("station_name").default("Alanya FM"),
+  stationName: text("station_name").default("Radio FM"),
   stationLogo: text("station_logo"),
   stationDescription: text("station_description"),
-  stationWebsite: text("station_website"),
-  stationLocation: text("station_location").default("Аланья, Турция"),
+  stationWebsite: text("station_website").default("http://radiofm.com"),
+  stationLocation: text("station_location").default(""),
   stationAttachments: text("station_attachments").array(),
   freesoundApiKey: text("freesound_api_key"),
   globalFirecrawlTopics: text("global_firecrawl_topics").array(),
