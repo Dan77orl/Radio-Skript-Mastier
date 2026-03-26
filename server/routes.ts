@@ -3083,7 +3083,7 @@ ${instructions || "Создай альтернативный вариант с �
   app.post("/api/ads/:id/synthesize-audio", async (req, res) => {
     try {
       const { id } = req.params;
-      const { voiceIds } = req.body;
+      const { voiceIds, voiceName: requestVoiceName } = req.body;
       
       const ad = await storage.getAd(id, req.session.userId!);
       if (!ad) {
@@ -3152,7 +3152,7 @@ ${instructions || "Создай альтернативный вариант с �
 
           const allVoices = await storage.getVoices(req.session.userId!);
           const usedVoice = allVoices.find(v => v.elevenLabsVoiceId === voiceIdToUse);
-          const voiceName = usedVoice ? (usedVoice.personaName || usedVoice.name) : voiceIdToUse;
+          const voiceName = usedVoice ? (usedVoice.personaName || usedVoice.name) : (requestVoiceName || voiceIdToUse);
 
           existingVersions.push({
             url: newAudioUrl,
@@ -3560,7 +3560,7 @@ ${instructions || "Создай альтернативный вариант с �
       const gender = req.query.gender as string | undefined;
       const language = req.query.language as string | undefined;
       const page = parseInt(req.query.page as string) || 0;
-      const pageSize = 20;
+      const pageSize = 100;
 
       const params = new URLSearchParams({
         page_size: String(pageSize),
@@ -5287,36 +5287,42 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
 
   // Freesound API for royalty-free music
   const FREESOUND_API_BASE = "https://freesound.org/apiv2";
+  const PIXABAY_API_BASE = "https://pixabay.com/api";
   
   async function getFreesoundApiKey(userId?: string): Promise<string | null> {
     const settings = await storage.getSettings(userId);
     return settings?.freesoundApiKey || null;
   }
-  
-  app.get("/api/music/search", async (req, res) => {
+
+  async function searchMusicPixabay(searchQuery: string): Promise<any[]> {
+    const pixabayKey = process.env.PIXABAY_API_KEY;
+    if (!pixabayKey) return [];
     try {
-      const { query } = req.query;
-      const apiKey = await getFreesoundApiKey(req.session.userId);
-      
-      if (!apiKey) {
-        return res.status(400).json({ 
-          error: "Freesound API key not configured",
-          needsApiKey: true 
-        });
-      }
-      
-      const searchQuery = query ? String(query) : "background music";
-      const url = `${FREESOUND_API_BASE}/search/text/?query=${encodeURIComponent(searchQuery)}&filter=duration:[30 TO 300] tag:music&fields=id,name,duration,tags,previews,username,license&page_size=20&token=${apiKey}`;
-      
+      const url = `${PIXABAY_API_BASE}/?key=${pixabayKey}&q=${encodeURIComponent(searchQuery)}&media_type=audio&per_page=20`;
       const response = await fetch(url);
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Freesound API error:", errorText);
-        return res.status(response.status).json({ error: "Freesound API error" });
-      }
-      
+      if (!response.ok) return [];
       const data = await response.json();
-      const tracks = (data.results || []).map((sound: any) => ({
+      return (data.hits || []).map((hit: any) => ({
+        id: String(hit.id),
+        title: hit.tags || "Untitled",
+        mainArtists: [hit.user || "Pixabay"],
+        bpm: 0,
+        length: Math.round(hit.duration || 0),
+        moods: (hit.tags || "").split(", ").slice(0, 5).map((t: string) => ({ name: t })),
+        images: { default: hit.userImageURL || "" },
+        audioUrl: hit.audio || hit.previewURL || "",
+        license: "Pixabay License",
+      }));
+    } catch { return []; }
+  }
+
+  async function searchMusicFreesound(searchQuery: string, apiKey: string): Promise<any[]> {
+    try {
+      const url = `${FREESOUND_API_BASE}/search/text/?query=${encodeURIComponent(searchQuery)}&filter=duration:[30 TO 300] tag:music&fields=id,name,duration,tags,previews,username,license&page_size=20&token=${apiKey}`;
+      const response = await fetch(url);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return (data.results || []).map((sound: any) => ({
         id: String(sound.id),
         title: sound.name,
         mainArtists: [sound.username],
@@ -5327,6 +5333,61 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
         audioUrl: sound.previews?.["preview-hq-mp3"] || sound.previews?.["preview-lq-mp3"] || "",
         license: sound.license,
       }));
+    } catch { return []; }
+  }
+
+  async function searchMusicEpidemic(searchQuery: string): Promise<any[]> {
+    const token = process.env.EPIDEMIC_SOUND_TOKEN;
+    if (!token) return [];
+    try {
+      const url = `https://www.epidemicsound.com/json/search/tracks/?term=${encodeURIComponent(searchQuery)}&limit=20`;
+      const response = await fetch(url, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/json",
+        },
+      });
+      if (!response.ok) return [];
+      const data = await response.json();
+      const entities = data?.entities || data?.tracks || [];
+      return entities.map((track: any) => ({
+        id: String(track.id),
+        title: track.title || track.name || "Untitled",
+        mainArtists: track.mainArtists?.map((a: any) => a.name || a) || [track.createdBy || "Unknown"],
+        bpm: track.bpm || 0,
+        length: Math.round(track.length || 0),
+        moods: track.moods?.slice(0, 5).map((m: any) => ({ name: typeof m === 'string' ? m : m.name || m })) || [],
+        images: { default: track.imageUrl || "" },
+        audioUrl: track.stems?.full?.lqMp3Url || track.previewUrl || "",
+        license: "Epidemic Sound",
+      }));
+    } catch { return []; }
+  }
+  
+  app.get("/api/music/search", async (req, res) => {
+    try {
+      const { query } = req.query;
+      const searchQuery = query ? String(query) : "background music";
+
+      const freesoundKey = await getFreesoundApiKey(req.session.userId);
+      let tracks: any[] = [];
+
+      if (freesoundKey) {
+        tracks = await searchMusicFreesound(searchQuery, freesoundKey);
+      }
+      if (tracks.length === 0) {
+        tracks = await searchMusicEpidemic(searchQuery);
+      }
+      if (tracks.length === 0) {
+        tracks = await searchMusicPixabay(searchQuery);
+      }
+
+      if (tracks.length === 0) {
+        return res.status(400).json({ 
+          error: "No music API configured",
+          needsApiKey: true 
+        });
+      }
       
       res.json({ tracks });
     } catch (error) {
@@ -5340,21 +5401,17 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
       const { trackId } = req.params;
       const apiKey = await getFreesoundApiKey(req.session.userId);
       
-      if (!apiKey) {
-        return res.status(400).json({ error: "Freesound API key not configured" });
+      if (apiKey) {
+        const url = `${FREESOUND_API_BASE}/sounds/${trackId}/?fields=previews&token=${apiKey}`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          const audioUrl = data.previews?.["preview-hq-mp3"] || data.previews?.["preview-lq-mp3"];
+          return res.json({ url: audioUrl });
+        }
       }
       
-      const url = `${FREESOUND_API_BASE}/sounds/${trackId}/?fields=previews&token=${apiKey}`;
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        return res.status(404).json({ error: "Track not found" });
-      }
-      
-      const data = await response.json();
-      const audioUrl = data.previews?.["preview-hq-mp3"] || data.previews?.["preview-lq-mp3"];
-      
-      res.json({ url: audioUrl });
+      return res.status(404).json({ error: "Track not found" });
     } catch (error) {
       console.error("Error getting stream URL:", error);
       res.status(500).json({ error: "Failed to get stream" });
@@ -5374,12 +5431,6 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
       }
 
       const freesoundKey = await getFreesoundApiKey(req.session.userId);
-      if (!freesoundKey) {
-        return res.status(400).json({ 
-          error: "Freesound API key not configured",
-          needsApiKey: true 
-        });
-      }
 
       const categoryLabels: Record<string, string> = {
         general: "общая реклама",
@@ -5439,24 +5490,16 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
         };
       }
 
-      const searchUrl = `${FREESOUND_API_BASE}/search/text/?query=${encodeURIComponent(analysis.searchQuery)}&filter=duration:[30 TO 180] tag:music&fields=id,name,duration,tags,previews,username,license&page_size=10&token=${freesoundKey}`;
-      
-      const searchResponse = await fetch(searchUrl);
       let tracks: any[] = [];
-      
-      if (searchResponse.ok) {
-        const data = await searchResponse.json();
-        tracks = (data.results || []).map((sound: any) => ({
-          id: String(sound.id),
-          title: sound.name,
-          mainArtists: [sound.username],
-          bpm: 0,
-          length: Math.round(sound.duration),
-          moods: sound.tags?.slice(0, 5).map((t: string) => ({ name: t })) || [],
-          images: { default: "" },
-          audioUrl: sound.previews?.["preview-hq-mp3"] || sound.previews?.["preview-lq-mp3"] || "",
-          license: sound.license,
-        }));
+
+      if (freesoundKey) {
+        tracks = await searchMusicFreesound(analysis.searchQuery, freesoundKey);
+      }
+      if (tracks.length === 0) {
+        tracks = await searchMusicEpidemic(analysis.searchQuery);
+      }
+      if (tracks.length === 0) {
+        tracks = await searchMusicPixabay(analysis.searchQuery);
       }
 
       res.json({

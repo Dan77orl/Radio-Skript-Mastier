@@ -92,6 +92,7 @@ export default function AdsPage() {
   const { toast } = useToast();
   const [currentAd, setCurrentAd] = useState<Ad | null>(null);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(null);
+  const [selectedVoiceName, setSelectedVoiceName] = useState<string | null>(null);
   const [playingAudio, setPlayingAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -354,8 +355,8 @@ export default function AdsPage() {
   });
 
   const synthesizeAudioMutation = useMutation({
-    mutationFn: async ({ adId, voiceIds }: { adId: string; voiceIds: string[] }) => {
-      const response = await apiRequest("POST", `/api/ads/${adId}/synthesize-audio`, { voiceIds });
+    mutationFn: async ({ adId, voiceIds, voiceName }: { adId: string; voiceIds: string[]; voiceName?: string }) => {
+      const response = await apiRequest("POST", `/api/ads/${adId}/synthesize-audio`, { voiceIds, voiceName });
       return response.json();
     },
     onSuccess: () => {
@@ -708,6 +709,7 @@ export default function AdsPage() {
         const res = await apiRequest("PATCH", `/api/ads/${currentAd.id}`, { stage: stageKey });
         const updated = await res.json();
         setCurrentAd(updated);
+        queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
       } catch (error) {
         console.error("Error navigating to stage:", error);
       }
@@ -936,7 +938,7 @@ export default function AdsPage() {
                     className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors hover-elevate ${
                       selectedVoiceId === voice.elevenLabsVoiceId ? "border-primary bg-primary/5" : ""
                     }`}
-                    onClick={() => setSelectedVoiceId(voice.elevenLabsVoiceId)}
+                    onClick={() => { setSelectedVoiceId(voice.elevenLabsVoiceId); setSelectedVoiceName(getCleanVoiceName(voice)); }}
                     data-testid={`voice-${voice.id}`}
                   >
                     <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
@@ -967,7 +969,7 @@ export default function AdsPage() {
                       className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors hover-elevate ${
                         selectedVoiceId === voice.voice_id ? "border-primary bg-primary/5" : ""
                       }`}
-                      onClick={() => setSelectedVoiceId(voice.voice_id)}
+                      onClick={() => { setSelectedVoiceId(voice.voice_id); setSelectedVoiceName(voice.name); }}
                     >
                       <div className="h-10 w-10 rounded-full flex items-center justify-center bg-muted">
                         <Volume2 className="h-5 w-5" />
@@ -1063,7 +1065,7 @@ export default function AdsPage() {
                             className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors hover-elevate ${
                               selectedVoiceId === voice.voice_id ? "border-primary bg-primary/5" : ""
                             }`}
-                            onClick={() => setSelectedVoiceId(voice.voice_id)}
+                            onClick={() => { setSelectedVoiceId(voice.voice_id); setSelectedVoiceName(voice.name); }}
                             data-testid={`shared-voice-${voice.voice_id}`}
                           >
                             <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
@@ -1117,6 +1119,7 @@ export default function AdsPage() {
                     synthesizeAudioMutation.mutate({
                       adId: currentAd.id,
                       voiceIds: [selectedVoiceId],
+                      voiceName: selectedVoiceName || undefined,
                     });
                   }
                 }}
@@ -1316,7 +1319,7 @@ export default function AdsPage() {
                         key={voice.id}
                         variant={selectedVoiceId === voice.elevenLabsVoiceId ? "default" : "outline"}
                         size="sm"
-                        onClick={() => setSelectedVoiceId(voice.elevenLabsVoiceId)}
+                        onClick={() => { setSelectedVoiceId(voice.elevenLabsVoiceId); setSelectedVoiceName(getCleanVoiceName(voice)); }}
                         data-testid={`rerender-voice-${voice.id}`}
                       >
                         <Volume2 className="mr-1 h-3 w-3" />
@@ -1341,18 +1344,38 @@ export default function AdsPage() {
                         <SelectContent>
                           <SelectItem value="all">{t("ads.allLanguages")}</SelectItem>
                           <SelectItem value="arabic">العربية</SelectItem>
+                          <SelectItem value="bulgarian">Български</SelectItem>
                           <SelectItem value="chinese">中文</SelectItem>
+                          <SelectItem value="croatian">Hrvatski</SelectItem>
+                          <SelectItem value="czech">Čeština</SelectItem>
+                          <SelectItem value="danish">Dansk</SelectItem>
+                          <SelectItem value="dutch">Nederlands</SelectItem>
                           <SelectItem value="english">English</SelectItem>
+                          <SelectItem value="filipino">Filipino</SelectItem>
+                          <SelectItem value="finnish">Suomi</SelectItem>
                           <SelectItem value="french">Français</SelectItem>
                           <SelectItem value="german">Deutsch</SelectItem>
+                          <SelectItem value="greek">Ελληνικά</SelectItem>
+                          <SelectItem value="hebrew">עברית</SelectItem>
+                          <SelectItem value="hindi">हिन्दी</SelectItem>
+                          <SelectItem value="hungarian">Magyar</SelectItem>
+                          <SelectItem value="indonesian">Bahasa Indonesia</SelectItem>
                           <SelectItem value="italian">Italiano</SelectItem>
                           <SelectItem value="japanese">日本語</SelectItem>
                           <SelectItem value="korean">한국어</SelectItem>
+                          <SelectItem value="malay">Bahasa Melayu</SelectItem>
+                          <SelectItem value="norwegian">Norsk</SelectItem>
+                          <SelectItem value="polish">Polski</SelectItem>
                           <SelectItem value="portuguese">Português</SelectItem>
+                          <SelectItem value="romanian">Română</SelectItem>
                           <SelectItem value="russian">Русский</SelectItem>
+                          <SelectItem value="slovak">Slovenčina</SelectItem>
                           <SelectItem value="spanish">Español</SelectItem>
+                          <SelectItem value="swedish">Svenska</SelectItem>
+                          <SelectItem value="tamil">தமிழ்</SelectItem>
                           <SelectItem value="turkish">Türkçe</SelectItem>
                           <SelectItem value="ukrainian">Українська</SelectItem>
+                          <SelectItem value="vietnamese">Tiếng Việt</SelectItem>
                         </SelectContent>
                       </Select>
                       <Select value={voiceSearchGender} onValueChange={setVoiceSearchGender}>
@@ -1379,7 +1402,7 @@ export default function AdsPage() {
                               className={`flex items-center gap-2 rounded-lg border p-2 cursor-pointer transition-colors hover:bg-muted/50 ${
                                 selectedVoiceId === voice.voice_id ? "border-primary bg-primary/5" : ""
                               }`}
-                              onClick={() => setSelectedVoiceId(voice.voice_id)}
+                              onClick={() => { setSelectedVoiceId(voice.voice_id); setSelectedVoiceName(voice.name); }}
                               data-testid={`audio-shared-voice-${voice.voice_id}`}
                             >
                               <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
@@ -1431,6 +1454,7 @@ export default function AdsPage() {
                       synthesizeAudioMutation.mutate({
                         adId: currentAd.id,
                         voiceIds: [selectedVoiceId],
+                        voiceName: selectedVoiceName || undefined,
                       });
                     }
                   }}

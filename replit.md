@@ -68,5 +68,11 @@ Preferred communication style: Simple, everyday language.
 ### Cloud Storage
 - **Yandex Disk**: Storage for generated audio files.
 
+### Music/Audio
+- **Freesound**: Royalty-free music search (requires user API key in settings).
+- **Epidemic Sound**: Background music search via `EPIDEMIC_SOUND_TOKEN` env var.
+- **Pixabay**: Fallback free music search (via `PIXABAY_API_KEY` env var).
+- **Music auto-select fallback chain**: Freesound → Epidemic Sound → Pixabay.
+
 ### Web Scraping/Research
 - **Firecrawl**: For web content search and research to feed AI prompts.
