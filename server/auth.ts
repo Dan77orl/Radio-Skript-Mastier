@@ -127,11 +127,12 @@ export async function updateUserLanguage(req: Request, res: Response) {
   }
 
   const { language } = req.body;
-  if (!language || !["ru", "en", "tr"].includes(language)) {
+  if (!language) {
     return res.status(400).json({ error: "Invalid language" });
   }
 
   await storage.updateUserLanguage(req.session.userId, language);
+  await storage.updateDefaultPromptsForLanguage(req.session.userId, language);
   return res.json({ ok: true, language });
 }
 

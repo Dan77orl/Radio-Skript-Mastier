@@ -217,6 +217,18 @@ export default function ShowsPage() {
   const [isolatingId, setIsolatingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const stopAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute("src");
+      audioRef.current = null;
+    }
+    setPlayingProgramId(null);
+    setAudioCurrentTime(0);
+    setAudioDuration(0);
+    setAudioPlaybackRate(1);
+  }, []);
+
   const { data: appSettings } = useQuery<AppSettings>({
     queryKey: ["/api/settings"],
   });
@@ -445,18 +457,6 @@ export default function ShowsPage() {
       await createTypeMutation.mutateAsync(type);
     }
   };
-
-  const stopAudio = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.removeAttribute("src");
-      audioRef.current = null;
-    }
-    setPlayingProgramId(null);
-    setAudioCurrentTime(0);
-    setAudioDuration(0);
-    setAudioPlaybackRate(1);
-  }, []);
 
   const playAudio = (audioUrl: string, programId: string) => {
     if (audioRef.current) {

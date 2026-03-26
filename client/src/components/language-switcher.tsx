@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const languageGroups = [
   {
@@ -58,6 +58,7 @@ export function LanguageSwitcher() {
     if (isAuthenticated) {
       try {
         await apiRequest("PATCH", "/api/auth/language", { language: code });
+        queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
       } catch (e) {
         toast({
           title: t("common.error"),

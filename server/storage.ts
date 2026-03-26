@@ -157,6 +157,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserLanguage(id: string, language: string): Promise<void>;
+  updateDefaultPromptsForLanguage(userId: string, language: string): Promise<void>;
   
   getSettings(userId?: string): Promise<Settings | undefined>;
   saveSettings(settings: InsertSettings, userId?: string): Promise<Settings>;
@@ -279,6 +280,31 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserLanguage(id: string, language: string): Promise<void> {
     await db.update(users).set({ language }).where(eq(users.id, id));
+  }
+
+  async updateDefaultPromptsForLanguage(userId: string, language: string): Promise<void> {
+    const [row] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+    if (!row) return;
+
+    const knownDefaultPrompts = new Set<string>();
+    const knownDailyPrompts = new Set<string>();
+    const allLangs = Object.keys(LANG_NAMES);
+    for (const lang of allLangs) {
+      knownDefaultPrompts.add(getDefaultPromptForLanguage(lang).trim());
+      knownDailyPrompts.add(getDefaultDailyPromptForLanguage(lang).trim());
+    }
+
+    const updates: Record<string, string> = {};
+    if (row.defaultPrompt && knownDefaultPrompts.has(row.defaultPrompt.trim())) {
+      updates.defaultPrompt = getDefaultPromptForLanguage(language);
+    }
+    if (row.dailyPrompt && knownDailyPrompts.has(row.dailyPrompt.trim())) {
+      updates.dailyPrompt = getDefaultDailyPromptForLanguage(language);
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await db.update(settings).set(updates).where(eq(settings.userId, userId));
+    }
   }
 
   async getSettings(userId?: string): Promise<Settings | undefined> {
