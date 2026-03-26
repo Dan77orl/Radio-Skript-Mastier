@@ -107,7 +107,7 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
       if (saved && Array.isArray(saved) && saved.length > 0) {
         setFirecrawlTopicsState(saved);
       } else {
-        setFirecrawlTopicsState(["weather Alanya today", "news Turkey"]);
+        setFirecrawlTopicsState(["local weather today", "latest news", "entertainment news", "technology trends"]);
       }
       if ((settings as any).dialogStyle) {
         setDialogStyle((settings as any).dialogStyle);
