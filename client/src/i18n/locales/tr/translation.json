@@ -568,7 +568,10 @@
     "allGenders": "Tüm sesler",
     "allLanguages": "Tüm diller",
     "reRenderVoice": "Farklı ses deneyin",
-    "resynthesizeVoice": "Sesi yeniden oluştur"
+    "resynthesizeVoice": "Sesi yeniden oluştur",
+    "version": "versiyon",
+    "versions": "versiyon",
+    "current": "mevcut"
   },
   "shows": {
     "title": "Programlar",

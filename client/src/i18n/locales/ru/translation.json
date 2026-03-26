@@ -600,7 +600,10 @@
     "allGenders": "Все голоса",
     "allLanguages": "Все языки",
     "reRenderVoice": "Попробовать другой голос",
-    "resynthesizeVoice": "Перерендерить аудио"
+    "resynthesizeVoice": "Перерендерить аудио",
+    "version": "версия",
+    "versions": "версий",
+    "current": "текущий"
   },
   "shows": {
     "title": "Передачи",

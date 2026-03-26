@@ -3138,14 +3138,39 @@ ${instructions || "Создай альтернативный вариант с �
           const audioFile = path.join(audioDir, `ad_${id}_${timestamp}.mp3`);
           await fs.writeFile(audioFile, audioBuffer);
 
+          const newAudioUrl = `/audio/ad_${id}_${timestamp}.mp3`;
+          const estimatedDuration = Math.round(audioBuffer.length / 24000);
+
+          const freshAd = await storage.getAd(id, req.session.userId!);
+          let existingVersions: Array<{ url: string; voiceId: string; voiceName: string; createdAt: string; duration: number }> = [];
+          try {
+            if (freshAd?.audioVersions) {
+              const parsed = JSON.parse(freshAd.audioVersions);
+              if (Array.isArray(parsed)) existingVersions = parsed;
+            }
+          } catch {}
+
+          const allVoices = await storage.getVoices(req.session.userId!);
+          const usedVoice = allVoices.find(v => v.elevenLabsVoiceId === voiceIdToUse);
+          const voiceName = usedVoice ? (usedVoice.personaName || usedVoice.name) : voiceIdToUse;
+
+          existingVersions.push({
+            url: newAudioUrl,
+            voiceId: voiceIdToUse,
+            voiceName,
+            createdAt: new Date().toISOString(),
+            duration: estimatedDuration,
+          });
+
           await storage.updateAd(id, req.session.userId!, {
-            audioUrl: `/audio/ad_${id}_${timestamp}.mp3`,
-            duration: Math.round(audioBuffer.length / 24000),
+            audioUrl: newAudioUrl,
+            audioVersions: JSON.stringify(existingVersions),
+            duration: estimatedDuration,
             status: "ready",
             stage: "audio",
           });
 
-          console.log(`Audio generated for ad ${id}`);
+          console.log(`Audio generated for ad ${id} (version ${existingVersions.length})`);
         } catch (error) {
           console.error(`Error generating audio for ad ${id}:`, error);
           await storage.updateAd(id, req.session.userId!, { status: "error" });

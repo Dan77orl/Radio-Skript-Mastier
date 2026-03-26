@@ -110,6 +110,9 @@ export default function AdsPage() {
   const [voiceSearchLanguage, setVoiceSearchLanguage] = useState("all");
   const [previewingVoiceUrl, setPreviewingVoiceUrl] = useState<string | null>(null);
   const voicePreviewRef = useRef<HTMLAudioElement | null>(null);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [playingVersionUrl, setPlayingVersionUrl] = useState<string | null>(null);
+  const versionAudioRef = useRef<HTMLAudioElement | null>(null);
   const [musicSearchQuery, setMusicSearchQuery] = useState("");
   const [isSearchingMusic, setIsSearchingMusic] = useState(false);
   const [musicSearchResults, setMusicSearchResults] = useState<Array<{
@@ -407,6 +410,28 @@ export default function AdsPage() {
     setPlayingAudio(true);
     audio.onended = () => setPlayingAudio(false);
   };
+
+  const playVersionAudio = (url: string) => {
+    if (versionAudioRef.current) {
+      versionAudioRef.current.pause();
+    }
+    if (playingVersionUrl === url) {
+      setPlayingVersionUrl(null);
+      return;
+    }
+    const audio = new Audio(url);
+    audio.playbackRate = playbackSpeed;
+    versionAudioRef.current = audio;
+    audio.play().catch(console.error);
+    setPlayingVersionUrl(url);
+    audio.onended = () => setPlayingVersionUrl(null);
+  };
+
+  useEffect(() => {
+    if (versionAudioRef.current) {
+      versionAudioRef.current.playbackRate = playbackSpeed;
+    }
+  }, [playbackSpeed]);
 
   const searchMusic = async () => {
     if (!musicSearchQuery.trim()) return;
@@ -1024,6 +1049,12 @@ export default function AdsPage() {
         );
 
       case "audio":
+        const audioVersions: Array<{ url: string; voiceId: string; voiceName: string; createdAt: string; duration: number }> = (() => {
+          try {
+            return currentAd.audioVersions ? JSON.parse(currentAd.audioVersions) : [];
+          } catch { return []; }
+        })();
+        const hasVersions = audioVersions.length > 0;
         return (
           <Card>
             <CardHeader>
@@ -1043,37 +1074,111 @@ export default function AdsPage() {
                       <p className="font-medium">{t("ads.audioReady")}</p>
                       <p className="text-sm text-muted-foreground">
                         {currentAd.duration ? `${currentAd.duration} ${t("ads.sec")}` : ""}
+                        {hasVersions && ` · ${audioVersions.length} ${audioVersions.length === 1 ? t("ads.version") : t("ads.versions")}`}
                       </p>
                     </div>
                   </div>
-                  {currentAd.audioUrl && (
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => playAudio(currentAd.audioUrl!)}
-                        data-testid="button-play-audio"
-                      >
-                        {playingAudio ? (
-                          <PauseCircle className="h-5 w-5" />
-                        ) : (
-                          <PlayCircle className="h-5 w-5" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        asChild
-                        data-testid="button-download-audio"
-                      >
-                        <a href={`/api/ads/${currentAd.id}/download-audio`} download={`${currentAd.title || "ad"}.mp3`}>
-                          <Download className="h-5 w-5" />
-                        </a>
-                      </Button>
+                  <div className="flex items-center gap-2">
+                    <div className="flex border rounded-md overflow-hidden">
+                      {[1, 1.5, 2].map((speed) => (
+                        <button
+                          key={speed}
+                          className={`px-2 py-1 text-xs font-medium transition-colors ${
+                            playbackSpeed === speed
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                          }`}
+                          onClick={() => setPlaybackSpeed(speed)}
+                          data-testid={`speed-${speed}x`}
+                        >
+                          {speed}x
+                        </button>
+                      ))}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
+
+              {hasVersions ? (
+                <div className="space-y-2">
+                  {audioVersions.map((version, idx) => {
+                    const isCurrentlyPlaying = playingVersionUrl === version.url;
+                    const isCurrent = version.url === currentAd.audioUrl;
+                    return (
+                      <div
+                        key={idx}
+                        className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+                          isCurrent ? "border-green-500 bg-green-500/5" : ""
+                        } ${isCurrentlyPlaying ? "bg-primary/5" : ""}`}
+                        data-testid={`audio-version-${idx}`}
+                      >
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 shrink-0"
+                          onClick={() => playVersionAudio(version.url)}
+                          data-testid={`play-version-${idx}`}
+                        >
+                          {isCurrentlyPlaying ? (
+                            <PauseCircle className="h-5 w-5 text-primary" />
+                          ) : (
+                            <PlayCircle className="h-5 w-5" />
+                          )}
+                        </Button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">#{idx + 1}</span>
+                            <span className="text-sm text-muted-foreground truncate">{version.voiceName}</span>
+                            {isCurrent && (
+                              <span className="text-xs bg-green-500/20 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded">{t("ads.current")}</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {version.duration ? `${version.duration} ${t("ads.sec")}` : ""}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          asChild
+                        >
+                          <a href={version.url} download={`${currentAd.title || "ad"}_v${idx + 1}.mp3`} data-testid={`download-version-${idx}`}>
+                            <Download className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : currentAd.audioUrl ? (
+                <div className="flex items-center gap-3 rounded-lg border p-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
+                    onClick={() => playVersionAudio(currentAd.audioUrl!)}
+                    data-testid="button-play-audio"
+                  >
+                    {playingVersionUrl === currentAd.audioUrl ? (
+                      <PauseCircle className="h-5 w-5 text-primary" />
+                    ) : (
+                      <PlayCircle className="h-5 w-5" />
+                    )}
+                  </Button>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">#1</p>
+                    <p className="text-xs text-muted-foreground">
+                      {currentAd.duration ? `${currentAd.duration} ${t("ads.sec")}` : ""}
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                    <a href={`/api/ads/${currentAd.id}/download-audio`} download={`${currentAd.title || "ad"}.mp3`} data-testid="button-download-audio">
+                      <Download className="h-4 w-4" />
+                    </a>
+                  </Button>
+                </div>
+              ) : null}
 
               <div className="rounded-lg bg-muted p-4">
                 <p className="text-sm">{currentAd.selectedVariantText}</p>

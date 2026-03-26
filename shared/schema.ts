@@ -164,6 +164,7 @@ export const ads = pgTable("ads", {
   speakersCount: integer("speakers_count").default(1),
   scriptText: text("script_text"),
   audioUrl: text("audio_url"),
+  audioVersions: text("audio_versions"),
   audioWithMusicUrl: text("audio_with_music_url"),
   musicTrackUrl: text("music_track_url"),
   musicTrackName: text("music_track_name"),

@@ -582,7 +582,10 @@
     "allGenders": "All genders",
     "allLanguages": "All languages",
     "reRenderVoice": "Try a different voice",
-    "resynthesizeVoice": "Re-render audio"
+    "resynthesizeVoice": "Re-render audio",
+    "version": "version",
+    "versions": "versions",
+    "current": "current"
   },
   "shows": {
     "title": "Shows",
