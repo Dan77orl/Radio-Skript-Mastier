@@ -47,6 +47,7 @@ interface UsageLog {
 interface UsageData {
   stats: { userId: string; action: string; count: number }[];
   logs: UsageLog[];
+  storageUsedBytes: number;
 }
 
 interface SupportSession {
@@ -148,6 +149,7 @@ export default function AdminPage() {
     script_generation: "Script Generation",
     audio_generation: "Audio Generation",
     ad_generation: "Ad Generation",
+    file_upload: "File Upload",
   };
 
   return (
@@ -338,6 +340,23 @@ export default function AdminPage() {
             <div className="text-center py-8 text-muted-foreground">Loading...</div>
           ) : (
             <>
+              {usage && (
+                <Card className="mb-4">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Audio Storage Used</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold" data-testid="text-storage-used">
+                      {usage.storageUsedBytes < 1024 * 1024
+                        ? `${(usage.storageUsedBytes / 1024).toFixed(1)} KB`
+                        : usage.storageUsedBytes < 1024 * 1024 * 1024
+                        ? `${(usage.storageUsedBytes / (1024 * 1024)).toFixed(1)} MB`
+                        : `${(usage.storageUsedBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {usage?.stats && usage.stats.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {Object.entries(

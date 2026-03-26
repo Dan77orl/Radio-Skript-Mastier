@@ -829,7 +829,20 @@ export async function registerRoutes(
     try {
       const stats = await storage.getUsageStats();
       const logs = await storage.getUsageLogs(undefined, 200);
-      return res.json({ stats, logs });
+
+      let storageUsed = 0;
+      const audioDir = path.join(process.cwd(), "public", "audio");
+      try {
+        const entries = await fs.readdir(audioDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isFile()) {
+            const stat = await fs.stat(path.join(audioDir, entry.name));
+            storageUsed += stat.size;
+          }
+        }
+      } catch {}
+
+      return res.json({ stats, logs, storageUsedBytes: storageUsed });
     } catch (error) {
       console.error("Admin usage error:", error);
       return res.status(500).json({ error: "Failed to get usage stats" });

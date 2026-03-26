@@ -198,10 +198,38 @@ export async function handleSupportChat(req: Request, res: Response) {
     }
 
     if (!sessionChats.has(sessionId)) {
-      sessionChats.set(sessionId, []);
+      try {
+        const dbMessages = await storage.getSupportMessagesBySession(sessionId);
+        const restored: ChatMessage[] = dbMessages
+          .filter(m => m.role === "user" || m.role === "assistant" || m.role === "admin")
+          .map(m => ({
+            role: m.role === "admin" ? "assistant" as const : m.role as "user" | "assistant",
+            content: m.content,
+          }));
+        sessionChats.set(sessionId, restored);
+      } catch {
+        sessionChats.set(sessionId, []);
+      }
     }
 
     const history = sessionChats.get(sessionId)!;
+
+    const pendingAdminReplies = await (async () => {
+      try {
+        const dbMessages = await storage.getSupportMessagesBySession(sessionId);
+        const lastInMemoryIdx = history.length;
+        const adminReplies = dbMessages
+          .filter(m => m.role === "admin")
+          .slice(-5);
+        const existingContents = new Set(history.map(h => h.content));
+        return adminReplies.filter(r => !existingContents.has(r.content));
+      } catch { return []; }
+    })();
+
+    for (const ar of pendingAdminReplies) {
+      history.push({ role: "assistant", content: ar.content });
+    }
+
     history.push({ role: "user", content: message.trim() });
 
     if (history.length > 40) {
