@@ -5720,7 +5720,9 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       const userHolidays = await getUserCustomHolidays(req.session.userId!);
       const allHolidays = getHolidaysForDate(date, userHolidays);
       const stationCountry = resolveStationCountry(settings?.stationLocation);
-      const holidays = allHolidays.filter(h => h.country === stationCountry || h.country === "BOTH");
+      const holidays = stationCountry
+        ? allHolidays.filter(h => h.country === stationCountry || h.country === "BOTH")
+        : allHolidays;
 
       if (!template) {
         const totalSlots = settings?.dailyDialogsCount || 12;
