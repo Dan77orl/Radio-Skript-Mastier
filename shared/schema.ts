@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, real, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, timestamp, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
@@ -238,7 +238,7 @@ export const programTypes = pgTable("program_types", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
+  slug: text("slug").notNull(),
   description: text("description"),
   defaultPrompt: text("default_prompt").notNull(),
   defaultDurationSeconds: integer("default_duration_seconds").default(60),
@@ -263,7 +263,9 @@ export const programTypes = pgTable("program_types", {
   useFirecrawl: boolean("use_firecrawl").default(false),
   firecrawlTopics: text("firecrawl_topics").array(),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  uniqueIndex("program_types_user_slug_idx").on(table.userId, table.slug),
+]);
 
 export const insertProgramTypeSchema = createInsertSchema(programTypes).omit({
   id: true,

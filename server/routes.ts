@@ -127,11 +127,13 @@ async function getAnthropicClient(userId?: string): Promise<Anthropic | null> {
 }
 
 function resolveStationCountry(stationLocation: string | null | undefined): string {
-  if (!stationLocation) return "TR";
+  if (!stationLocation) return "";
   const loc = stationLocation.toLowerCase();
-  if (loc.includes("турц") || loc.includes("turkey") || loc.includes("alanya") || loc.includes("аланья")) return "TR";
+  if (loc.includes("турц") || loc.includes("turkey") || loc.includes("alanya") || loc.includes("аланья") || loc.includes("türkiye")) return "TR";
   if (loc.includes("росс") || loc.includes("russia") || loc.includes("москв") || loc.includes("moscow")) return "RU";
-  return "TR";
+  if (loc.includes("usa") || loc.includes("united states") || loc.includes("сша") || loc.includes("america")) return "US";
+  if (loc.includes("german") || loc.includes("герман") || loc.includes("deutsch")) return "DE";
+  return "";
 }
 
 interface StationContext {
@@ -147,8 +149,8 @@ async function buildStationContext(userId?: string): Promise<StationContext> {
   const settings = await storage.getSettings(userId);
   const voices = userId ? await storage.getVoices(userId) : [];
   
-  const stationName = settings?.stationName || "Alanya FM";
-  const stationDescription = settings?.stationDescription || "русскоязычная радиостанция для экспатов в Аланье, Турция";
+  const stationName = settings?.stationName || "Radio FM";
+  const stationDescription = settings?.stationDescription || "";
   
   const activeVoices = voices.filter(v => v.isActive);
   const maleVoices = activeVoices.filter(v => v.gender === "male");
@@ -680,11 +682,13 @@ interface WeatherData {
   };
 }
 
-const ALANYA_COORDS = { lat: 36.5444, lon: 31.9997 };
+const DEFAULT_COORDS = { lat: 36.5444, lon: 31.9997 };
 
-async function fetchAlanayWeather(): Promise<WeatherData | null> {
+async function fetchWeather(lat?: number, lon?: number): Promise<WeatherData | null> {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${ALANYA_COORDS.lat}&longitude=${ALANYA_COORDS.lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,sunrise,sunset&timezone=Europe/Istanbul`;
+    const useLat = lat ?? DEFAULT_COORDS.lat;
+    const useLon = lon ?? DEFAULT_COORDS.lon;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${useLat}&longitude=${useLon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,sunrise,sunset&timezone=auto`;
     const response = await fetch(url);
     if (!response.ok) return null;
     const data = await response.json();
@@ -1054,14 +1058,16 @@ export async function registerRoutes(
 
   app.get("/api/weather", async (req, res) => {
     try {
-      const weather = await fetchAlanayWeather();
+      const userSettings = await storage.getSettings(req.session?.userId);
+      const stationLocation = userSettings?.stationLocation || "";
+      const weather = await fetchWeather();
       if (!weather) {
         return res.status(503).json({ error: "Weather service unavailable" });
       }
       res.json({
         ...weather,
         description: getWeatherDescription(weather.weathercode),
-        location: "Alanya, Turkey",
+        location: stationLocation || "Local area",
       });
     } catch (error) {
       console.error("Error fetching weather:", error);
@@ -3321,9 +3327,14 @@ ${instructions || "Создай альтернативный вариант с �
     try {
       const programType = await storage.createProgramType({ ...req.body, userId: req.session.userId });
       res.json(programType);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating program type:", error);
-      res.status(500).json({ error: "Failed to create program type" });
+      const msg = error?.message || "";
+      if (msg.includes("unique") || msg.includes("duplicate") || msg.includes("23505")) {
+        res.status(409).json({ error: "A program type with this slug already exists" });
+      } else {
+        res.status(500).json({ error: "Failed to create program type" });
+      }
     }
   });
 
@@ -3334,9 +3345,14 @@ ${instructions || "Создай альтернативный вариант с �
         return res.status(404).json({ error: "Program type not found" });
       }
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating program type:", error);
-      res.status(500).json({ error: "Failed to update program type" });
+      const msg = error?.message || "";
+      if (msg.includes("unique") || msg.includes("duplicate") || msg.includes("23505")) {
+        res.status(409).json({ error: "A program type with this slug already exists" });
+      } else {
+        res.status(500).json({ error: "Failed to update program type" });
+      }
     }
   });
 
@@ -3647,8 +3663,8 @@ ${contextParts.join("\n\n")}
 4. На языке, оптимальном для поиска (английский для международных тем, русский для русскоязычных)
 5. БЕЗ указания месяцев, годов, конкретных дат — запросы должны работать всегда
 
-Плохие примеры: "события Турция март 2026", "новости Аланья январь"
-Хорошие примеры: "Alanya events today", "лучшие рестораны Аланья", "weather Alanya forecast", "что делать в Аланье"
+Плохие примеры: "события март 2026", "новости январь 2025"
+Хорошие примеры: "local events today", "best restaurants nearby", "weather forecast", "interesting facts"
 ${existingList}
 
 Верни JSON: {"topics": ["запрос1", "запрос2", ...], "reasoning": "краткое объяснение выбора тем на русском"}`;
@@ -4893,7 +4909,7 @@ ${programType.scriptTemplate}
           let itemsCreated = 0;
           const itemsCount = automation.itemsCount || 1;
 
-          const weather = await fetchAlanayWeather();
+          const weather = await fetchWeather();
           const newsItems = await storage.getNewsItems(req.session.userId!);
           const unusedNews = newsItems.filter(n => !n.isUsed).slice(0, 10);
 

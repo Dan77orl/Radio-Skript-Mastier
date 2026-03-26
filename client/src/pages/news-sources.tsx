@@ -195,7 +195,7 @@ export default function NewsSources() {
                         <FormLabel>{t("newsSources.sourceName")}</FormLabel>
                         <div className="flex gap-1 items-center">
                           <FormControl>
-                            <Input placeholder="Alanya News" {...field} data-testid="input-source-name" className="flex-1" />
+                            <Input placeholder="News Source" {...field} data-testid="input-source-name" className="flex-1" />
                           </FormControl>
                           <VoiceInput onTranscript={(text) => field.onChange(field.value + text)} />
                         </div>

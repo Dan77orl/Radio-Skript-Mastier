@@ -66,15 +66,12 @@ export default function SettingsPage() {
       maleVoiceId: "onwK4e9ZLuTAKqWW03F9",
       femaleVoiceId: "EXAVITQu4vr4xnSDxMaL",
       dailyDialogsCount: 12,
-      defaultPrompt: `Создай короткий диалог между ведущими радио "Алания FM" (мужчина и женщина). 
-Тема: жизнь экспатов в Аланье, Турция. 
-Стиль: дружелюбный, непринужденный, с юмором.
-Длительность: 30-50 секунд при чтении.`,
-      stationName: "Alanya FM",
+      defaultPrompt: "",
+      stationName: "Radio FM",
       stationLogo: "",
       stationDescription: "",
       stationWebsite: "",
-      stationLocation: "Аланья, Турция",
+      stationLocation: "",
       stationAttachments: [],
     },
   });
@@ -90,11 +87,11 @@ export default function SettingsPage() {
         femaleVoiceId: settings.femaleVoiceId || "EXAVITQu4vr4xnSDxMaL",
         dailyDialogsCount: settings.dailyDialogsCount || 12,
         defaultPrompt: settings.defaultPrompt || "",
-        stationName: settings.stationName || "Alanya FM",
+        stationName: settings.stationName || "Radio FM",
         stationLogo: settings.stationLogo || "",
         stationDescription: settings.stationDescription || "",
         stationWebsite: settings.stationWebsite || "",
-        stationLocation: settings.stationLocation || "Аланья, Турция",
+        stationLocation: settings.stationLocation || "",
         stationAttachments: settings.stationAttachments || [],
       });
     }
@@ -573,7 +570,7 @@ export default function SettingsPage() {
                         <FormItem>
                           <FormLabel>{t("settings.stationName")}</FormLabel>
                           <FormControl>
-                            <Input placeholder="Alanya FM" {...field} data-testid="input-station-name" />
+                            <Input placeholder="Radio FM" {...field} data-testid="input-station-name" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -589,7 +586,7 @@ export default function SettingsPage() {
                             {t("settings.stationWebsiteLabel")}
                           </FormLabel>
                           <FormControl>
-                            <Input placeholder="https://alanyafm.com" {...field} data-testid="input-station-website" />
+                            <Input placeholder="https://radiofm.com" {...field} data-testid="input-station-website" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -830,7 +827,7 @@ export default function SettingsPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label>{t("settings.email")}</Label>
-                      <Input placeholder="admin@alanyafm.com" disabled data-testid="input-email" />
+                      <Input placeholder="admin@radiofm.com" disabled data-testid="input-email" />
                       <p className="text-xs text-muted-foreground">{t("settings.comingSoon")}</p>
                     </div>
                     <div className="space-y-2">

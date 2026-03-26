@@ -29,7 +29,7 @@ export function AppSidebar() {
     queryKey: ["/api/settings"],
   });
 
-  const stationName = settings?.stationName || "Alanya FM";
+  const stationName = settings?.stationName || "Radio FM";
   const stationLogo = settings?.stationLogo;
   const stationLocation = settings?.stationLocation;
 
