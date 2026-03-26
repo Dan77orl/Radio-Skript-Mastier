@@ -5364,6 +5364,10 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
   app.get("/api/schedule-templates/:id/shifts", async (req, res) => {
     try {
+      const template = await storage.getScheduleTemplate(req.params.id, req.session.userId!);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
       const shifts = await storage.getHostShifts(req.params.id);
       res.json(shifts);
     } catch (error) {
