@@ -597,7 +597,8 @@
     "addPersona": "Добавить голос",
     "voiceLibrary": "Библиотека голосов",
     "searchVoicePlaceholder": "Поиск голосов...",
-    "allGenders": "Все",
+    "allGenders": "Все голоса",
+    "allLanguages": "Все языки",
     "reRenderVoice": "Попробовать другой голос",
     "resynthesizeVoice": "Перерендерить аудио"
   },

@@ -579,7 +579,8 @@
     "addPersona": "Add persona",
     "voiceLibrary": "Voice library",
     "searchVoicePlaceholder": "Search voices...",
-    "allGenders": "All",
+    "allGenders": "All genders",
+    "allLanguages": "All languages",
     "reRenderVoice": "Try a different voice",
     "resynthesizeVoice": "Re-render audio"
   },

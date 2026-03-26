@@ -565,7 +565,8 @@
     "addPersona": "Ses ekle",
     "voiceLibrary": "Ses kütüphanesi",
     "searchVoicePlaceholder": "Ses ara...",
-    "allGenders": "Tümü",
+    "allGenders": "Tüm sesler",
+    "allLanguages": "Tüm diller",
     "reRenderVoice": "Farklı ses deneyin",
     "resynthesizeVoice": "Sesi yeniden oluştur"
   },

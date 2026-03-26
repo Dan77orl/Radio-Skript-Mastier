@@ -3478,6 +3478,7 @@ ${instructions || "Создай альтернативный вариант с �
 
       const query = (req.query.q as string) || "";
       const gender = req.query.gender as string | undefined;
+      const language = req.query.language as string | undefined;
       const page = parseInt(req.query.page as string) || 0;
       const pageSize = 20;
 
@@ -3487,6 +3488,7 @@ ${instructions || "Создай альтернативный вариант с �
       });
       if (query) params.append("search", query);
       if (gender && gender !== "all") params.append("gender", gender);
+      if (language && language !== "all") params.append("language", language);
 
       const response = await fetch(`https://api.elevenlabs.io/v1/shared-voices?${params.toString()}`, {
         headers: {

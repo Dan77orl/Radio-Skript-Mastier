@@ -107,6 +107,7 @@ export default function AdsPage() {
   const [showVoiceLibrary, setShowVoiceLibrary] = useState(false);
   const [voiceSearchQuery, setVoiceSearchQuery] = useState("");
   const [voiceSearchGender, setVoiceSearchGender] = useState("all");
+  const [voiceSearchLanguage, setVoiceSearchLanguage] = useState("all");
   const [previewingVoiceUrl, setPreviewingVoiceUrl] = useState<string | null>(null);
   const voicePreviewRef = useRef<HTMLAudioElement | null>(null);
   const [musicSearchQuery, setMusicSearchQuery] = useState("");
@@ -148,7 +149,7 @@ export default function AdsPage() {
     queryKey: ["/api/ad-presets"],
   });
 
-  const voiceSearchUrl = `/api/elevenlabs/voices/search?q=${encodeURIComponent(voiceSearchQuery)}&gender=${voiceSearchGender}`;
+  const voiceSearchUrl = `/api/elevenlabs/voices/search?q=${encodeURIComponent(voiceSearchQuery)}&gender=${voiceSearchGender}&language=${encodeURIComponent(voiceSearchLanguage)}`;
   const { data: sharedVoicesData, isLoading: isSearchingVoices } = useQuery<{
     voices: Array<{
       voice_id: string;
@@ -879,6 +880,47 @@ export default function AdsPage() {
                       className="flex-1"
                       data-testid="input-voice-search"
                     />
+                    <Select value={voiceSearchLanguage} onValueChange={setVoiceSearchLanguage}>
+                      <SelectTrigger className="w-36" data-testid="select-voice-language">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t("ads.allLanguages")}</SelectItem>
+                        <SelectItem value="arabic">العربية</SelectItem>
+                        <SelectItem value="bulgarian">Български</SelectItem>
+                        <SelectItem value="chinese">中文</SelectItem>
+                        <SelectItem value="croatian">Hrvatski</SelectItem>
+                        <SelectItem value="czech">Čeština</SelectItem>
+                        <SelectItem value="danish">Dansk</SelectItem>
+                        <SelectItem value="dutch">Nederlands</SelectItem>
+                        <SelectItem value="english">English</SelectItem>
+                        <SelectItem value="filipino">Filipino</SelectItem>
+                        <SelectItem value="finnish">Suomi</SelectItem>
+                        <SelectItem value="french">Français</SelectItem>
+                        <SelectItem value="german">Deutsch</SelectItem>
+                        <SelectItem value="greek">Ελληνικά</SelectItem>
+                        <SelectItem value="hebrew">עברית</SelectItem>
+                        <SelectItem value="hindi">हिन्दी</SelectItem>
+                        <SelectItem value="hungarian">Magyar</SelectItem>
+                        <SelectItem value="indonesian">Bahasa Indonesia</SelectItem>
+                        <SelectItem value="italian">Italiano</SelectItem>
+                        <SelectItem value="japanese">日本語</SelectItem>
+                        <SelectItem value="korean">한국어</SelectItem>
+                        <SelectItem value="malay">Bahasa Melayu</SelectItem>
+                        <SelectItem value="norwegian">Norsk</SelectItem>
+                        <SelectItem value="polish">Polski</SelectItem>
+                        <SelectItem value="portuguese">Português</SelectItem>
+                        <SelectItem value="romanian">Română</SelectItem>
+                        <SelectItem value="russian">Русский</SelectItem>
+                        <SelectItem value="slovak">Slovenčina</SelectItem>
+                        <SelectItem value="spanish">Español</SelectItem>
+                        <SelectItem value="swedish">Svenska</SelectItem>
+                        <SelectItem value="tamil">தமிழ்</SelectItem>
+                        <SelectItem value="turkish">Türkçe</SelectItem>
+                        <SelectItem value="ukrainian">Українська</SelectItem>
+                        <SelectItem value="vietnamese">Tiếng Việt</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <Select value={voiceSearchGender} onValueChange={setVoiceSearchGender}>
                       <SelectTrigger className="w-28" data-testid="select-voice-gender">
                         <SelectValue />
@@ -917,7 +959,7 @@ export default function AdsPage() {
                             <div className="flex-1 min-w-0">
                               <p className="font-medium truncate text-sm">{voice.name}</p>
                               <p className="text-xs text-muted-foreground truncate">
-                                {[voice.labels?.gender, voice.labels?.accent, voice.labels?.age].filter(Boolean).join(" · ")}
+                                {[voice.labels?.language, voice.labels?.gender, voice.labels?.accent, voice.labels?.age].filter(Boolean).join(" · ")}
                               </p>
                             </div>
                             <div className="flex items-center gap-1">
