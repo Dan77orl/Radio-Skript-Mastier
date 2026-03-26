@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -124,6 +124,12 @@ export default function AdminPage() {
     },
   });
 
+  useEffect(() => {
+    if (!isLoading && !isAdmin) {
+      setLocation("/");
+    }
+  }, [isLoading, isAdmin, setLocation]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -133,7 +139,6 @@ export default function AdminPage() {
   }
 
   if (!isAdmin) {
-    setLocation("/");
     return null;
   }
 

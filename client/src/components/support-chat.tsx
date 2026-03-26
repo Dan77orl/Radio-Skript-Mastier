@@ -31,7 +31,8 @@ export function SupportChat() {
 
   useEffect(() => {
     if (!isOpen) return;
-    const interval = setInterval(async () => {
+
+    const fetchAdminReplies = async () => {
       try {
         const res = await fetch("/api/support-chat/admin-replies");
         if (res.ok) {
@@ -40,22 +41,26 @@ export function SupportChat() {
             const lastSeen = lastAdminReplyTimeRef.current;
             const newReplies = lastSeen
               ? data.replies.filter((r: { content: string; createdAt: string }) => r.createdAt > lastSeen)
-              : [];
+              : data.replies;
             if (newReplies.length > 0) {
               lastAdminReplyTimeRef.current = newReplies[newReplies.length - 1].createdAt;
-              setMessages(prev => [
-                ...prev,
-                ...newReplies.map((r: { content: string }) => ({ role: "assistant" as const, content: r.content })),
-              ]);
-            } else if (!lastSeen && data.replies.length > 0) {
-              lastAdminReplyTimeRef.current = data.replies[data.replies.length - 1].createdAt;
+              setMessages(prev => {
+                const existingSet = new Set(prev.map(m => m.content));
+                const truly = newReplies.filter((r: { content: string }) => !existingSet.has(r.content));
+                return truly.length > 0
+                  ? [...prev, ...truly.map((r: { content: string }) => ({ role: "assistant" as const, content: r.content }))]
+                  : prev;
+              });
             }
           }
         }
       } catch (err) {
         console.error("[support-chat] Polling admin replies failed:", err);
       }
-    }, 15000);
+    };
+
+    fetchAdminReplies();
+    const interval = setInterval(fetchAdminReplies, 15000);
     return () => clearInterval(interval);
   }, [isOpen]);
 
