@@ -75,7 +75,6 @@ async function syncSchema() {
 }
 
 buildAll()
-  .then(() => syncSchema())
   .catch((err) => {
     console.error(err);
     process.exit(1);
