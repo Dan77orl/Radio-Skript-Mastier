@@ -738,6 +738,20 @@ export async function registerRoutes(
 
   app.post("/api/support-chat", handleSupportChat);
 
+  app.get("/api/support-chat/admin-replies", async (req, res) => {
+    try {
+      const sessionId = req.sessionID;
+      if (!sessionId) return res.json({ replies: [] });
+      const messages = await storage.getSupportMessagesBySession(sessionId);
+      const adminReplies = messages
+        .filter(m => m.role === "admin")
+        .map(m => ({ content: m.content, createdAt: m.createdAt }));
+      return res.json({ replies: adminReplies });
+    } catch {
+      return res.json({ replies: [] });
+    }
+  });
+
   app.use("/api", (req, res, next) => {
     if (req.path.startsWith("/auth/")) return next();
     if (req.path === "/support-chat") return next();

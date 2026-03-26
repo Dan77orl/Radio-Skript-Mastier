@@ -29,6 +29,29 @@ export function SupportChat() {
   }, [messages, scrollToBottom]);
 
   useEffect(() => {
+    if (!isOpen || messages.length === 0) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/support-chat/admin-replies");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.replies && data.replies.length > 0) {
+            const existing = new Set(messages.filter(m => m.role === "assistant").map(m => m.content));
+            const newReplies = data.replies.filter((r: { content: string }) => !existing.has(r.content));
+            if (newReplies.length > 0) {
+              setMessages(prev => [
+                ...prev,
+                ...newReplies.map((r: { content: string }) => ({ role: "assistant" as const, content: r.content })),
+              ]);
+            }
+          }
+        }
+      } catch {}
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [isOpen, messages]);
+
+  useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
     }

@@ -139,7 +139,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ error: "Authentication required" });
   }
   const user = await storage.getUser(req.session.userId);
-  if (user?.blocked) {
+  if (!user) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  if (user.blocked) {
     req.session.destroy(() => {});
     return res.status(403).json({ error: "Your account has been blocked" });
   }
