@@ -72,106 +72,81 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import type { ProgramType, Program, Settings as AppSettings, Voice } from "@shared/schema";
 
-const getDefaultProgramTypes = (stationName: string) => [
+const getDefaultProgramTypes = (stationName: string, t: (key: string) => string) => [
   {
-    name: "Новости",
+    name: t("defaults.newsName"),
     slug: "news",
-    description: "Новостной выпуск",
+    description: t("defaults.newsDesc"),
     icon: "newspaper",
     dailyCount: 4,
     slotDescriptions: [
-      "Утренний выпуск: главные новости дня, что произошло за ночь",
-      "Дневной выпуск: актуальные события первой половины дня",
-      "Вечерний выпуск: итоги дня, важные события",
-      "Ночной выпуск: краткий обзор дня, что ожидать завтра",
+      t("defaults.newsSlot1"),
+      t("defaults.newsSlot2"),
+      t("defaults.newsSlot3"),
+      t("defaults.newsSlot4"),
     ],
-    defaultPrompt: `Создай краткий новостной выпуск для радио "${stationName}".
-Тематика: местные новости Аланьи и Турции, интересные мировые события
-Стиль: информативный, но не сухой, дайджест-формат
-Длительность: 30-40 секунд при чтении
-Включи: 3-4 новости коротко, четко, интересно`,
+    defaultPrompt: t("defaults.newsPrompt").replace("{stationName}", stationName),
   },
   {
-    name: "Дайджест",
+    name: t("defaults.digestName"),
     slug: "digest",
-    description: "Обзор интересных событий",
+    description: t("defaults.digestDesc"),
     icon: "file-text",
     dailyCount: 2,
     slotDescriptions: [
-      "Утренний дайджест: интересные факты и события на сегодня",
-      "Вечерний дайджест: что интересного произошло, полезные советы",
+      t("defaults.digestSlot1"),
+      t("defaults.digestSlot2"),
     ],
-    defaultPrompt: `Создай дайджест интересных событий для радио "${stationName}".
-Тематика: события в Аланье, полезные советы для экспатов
-Стиль: информативный и дружелюбный, коротко и ёмко
-Длительность: 30-40 секунд при чтении`,
+    defaultPrompt: t("defaults.digestPrompt").replace("{stationName}", stationName),
   },
   {
-    name: "Новости ИИ",
-    slug: "ai-news",
-    description: "Новости искусственного интеллекта",
+    name: t("defaults.techName"),
+    slug: "tech-news",
+    description: t("defaults.techDesc"),
     icon: "brain",
     dailyCount: 2,
     slotDescriptions: [
-      "Утренний выпуск: главные новости мира ИИ и технологий",
-      "Вечерний выпуск: интересные разработки и тренды ИИ",
+      t("defaults.techSlot1"),
+      t("defaults.techSlot2"),
     ],
-    defaultPrompt: `Создай краткий выпуск новостей искусственного интеллекта для радио "${stationName}".
-Тематика: новые модели ИИ, интересные применения, тренды технологий
-Стиль: доступный, без сложных терминов, с примерами из жизни
-Длительность: 25-35 секунд при чтении
-Формат: дайджест, коротко, четко, прикольно`,
+    defaultPrompt: t("defaults.techPrompt").replace("{stationName}", stationName),
   },
   {
-    name: "Светские новости",
+    name: t("defaults.celebName"),
     slug: "celebrity",
-    description: "Новости шоу-бизнеса",
+    description: t("defaults.celebDesc"),
     icon: "sparkles",
-    dailyCount: 6,
+    dailyCount: 4,
     slotDescriptions: [
-      "Утро #1: свежие новости шоу-бизнеса",
-      "Утро #2: интересные факты о звёздах",
-      "День #1: скандалы и сенсации",
-      "День #2: новости кино и музыки",
-      "Вечер #1: светская хроника дня",
-      "Вечер #2: забавные истории из жизни знаменитостей",
+      t("defaults.celebSlot1"),
+      t("defaults.celebSlot2"),
+      t("defaults.celebSlot3"),
+      t("defaults.celebSlot4"),
     ],
-    defaultPrompt: `Создай выпуск светских новостей для радио "${stationName}".
-Тематика: интересные события из мира звёзд, забавные факты
-Стиль: лёгкий, с юмором, дайджест-формат
-Длительность: 20-30 секунд при чтении
-Формат: коротко, ярко, запоминающеся`,
+    defaultPrompt: t("defaults.celebPrompt").replace("{stationName}", stationName),
   },
   {
-    name: "Прогноз погоды",
+    name: t("defaults.weatherName"),
     slug: "weather",
-    description: "Прогноз погоды для Аланьи",
+    description: t("defaults.weatherDesc"),
     icon: "cloud-sun",
     dailyCount: 2,
     slotDescriptions: [
-      "Утренний прогноз: какая погода сегодня днём, вечером, совет слушателям",
-      "Вечерний прогноз: какая погода ночью и завтра, прогноз на завтра",
+      t("defaults.weatherSlot1"),
+      t("defaults.weatherSlot2"),
     ],
-    defaultPrompt: `Создай краткий прогноз погоды для радио "${stationName}".
-Город: Аланья, Турция
-Стиль: дружелюбный, неформальный
-Длительность: 20-30 секунд при чтении
-Включи: текущую погоду, прогноз, совет слушателям`,
+    defaultPrompt: t("defaults.weatherPrompt").replace("{stationName}", stationName),
   },
   {
-    name: "Куда сходить в Аланье",
-    slug: "alanya-guide",
-    description: "Рекомендации мест и развлечений",
+    name: t("defaults.guideName"),
+    slug: "local-guide",
+    description: t("defaults.guideDesc"),
     icon: "map-pin",
     dailyCount: 1,
     slotDescriptions: [
-      "Рекомендация дня: интересное место, ресторан или мероприятие в Аланье",
+      t("defaults.guideSlot1"),
     ],
-    defaultPrompt: `Создай рекомендацию для рубрики "Куда сходить в Аланье" для радио "${stationName}".
-Тематика: интересные места, рестораны, кафе, мероприятия, пляжи, экскурсии
-Стиль: дружелюбный, как совет от друга-экспата
-Длительность: 25-35 секунд при чтении
-Включи: название места, почему стоит посетить, практические советы (время, цены, как добраться)`,
+    defaultPrompt: t("defaults.guidePrompt").replace("{stationName}", stationName),
   },
 ];
 
@@ -247,7 +222,7 @@ export default function ShowsPage() {
   });
 
   const stationName = appSettings?.stationName || t("shows.stationDefault");
-  const defaultProgramTypes = getDefaultProgramTypes(stationName);
+  const defaultProgramTypes = getDefaultProgramTypes(stationName, t);
 
   const { data: programTypes, isLoading: isLoadingTypes } = useQuery<ProgramType[]>({
     queryKey: ["/api/program-types"],
