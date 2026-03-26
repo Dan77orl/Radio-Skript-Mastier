@@ -358,25 +358,60 @@ export default function AdminPage() {
               )}
 
               {usage?.stats && usage.stats.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {Object.entries(
-                    usage.stats.reduce((acc, s) => {
-                      acc[s.action] = (acc[s.action] || 0) + s.count;
-                      return acc;
-                    }, {} as Record<string, number>)
-                  ).map(([action, count]) => (
-                    <Card key={action}>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                          {actionLabels[action] || action}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-3xl font-bold">{count}</div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {Object.entries(
+                      usage.stats.reduce((acc, s) => {
+                        acc[s.action] = (acc[s.action] || 0) + s.count;
+                        return acc;
+                      }, {} as Record<string, number>)
+                    ).map(([action, count]) => (
+                      <Card key={action}>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            {actionLabels[action] || action}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-3xl font-bold">{count}</div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Per-User Breakdown</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>User</TableHead>
+                            <TableHead>Action</TableHead>
+                            <TableHead>Count</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {usage.stats.map((s, i) => {
+                            const u = users?.find(u => u.id === s.userId);
+                            return (
+                              <TableRow key={i} data-testid={`row-usage-${i}`}>
+                                <TableCell className="font-medium">
+                                  {u?.email || s.userId?.slice(0, 8) || "—"}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">{actionLabels[s.action] || s.action}</Badge>
+                                </TableCell>
+                                <TableCell className="font-bold">{s.count}</TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </>
               )}
 
               <Card>

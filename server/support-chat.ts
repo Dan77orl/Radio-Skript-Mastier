@@ -217,7 +217,6 @@ export async function handleSupportChat(req: Request, res: Response) {
     const pendingAdminReplies = await (async () => {
       try {
         const dbMessages = await storage.getSupportMessagesBySession(sessionId);
-        const lastInMemoryIdx = history.length;
         const adminReplies = dbMessages
           .filter(m => m.role === "admin")
           .slice(-5);
