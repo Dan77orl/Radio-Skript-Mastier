@@ -605,9 +605,11 @@ async function concatMp3WithFfmpeg(segmentFiles: string[], outputFile: string, t
       "-f", "concat",
       "-safe", "0",
       "-i", listFile,
-      "-c", "copy",
+      "-c:a", "libmp3lame",
+      "-b:a", "192k",
+      "-write_xing", "1",
       outputFile,
-    ], { timeout: 60000 });
+    ], { timeout: 120000 });
     console.log(`ffmpeg concat: ${segmentFiles.length} segments -> ${path.basename(outputFile)}`);
   } catch (err: any) {
     console.warn("ffmpeg concat failed, falling back to Buffer.concat:", err.message);
@@ -631,14 +633,15 @@ async function ensureRemuxed(filePath: string): Promise<string> {
     const { promisify } = await import("util");
     const execFileAsync = promisify(execFile);
 
-    const tmpFile = filePath + ".remux.tmp";
-    await execFileAsync("ffmpeg", ["-y", "-i", filePath, "-c", "copy", tmpFile], { timeout: 30000 });
+    const dir = path.dirname(filePath);
+    const base = path.basename(filePath, ".mp3");
+    const tmpFile = path.join(dir, `_remux_${base}_${Date.now()}.mp3`);
+    await execFileAsync("ffmpeg", ["-y", "-i", filePath, "-c:a", "libmp3lame", "-b:a", "192k", "-write_xing", "1", tmpFile], { timeout: 60000 });
     await fs.rename(tmpFile, filePath);
     remuxedCache.add(filePath);
     console.log(`Remuxed: ${path.basename(filePath)}`);
   } catch (err: any) {
-    console.warn(`Remux skipped for ${path.basename(filePath)}: ${err.message}`);
-    remuxedCache.add(filePath);
+    console.warn(`Remux failed for ${path.basename(filePath)}: ${err.message}`);
   }
 
   return filePath;
