@@ -19,6 +19,7 @@ export function SupportChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const lastAdminReplyTimeRef = useRef<string | null>(null);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -36,9 +37,12 @@ export function SupportChat() {
         if (res.ok) {
           const data = await res.json();
           if (data.replies && data.replies.length > 0) {
-            const existing = new Set(messages.filter(m => m.role === "assistant").map(m => m.content));
-            const newReplies = data.replies.filter((r: { content: string }) => !existing.has(r.content));
+            const lastSeen = lastAdminReplyTimeRef.current;
+            const newReplies = lastSeen
+              ? data.replies.filter((r: { content: string; createdAt: string }) => r.createdAt > lastSeen)
+              : data.replies;
             if (newReplies.length > 0) {
+              lastAdminReplyTimeRef.current = newReplies[newReplies.length - 1].createdAt;
               setMessages(prev => [
                 ...prev,
                 ...newReplies.map((r: { content: string }) => ({ role: "assistant" as const, content: r.content })),

@@ -130,24 +130,28 @@ export async function updateUserLanguage(req: Request, res: Response) {
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const internalKey = req.headers["x-internal-key"] as string;
-  if (internalKey && internalKey === process.env.VOICE_AGENT_API_KEY) {
-    req.session.userId = req.headers["x-internal-user-id"] as string || "system";
-    return next();
+  try {
+    const internalKey = req.headers["x-internal-key"] as string;
+    if (internalKey && internalKey === process.env.VOICE_AGENT_API_KEY) {
+      req.session.userId = req.headers["x-internal-user-id"] as string || "system";
+      return next();
+    }
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user) {
+      req.session.destroy(() => {});
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    if (user.blocked) {
+      req.session.destroy(() => {});
+      return res.status(403).json({ error: "Your account has been blocked" });
+    }
+    next();
+  } catch (err) {
+    next(err);
   }
-  if (!req.session.userId) {
-    return res.status(401).json({ error: "Authentication required" });
-  }
-  const user = await storage.getUser(req.session.userId);
-  if (!user) {
-    req.session.destroy(() => {});
-    return res.status(401).json({ error: "Authentication required" });
-  }
-  if (user.blocked) {
-    req.session.destroy(() => {});
-    return res.status(403).json({ error: "Your account has been blocked" });
-  }
-  next();
 }
 
 export async function ensureAdminExists() {
@@ -164,12 +168,16 @@ export async function ensureAdminExists() {
 }
 
 export async function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  if (!req.session.userId) {
-    return res.status(401).json({ error: "Authentication required" });
+  try {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    next();
+  } catch (err) {
+    next(err);
   }
-  const user = await storage.getUser(req.session.userId);
-  if (!user || user.role !== "admin") {
-    return res.status(403).json({ error: "Admin access required" });
-  }
-  next();
 }
