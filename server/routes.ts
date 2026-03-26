@@ -2585,6 +2585,100 @@ Create exactly ${dailyCount} dialogs.`;
     }
   });
 
+  const validAdCategories = new Set(["general", "restaurant", "real_estate", "services", "shop", "events"]);
+  function sanitizeParseResult(raw: Record<string, unknown>) {
+    const dur = typeof raw.targetDurationSeconds === "number"
+      ? raw.targetDurationSeconds
+      : parseInt(String(raw.targetDurationSeconds), 10) || 30;
+    const cat = typeof raw.category === "string" && validAdCategories.has(raw.category)
+      ? raw.category : "general";
+    return {
+      clientName: typeof raw.clientName === "string" ? raw.clientName.trim() : "",
+      websiteUrl: typeof raw.websiteUrl === "string" ? raw.websiteUrl.trim() : "",
+      instagramUrl: typeof raw.instagramUrl === "string" ? raw.instagramUrl.trim() : "",
+      category: cat,
+      targetDurationSeconds: Math.max(10, Math.min(120, dur)),
+      description: typeof raw.description === "string" ? raw.description.trim() : "",
+    };
+  }
+
+  app.post("/api/ads/parse-prompt", async (req, res) => {
+    try {
+      const { text } = req.body;
+      if (!text || text.length < 5) {
+        return res.status(400).json({ error: "Text is required" });
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      const userLang = user?.language || "en";
+      const ps = getPromptStrings(userLang);
+
+      const systemPrompt = `${ps.langDirective}
+You are an assistant that extracts structured ad brief data from free-form text.
+The user describes what they want to advertise. Extract as much information as possible.
+
+Return a JSON object with these fields (leave empty string "" if not found):
+{
+  "clientName": "business/client name",
+  "websiteUrl": "website URL if mentioned",
+  "instagramUrl": "Instagram handle if mentioned (with @)",
+  "category": "one of: general, restaurant, real_estate, services, shop, events",
+  "targetDurationSeconds": number (default 30 if not mentioned),
+  "description": "the core ad description/brief, cleaned up and structured"
+}
+
+Be smart: if the user mentions a restaurant name, set category to "restaurant". If they mention a shop or store, set category to "shop", etc. Try to find website and Instagram even if not explicitly labeled. If the user mentions duration like "30 seconds" or "15 sec", extract it.
+
+Return ONLY valid JSON, no extra text.`;
+
+      const anthropic = await getAnthropicClient(req.session.userId);
+      if (anthropic) {
+        const response = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 512,
+          system: systemPrompt,
+          messages: [{ role: "user", content: text }],
+        });
+
+        const textContent = response.content.find(c => c.type === "text");
+        if (!textContent || textContent.type !== "text") {
+          return res.status(500).json({ error: "No response from AI" });
+        }
+
+        const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          return res.status(500).json({ error: "Invalid response format" });
+        }
+
+        const parsed = JSON.parse(jsonMatch[0]);
+        logUsage(req.session.userId!, "ad_parse_prompt", "Claude");
+        return res.json(sanitizeParseResult(parsed));
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4.1",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: text },
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 512,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "No response from AI" });
+      }
+
+      const parsed = JSON.parse(content);
+      logUsage(req.session.userId!, "ad_parse_prompt", "OpenAI");
+      res.json(sanitizeParseResult(parsed));
+    } catch (error) {
+      console.error("Error parsing ad prompt:", error);
+      res.status(500).json({ error: "Failed to parse prompt" });
+    }
+  });
+
   app.post("/api/generate-ad", async (req, res) => {
     try {
       const { prompt, clientName, category } = req.body;

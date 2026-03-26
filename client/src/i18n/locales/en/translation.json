@@ -571,7 +571,10 @@
     "inactive": "Inactive",
     "noPresets": "No presets",
     "noPresetsDesc": "Create your first preset for quick ad creation",
-    "fromFile": "From file"
+    "fromFile": "From file",
+    "smartPromptPlaceholder": "Describe the client and ad in free form — AI will fill in the fields...",
+    "smartPromptHint": "Type or dictate: client name, what to advertise, website, Instagram, duration. AI will parse and fill in the form.",
+    "smartParsed": "Form filled from your description"
   },
   "shows": {
     "title": "Shows",

@@ -557,7 +557,10 @@
     "inactive": "Pasif",
     "noPresets": "Şablon yok",
     "noPresetsDesc": "Hızlı reklam oluşturmak için ilk şablonunuzu oluşturun",
-    "fromFile": "Dosyadan"
+    "fromFile": "Dosyadan",
+    "smartPromptPlaceholder": "Müşteriyi ve reklamı serbest formda tanımlayın — yapay zeka alanları dolduracak...",
+    "smartPromptHint": "Yazın veya sesle söyleyin: müşteri adı, ne reklamlanacak, web sitesi, Instagram, süre. Yapay zeka ayrıştırıp formu dolduracak.",
+    "smartParsed": "Form açıklamanızdan dolduruldu"
   },
   "shows": {
     "title": "Programlar",

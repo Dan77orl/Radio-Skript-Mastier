@@ -99,6 +99,9 @@ export default function AdsPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedVariantForEdit, setSelectedVariantForEdit] = useState<number | null>(null);
   const [editInstructions, setEditInstructions] = useState("");
+  const [smartPrompt, setSmartPrompt] = useState("");
+  const [isParsingPrompt, setIsParsingPrompt] = useState(false);
+  const smartInputRef = useRef<HTMLInputElement | null>(null);
   const [musicSearchQuery, setMusicSearchQuery] = useState("");
   const [isSearchingMusic, setIsSearchingMusic] = useState(false);
   const [musicSearchResults, setMusicSearchResults] = useState<Array<{
@@ -188,6 +191,28 @@ export default function AdsPage() {
       category: "general",
     },
   });
+
+  const handleSmartParse = async () => {
+    if (!smartPrompt.trim() || smartPrompt.trim().length < 5) return;
+    setIsParsingPrompt(true);
+    try {
+      const res = await apiRequest("POST", "/api/ads/parse-prompt", { text: smartPrompt });
+      const data = await res.json();
+      if (data.clientName) form.setValue("clientName", data.clientName);
+      if (data.websiteUrl) form.setValue("websiteUrl", data.websiteUrl);
+      if (data.instagramUrl) form.setValue("instagramUrl", data.instagramUrl);
+      if (data.category && data.category !== "general") form.setValue("category", data.category);
+      if (data.targetDurationSeconds && data.targetDurationSeconds !== 30) {
+        form.setValue("targetDurationSeconds", data.targetDurationSeconds);
+      }
+      if (data.description) form.setValue("prompt", data.description);
+      toast({ title: t("ads.smartParsed") });
+    } catch {
+      toast({ title: t("common.error"), variant: "destructive" });
+    } finally {
+      setIsParsingPrompt(false);
+    }
+  };
 
   const createAdMutation = useMutation({
     mutationFn: async (data: AdFormValues) => {
@@ -1146,7 +1171,44 @@ export default function AdsPage() {
           )}
         </>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex gap-2 items-start">
+                <div className="flex-1 relative">
+                  <Textarea
+                    placeholder={t("ads.smartPromptPlaceholder")}
+                    value={smartPrompt}
+                    onChange={(e) => setSmartPrompt(e.target.value)}
+                    rows={2}
+                    className="pr-10 resize-none"
+                    data-testid="textarea-smart-prompt"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSmartParse();
+                      }
+                    }}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <VoiceInput onTranscript={(text) => setSmartPrompt((prev) => (prev ? prev + " " : "") + text)} />
+                  <Button
+                    type="button"
+                    onClick={handleSmartParse}
+                    disabled={isParsingPrompt || smartPrompt.trim().length < 5}
+                    size="icon"
+                    data-testid="button-smart-parse"
+                  >
+                    {isParsingPrompt ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">{t("ads.smartPromptHint")}</p>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1260,7 +1322,7 @@ export default function AdsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>{t("ads.category")}</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger data-testid="select-category">
                                 <SelectValue placeholder={t("ads.selectCategory")} />
@@ -1492,6 +1554,7 @@ export default function AdsPage() {
               )}
             </CardContent>
           </Card>
+          </div>
         </div>
       )}
         </TabsContent>
