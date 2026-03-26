@@ -2602,6 +2602,111 @@ Create exactly ${dailyCount} dialogs.`;
     };
   }
 
+  app.post("/api/ads/parse-prompt-image", upload.single("image"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No image uploaded" });
+      }
+
+      const text = (req.body.text || "").trim();
+      const user = await storage.getUser(req.session.userId!);
+      const userLang = user?.language || "en";
+      const ps = getPromptStrings(userLang);
+
+      const imageBuffer = await fs.readFile(req.file.path);
+      const base64Image = imageBuffer.toString("base64");
+      const mediaType = req.file.mimetype as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+
+      const systemPrompt = `${ps.langDirective}
+You are an assistant that extracts structured ad brief data from an image (and optional text).
+Analyze the image carefully using computer vision. Extract all visible text, logos, brand names, contact info, social media handles, website URLs, phone numbers, and product/service descriptions.
+
+Return a JSON object with these fields (leave empty string "" if not found):
+{
+  "clientName": "business/client name from logo or text",
+  "websiteUrl": "website URL if visible",
+  "instagramUrl": "Instagram handle if visible (with @)",
+  "category": "one of: general, restaurant, real_estate, services, shop, events",
+  "targetDurationSeconds": 30,
+  "description": "comprehensive description of what to advertise based on the image content and any provided text"
+}
+
+Be thorough: read ALL text on the image, identify the business type from visual cues (food photos = restaurant, property photos = real_estate, etc.).
+Return ONLY valid JSON, no extra text.`;
+
+      const anthropic = await getAnthropicClient(req.session.userId);
+      if (anthropic) {
+        const userContent: Array<{ type: string; source?: any; text?: string }> = [
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: mediaType,
+              data: base64Image,
+            },
+          },
+        ];
+        if (text) {
+          userContent.push({ type: "text", text: `Additional context from user: ${text}` });
+        }
+
+        const response = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userContent as any }],
+        });
+
+        const textContent = response.content.find(c => c.type === "text");
+        if (!textContent || textContent.type !== "text") {
+          return res.status(500).json({ error: "No response from AI" });
+        }
+
+        const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          return res.status(500).json({ error: "Invalid response format" });
+        }
+
+        const parsed = JSON.parse(jsonMatch[0]);
+        logUsage(req.session.userId!, "ad_parse_image", "Claude");
+        await fs.unlink(req.file.path).catch(() => {});
+        return res.json(sanitizeParseResult(parsed));
+      }
+
+      const dataUrl = `data:${mediaType};base64,${base64Image}`;
+      const messages: any[] = [
+        {
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: dataUrl } },
+            { type: "text", text: text ? `Additional context: ${text}\n\n${systemPrompt}` : systemPrompt },
+          ],
+        },
+      ];
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4.1",
+        messages,
+        response_format: { type: "json_object" },
+        max_completion_tokens: 1024,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "No response from AI" });
+      }
+
+      const parsed = JSON.parse(content);
+      logUsage(req.session.userId!, "ad_parse_image", "OpenAI");
+      await fs.unlink(req.file.path).catch(() => {});
+      res.json(sanitizeParseResult(parsed));
+    } catch (error) {
+      console.error("Error parsing image:", error);
+      if (req.file) await fs.unlink(req.file.path).catch(() => {});
+      res.status(500).json({ error: "Failed to parse image" });
+    }
+  });
+
   app.post("/api/ads/parse-prompt", async (req, res) => {
     try {
       const { text } = req.body;

@@ -573,8 +573,15 @@
     "noPresetsDesc": "Create your first preset for quick ad creation",
     "fromFile": "From file",
     "smartPromptPlaceholder": "Describe the client and ad in free form — AI will fill in the fields...",
-    "smartPromptHint": "Type or dictate: client name, what to advertise, website, Instagram, duration. AI will parse and fill in the form.",
-    "smartParsed": "Form filled from your description"
+    "smartPromptHint": "Type or dictate, attach a photo. AI will parse and fill in the form.",
+    "smartParsed": "Form filled from your description",
+    "myVoices": "My voices",
+    "addPersona": "Add persona",
+    "voiceLibrary": "Voice library",
+    "searchVoicePlaceholder": "Search voices...",
+    "allGenders": "All",
+    "reRenderVoice": "Try a different voice",
+    "resynthesizeVoice": "Re-render audio"
   },
   "shows": {
     "title": "Shows",

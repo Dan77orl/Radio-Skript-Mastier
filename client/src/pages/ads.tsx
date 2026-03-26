@@ -101,7 +101,14 @@ export default function AdsPage() {
   const [editInstructions, setEditInstructions] = useState("");
   const [smartPrompt, setSmartPrompt] = useState("");
   const [isParsingPrompt, setIsParsingPrompt] = useState(false);
-  const smartInputRef = useRef<HTMLInputElement | null>(null);
+  const smartImageInputRef = useRef<HTMLInputElement | null>(null);
+  const [smartImage, setSmartImage] = useState<File | null>(null);
+  const [smartImagePreview, setSmartImagePreview] = useState<string | null>(null);
+  const [showVoiceLibrary, setShowVoiceLibrary] = useState(false);
+  const [voiceSearchQuery, setVoiceSearchQuery] = useState("");
+  const [voiceSearchGender, setVoiceSearchGender] = useState("all");
+  const [previewingVoiceUrl, setPreviewingVoiceUrl] = useState<string | null>(null);
+  const voicePreviewRef = useRef<HTMLAudioElement | null>(null);
   const [musicSearchQuery, setMusicSearchQuery] = useState("");
   const [isSearchingMusic, setIsSearchingMusic] = useState(false);
   const [musicSearchResults, setMusicSearchResults] = useState<Array<{
@@ -139,6 +146,23 @@ export default function AdsPage() {
 
   const { data: adPresets } = useQuery<AdPreset[]>({
     queryKey: ["/api/ad-presets"],
+  });
+
+  const voiceSearchUrl = `/api/elevenlabs/voices/search?q=${encodeURIComponent(voiceSearchQuery)}&gender=${voiceSearchGender}`;
+  const { data: sharedVoicesData, isLoading: isSearchingVoices } = useQuery<{
+    voices: Array<{
+      voice_id: string;
+      public_owner_id: string;
+      name: string;
+      category: string;
+      labels?: { gender?: string; accent?: string; age?: string; language?: string; use_case?: string };
+      preview_url?: string;
+      description?: string;
+    }>;
+    has_more: boolean;
+  }>({
+    queryKey: [voiceSearchUrl],
+    enabled: showVoiceLibrary,
   });
 
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
@@ -192,26 +216,70 @@ export default function AdsPage() {
     },
   });
 
+  const handleSmartImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSmartImage(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setSmartImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const applyParsedData = (data: Record<string, unknown>) => {
+    if (data.clientName) form.setValue("clientName", data.clientName as string);
+    if (data.websiteUrl) form.setValue("websiteUrl", data.websiteUrl as string);
+    if (data.instagramUrl) form.setValue("instagramUrl", data.instagramUrl as string);
+    if (data.category && data.category !== "general") form.setValue("category", data.category as string);
+    if (data.targetDurationSeconds && data.targetDurationSeconds !== 30) {
+      form.setValue("targetDurationSeconds", data.targetDurationSeconds as number);
+    }
+    if (data.description) form.setValue("prompt", data.description as string);
+    toast({ title: t("ads.smartParsed") });
+  };
+
   const handleSmartParse = async () => {
-    if (!smartPrompt.trim() || smartPrompt.trim().length < 5) return;
+    const hasText = smartPrompt.trim().length >= 5;
+    const hasImage = !!smartImage;
+    if (!hasText && !hasImage) return;
+
     setIsParsingPrompt(true);
     try {
-      const res = await apiRequest("POST", "/api/ads/parse-prompt", { text: smartPrompt });
-      const data = await res.json();
-      if (data.clientName) form.setValue("clientName", data.clientName);
-      if (data.websiteUrl) form.setValue("websiteUrl", data.websiteUrl);
-      if (data.instagramUrl) form.setValue("instagramUrl", data.instagramUrl);
-      if (data.category && data.category !== "general") form.setValue("category", data.category);
-      if (data.targetDurationSeconds && data.targetDurationSeconds !== 30) {
-        form.setValue("targetDurationSeconds", data.targetDurationSeconds);
+      if (hasImage) {
+        const formData = new FormData();
+        formData.append("image", smartImage!);
+        if (smartPrompt.trim()) formData.append("text", smartPrompt.trim());
+        const res = await fetch("/api/ads/parse-prompt-image", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error("Failed");
+        applyParsedData(await res.json());
+      } else {
+        const res = await apiRequest("POST", "/api/ads/parse-prompt", { text: smartPrompt });
+        applyParsedData(await res.json());
       }
-      if (data.description) form.setValue("prompt", data.description);
-      toast({ title: t("ads.smartParsed") });
     } catch {
       toast({ title: t("common.error"), variant: "destructive" });
     } finally {
       setIsParsingPrompt(false);
     }
+  };
+
+  const previewVoice = (url: string) => {
+    if (voicePreviewRef.current) {
+      voicePreviewRef.current.pause();
+      voicePreviewRef.current = null;
+    }
+    if (previewingVoiceUrl === url) {
+      setPreviewingVoiceUrl(null);
+      return;
+    }
+    const audio = new Audio(url);
+    voicePreviewRef.current = audio;
+    audio.onended = () => setPreviewingVoiceUrl(null);
+    audio.play().catch(() => setPreviewingVoiceUrl(null));
+    setPreviewingVoiceUrl(url);
   };
 
   const createAdMutation = useMutation({
@@ -730,6 +798,19 @@ export default function AdsPage() {
                 <p className="text-sm">{currentAd.selectedVariantText}</p>
               </div>
 
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium">{t("ads.myVoices")}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowVoiceLibrary(!showVoiceLibrary)}
+                  data-testid="button-add-persona"
+                >
+                  {showVoiceLibrary ? <X className="mr-1 h-4 w-4" /> : <Plus className="mr-1 h-4 w-4" />}
+                  {showVoiceLibrary ? t("common.close") : t("ads.addPersona")}
+                </Button>
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-2">
                 {voices?.filter(v => v.isActive).map((voice) => (
                   <div
@@ -784,6 +865,90 @@ export default function AdsPage() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+
+              {showVoiceLibrary && (
+                <div className="border rounded-lg p-4 space-y-3">
+                  <p className="text-sm font-medium">{t("ads.voiceLibrary")}</p>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder={t("ads.searchVoicePlaceholder")}
+                      value={voiceSearchQuery}
+                      onChange={(e) => setVoiceSearchQuery(e.target.value)}
+                      className="flex-1"
+                      data-testid="input-voice-search"
+                    />
+                    <Select value={voiceSearchGender} onValueChange={setVoiceSearchGender}>
+                      <SelectTrigger className="w-28" data-testid="select-voice-gender">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t("ads.allGenders")}</SelectItem>
+                        <SelectItem value="male">{t("ads.male")}</SelectItem>
+                        <SelectItem value="female">{t("ads.female")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {isSearchingVoices ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[250px]">
+                      <div className="grid gap-2">
+                        {sharedVoicesData?.voices?.map((voice) => (
+                          <div
+                            key={voice.voice_id}
+                            className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors hover-elevate ${
+                              selectedVoiceId === voice.voice_id ? "border-primary bg-primary/5" : ""
+                            }`}
+                            onClick={() => setSelectedVoiceId(voice.voice_id)}
+                            data-testid={`shared-voice-${voice.voice_id}`}
+                          >
+                            <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                              voice.labels?.gender === "male" ? "bg-blue-500/20" : "bg-pink-500/20"
+                            }`}>
+                              <User className={`h-5 w-5 ${
+                                voice.labels?.gender === "male" ? "text-blue-500" : "text-pink-500"
+                              }`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate text-sm">{voice.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {[voice.labels?.gender, voice.labels?.accent, voice.labels?.age].filter(Boolean).join(" · ")}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {voice.preview_url && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    previewVoice(voice.preview_url!);
+                                  }}
+                                  data-testid={`preview-voice-${voice.voice_id}`}
+                                >
+                                  {previewingVoiceUrl === voice.preview_url ? (
+                                    <PauseCircle className="h-4 w-4" />
+                                  ) : (
+                                    <PlayCircle className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              )}
+                              {selectedVoiceId === voice.voice_id && (
+                                <Check className="h-4 w-4 text-primary" />
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
                 </div>
               )}
 
@@ -870,6 +1035,45 @@ export default function AdsPage() {
 
               <div className="rounded-lg bg-muted p-4">
                 <p className="text-sm">{currentAd.selectedVariantText}</p>
+              </div>
+
+              <div className="border rounded-lg p-4 space-y-3">
+                <p className="text-sm font-medium">{t("ads.reRenderVoice")}</p>
+                <div className="flex gap-2 flex-wrap">
+                  {voices?.filter(v => v.isActive).map((voice) => (
+                    <Button
+                      key={voice.id}
+                      variant={selectedVoiceId === voice.elevenLabsVoiceId ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedVoiceId(voice.elevenLabsVoiceId)}
+                      data-testid={`rerender-voice-${voice.id}`}
+                    >
+                      <Volume2 className="mr-1 h-3 w-3" />
+                      {getCleanVoiceName(voice)}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  onClick={() => {
+                    if (selectedVoiceId) {
+                      synthesizeAudioMutation.mutate({
+                        adId: currentAd.id,
+                        voiceIds: [selectedVoiceId],
+                      });
+                    }
+                  }}
+                  disabled={!selectedVoiceId || synthesizeAudioMutation.isPending}
+                  size="sm"
+                  variant="secondary"
+                  data-testid="button-resynthesize"
+                >
+                  {synthesizeAudioMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                  )}
+                  {t("ads.resynthesizeVoice")}
+                </Button>
               </div>
 
               <div className="space-y-4 border-t pt-4">
@@ -1175,13 +1379,13 @@ export default function AdsPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex gap-2 items-start">
-                <div className="flex-1 relative">
+                <div className="flex-1 space-y-2">
                   <Textarea
                     placeholder={t("ads.smartPromptPlaceholder")}
                     value={smartPrompt}
                     onChange={(e) => setSmartPrompt(e.target.value)}
                     rows={2}
-                    className="pr-10 resize-none"
+                    className="resize-none"
                     data-testid="textarea-smart-prompt"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
@@ -1190,13 +1394,43 @@ export default function AdsPage() {
                       }
                     }}
                   />
+                  {smartImagePreview && (
+                    <div className="relative inline-block">
+                      <img src={smartImagePreview} alt="preview" className="h-16 rounded-md border" />
+                      <button
+                        type="button"
+                        className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs"
+                        onClick={() => { setSmartImage(null); setSmartImagePreview(null); }}
+                        data-testid="button-remove-smart-image"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col gap-1">
                   <VoiceInput onTranscript={(text) => setSmartPrompt((prev) => (prev ? prev + " " : "") + text)} />
+                  <input
+                    ref={smartImageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleSmartImageSelect}
+                    className="hidden"
+                    data-testid="input-smart-image"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => smartImageInputRef.current?.click()}
+                    data-testid="button-upload-smart-image"
+                  >
+                    <Upload className="h-4 w-4" />
+                  </Button>
                   <Button
                     type="button"
                     onClick={handleSmartParse}
-                    disabled={isParsingPrompt || smartPrompt.trim().length < 5}
+                    disabled={isParsingPrompt || (smartPrompt.trim().length < 5 && !smartImage)}
                     size="icon"
                     data-testid="button-smart-parse"
                   >

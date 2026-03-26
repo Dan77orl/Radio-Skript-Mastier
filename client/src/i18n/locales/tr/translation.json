@@ -559,8 +559,15 @@
     "noPresetsDesc": "Hızlı reklam oluşturmak için ilk şablonunuzu oluşturun",
     "fromFile": "Dosyadan",
     "smartPromptPlaceholder": "Müşteriyi ve reklamı serbest formda tanımlayın — yapay zeka alanları dolduracak...",
-    "smartPromptHint": "Yazın veya sesle söyleyin: müşteri adı, ne reklamlanacak, web sitesi, Instagram, süre. Yapay zeka ayrıştırıp formu dolduracak.",
-    "smartParsed": "Form açıklamanızdan dolduruldu"
+    "smartPromptHint": "Yazın veya sesle söyleyin, fotoğraf ekleyin. Yapay zeka ayrıştırıp formu dolduracak.",
+    "smartParsed": "Form açıklamanızdan dolduruldu",
+    "myVoices": "Seslerim",
+    "addPersona": "Ses ekle",
+    "voiceLibrary": "Ses kütüphanesi",
+    "searchVoicePlaceholder": "Ses ara...",
+    "allGenders": "Tümü",
+    "reRenderVoice": "Farklı ses deneyin",
+    "resynthesizeVoice": "Sesi yeniden oluştur"
   },
   "shows": {
     "title": "Programlar",
