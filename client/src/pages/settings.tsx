@@ -15,7 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Save, Key, Mic, Settings2, Eye, EyeOff, Loader2, CheckCircle, AlertCircle, HardDrive, Radio, Upload, Globe, X, FileText, User, BookOpen } from "lucide-react";
+import { Save, Key, Mic, Settings2, Eye, EyeOff, Loader2, CheckCircle, AlertCircle, HardDrive, Radio, Upload, Globe, X, FileText, User, BookOpen, Wifi, WifiOff, Volume2, Brain, Search, Cloud, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { VoiceInput } from "@/components/voice-input";
 import { useAuth } from "@/hooks/use-auth";
 import type { Settings } from "@shared/schema";
@@ -44,6 +45,18 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const { user: authUser } = useAuth();
   const isAdmin = authUser?.role === "admin";
+  interface ServicesStatus {
+    elevenLabs: boolean;
+    anthropic: boolean;
+    firecrawl: boolean;
+    yandexDisk: boolean;
+    openai: boolean;
+    gemini: boolean;
+  }
+  const { data: servicesStatus } = useQuery<ServicesStatus>({
+    queryKey: ["/api/services-status"],
+  });
+
   const [showApiKey, setShowApiKey] = useState(false);
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showYandexToken, setShowYandexToken] = useState(false);
@@ -273,6 +286,55 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-bold tracking-tight" data-testid="text-settings-title">{t("settings.title")}</h1>
         <p className="text-muted-foreground">{t("settings.subtitle")}</p>
       </div>
+
+      {servicesStatus && (
+        <Card data-testid="card-services-status">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Wifi className="h-5 w-5" />
+              {t("settings.servicesStatus")}
+            </CardTitle>
+            <CardDescription>{t("settings.servicesStatusDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[
+                { key: "elevenLabs", label: "ElevenLabs", icon: Volume2, desc: t("settings.serviceVoice") },
+                { key: "anthropic", label: "Claude AI", icon: Brain, desc: t("settings.serviceAI") },
+                { key: "openai", label: "OpenAI", icon: Sparkles, desc: t("settings.serviceAIFallback") },
+                { key: "gemini", label: "Gemini", icon: Mic, desc: t("settings.serviceTranscription") },
+                { key: "firecrawl", label: "Firecrawl", icon: Search, desc: t("settings.serviceSearch") },
+                { key: "yandexDisk", label: "Yandex Disk", icon: Cloud, desc: t("settings.serviceStorage") },
+              ].map(({ key, label, icon: Icon, desc }) => {
+                const connected = servicesStatus[key as keyof ServicesStatus];
+                return (
+                  <div
+                    key={key}
+                    className={`flex flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors ${
+                      connected 
+                        ? "border-green-500/30 bg-green-500/5" 
+                        : "border-muted bg-muted/30"
+                    }`}
+                    data-testid={`status-service-${key}`}
+                  >
+                    <Icon className={`h-5 w-5 ${connected ? "text-green-500" : "text-muted-foreground"}`} />
+                    <div className="space-y-0.5">
+                      <p className={`text-sm font-medium ${connected ? "" : "text-muted-foreground"}`}>{label}</p>
+                      <p className="text-[10px] text-muted-foreground leading-tight">{desc}</p>
+                    </div>
+                    <Badge 
+                      variant={connected ? "default" : "secondary"} 
+                      className={`text-[10px] px-1.5 py-0 ${connected ? "bg-green-500 hover:bg-green-600" : ""}`}
+                    >
+                      {connected ? t("settings.connected") : t("settings.notConnected")}
+                    </Badge>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>

@@ -1420,6 +1420,31 @@ ${styleInstructions}
     }
   });
 
+  app.get("/api/services-status", async (req, res) => {
+    try {
+      const userSettings = await storage.getSettings(req.session?.userId);
+      
+      const elevenLabsKey = getEffectiveElevenLabsKey(userSettings);
+      const anthropicKey = getEffectiveAnthropicKey(userSettings);
+      const firecrawlKey = process.env.FIRECRAWL_API_KEY;
+      const yandexToken = userSettings?.yandexDiskToken || null;
+      const openaiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+      const geminiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
+      
+      res.json({
+        elevenLabs: !!elevenLabsKey,
+        anthropic: !!anthropicKey,
+        firecrawl: !!firecrawlKey,
+        yandexDisk: !!yandexToken,
+        openai: !!openaiKey,
+        gemini: !!geminiKey,
+      });
+    } catch (error) {
+      console.error("Error checking services status:", error);
+      res.status(500).json({ error: "Failed to check services" });
+    }
+  });
+
   app.post("/api/generate-audio", async (req, res) => {
     try {
       const { maleText, femaleText, title, scheduledDate, slotNumber, dialogId } = req.body;
