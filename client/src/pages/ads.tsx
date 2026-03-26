@@ -834,7 +834,7 @@ export default function AdsPage() {
                         asChild
                         data-testid="button-download-audio"
                       >
-                        <a href={currentAd.audioUrl} download={`${currentAd.title || "ad"}.mp3`}>
+                        <a href={`/api/ads/${currentAd.id}/download-audio`} download={`${currentAd.title || "ad"}.mp3`}>
                           <Download className="h-5 w-5" />
                         </a>
                       </Button>

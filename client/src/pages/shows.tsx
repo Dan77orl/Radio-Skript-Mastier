@@ -1323,7 +1323,7 @@ export default function ShowsPage() {
                                     <Play className="h-4 w-4" />
                                   )}
                                 </Button>
-                                <a href={program.audioUrl} download>
+                                <a href={`/api/programs/${program.id}/download-audio`} download>
                                   <Button size="icon" variant="outline" data-testid={`button-download-${program.id}`}>
                                     <Download className="h-4 w-4" />
                                   </Button>

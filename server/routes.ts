@@ -590,6 +590,37 @@ function isMultiSpeakerScript(scriptText: string): boolean {
   return !!matches && matches.length >= 2;
 }
 
+async function concatMp3WithFfmpeg(segmentFiles: string[], outputFile: string, tmpDir: string, timestamp: number): Promise<void> {
+  const { execFile } = await import("child_process");
+  const { promisify } = await import("util");
+  const execFileAsync = promisify(execFile);
+
+  const listFile = path.join(tmpDir, `_concat_${timestamp}.txt`);
+  const listContent = segmentFiles.map(f => `file '${f}'`).join("\n");
+  await fs.writeFile(listFile, listContent);
+
+  try {
+    await execFileAsync("ffmpeg", [
+      "-y",
+      "-f", "concat",
+      "-safe", "0",
+      "-i", listFile,
+      "-c", "copy",
+      outputFile,
+    ], { timeout: 60000 });
+    console.log(`ffmpeg concat: ${segmentFiles.length} segments -> ${path.basename(outputFile)}`);
+  } catch (err: any) {
+    console.warn("ffmpeg concat failed, falling back to Buffer.concat:", err.message);
+    const buffers: Buffer[] = [];
+    for (const f of segmentFiles) {
+      buffers.push(await fs.readFile(f));
+    }
+    await fs.writeFile(outputFile, Buffer.concat(buffers));
+  } finally {
+    await fs.unlink(listFile).catch(() => {});
+  }
+}
+
 interface WeatherData {
   temperature: number;
   windspeed: number;
@@ -1176,8 +1207,7 @@ ${styleInstructions}
       await fs.writeFile(maleFile, maleAudio);
       await fs.writeFile(femaleFile, femaleAudio);
 
-      const combined = Buffer.concat([maleAudio, femaleAudio]);
-      await fs.writeFile(combinedFile, combined);
+      await concatMp3WithFfmpeg([maleFile, femaleFile], combinedFile, audioDir, timestamp);
 
       await fs.unlink(maleFile).catch(() => {});
       await fs.unlink(femaleFile).catch(() => {});
@@ -1730,13 +1760,19 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
 
             const timestamp = Date.now();
             const combinedFile = path.join(audioDir, `dialog_${dialog.id}_${timestamp}.mp3`);
+            const maleFile = path.join(audioDir, `_male_${dialog.id}_${timestamp}.mp3`);
+            const femaleFile2 = path.join(audioDir, `_female_${dialog.id}_${timestamp}.mp3`);
 
-            const combined = Buffer.concat([maleAudio, femaleAudio]);
-            await fs.writeFile(combinedFile, combined);
+            await fs.writeFile(maleFile, maleAudio);
+            await fs.writeFile(femaleFile2, femaleAudio);
+            await concatMp3WithFfmpeg([maleFile, femaleFile2], combinedFile, audioDir, timestamp);
+            await fs.unlink(maleFile).catch(() => {});
+            await fs.unlink(femaleFile2).catch(() => {});
 
+            const stat = await fs.stat(combinedFile);
             await storage.updateDialog(dialog.id, {
               audioUrl: `/audio/dialog_${dialog.id}_${timestamp}.mp3`,
-              duration: Math.round((combined.length / 1024) * 0.5),
+              duration: Math.round(stat.size / (192000 / 8)),
               status: "ready",
             });
 
@@ -2591,6 +2627,38 @@ ${instructions || "Создай альтернативный вариант с �
     } catch (error) {
       console.error("Error starting audio synthesis:", error);
       res.status(500).json({ error: "Failed to start audio synthesis" });
+    }
+  });
+
+  app.get("/api/ads/:id/download-audio", async (req, res) => {
+    try {
+      const ad = await storage.getAd(req.params.id);
+      if (!ad) {
+        return res.status(404).json({ error: "Ad not found" });
+      }
+      if (!ad.audioUrl) {
+        return res.status(404).json({ error: "No audio file" });
+      }
+
+      const normalizedUrl = ad.audioUrl.startsWith("/") ? ad.audioUrl.slice(1) : ad.audioUrl;
+      const audioPath = path.join(process.cwd(), "public", normalizedUrl);
+
+      try {
+        await fs.access(audioPath);
+      } catch {
+        return res.status(404).json({ error: "Audio file not found on disk" });
+      }
+
+      const filename = `${ad.title || "ad"}.mp3`;
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+
+      const { createReadStream } = await import("fs");
+      const stream = createReadStream(audioPath);
+      stream.pipe(res);
+    } catch (error) {
+      console.error("Error downloading ad audio:", error);
+      res.status(500).json({ error: "Failed to download audio" });
     }
   });
 
@@ -4216,7 +4284,7 @@ ${programType.scriptTemplate}
           speakerVoiceMap.set(speakerName.toLowerCase(), voice.elevenLabsVoiceId);
         }
 
-        const audioBuffers: Buffer[] = [];
+        const segmentFiles: string[] = [];
         let segmentErrors: string[] = [];
 
         for (let i = 0; i < segments.length; i++) {
@@ -4244,26 +4312,34 @@ ${programType.scriptTemplate}
           try {
             console.log(`Synthesizing segment ${i + 1}/${segments.length}: [${segment.speaker}] (${cleanText.length} chars)`);
             const buffer = await generateVoiceSegment(cleanText, voiceId);
-            audioBuffers.push(buffer);
+            const segFile = path.join(audioDir, `_seg_${timestamp}_${i}.mp3`);
+            await fs.writeFile(segFile, buffer);
+            segmentFiles.push(segFile);
           } catch (err) {
             console.error(`Segment ${i + 1} synthesis error:`, err);
             segmentErrors.push(`Сегмент ${i + 1} (${segment.speaker}): ошибка синтеза`);
           }
         }
 
-        if (audioBuffers.length === 0) {
+        if (segmentFiles.length === 0) {
           return res.status(500).json({ error: "Не удалось озвучить ни один сегмент", details: segmentErrors });
         }
 
-        const combined = Buffer.concat(audioBuffers);
         const filename = resolveFileName(programType?.fileNameTemplate, programType, program, timestamp);
-        await fs.writeFile(path.join(audioDir, filename), combined);
+        const outputFile = path.join(audioDir, filename);
 
-        const estimatedDuration = Math.round(combined.length / (192000 / 8));
+        const combined = await concatMp3WithFfmpeg(segmentFiles, outputFile, audioDir, timestamp);
+
+        for (const f of segmentFiles) {
+          await fs.unlink(f).catch(() => {});
+        }
+
+        const stat = await fs.stat(outputFile);
+        const estimatedDuration = Math.round(stat.size / (192000 / 8));
 
         const totalExpected = segments.filter(s => stripEmotionTags(s.text).length > 0).length;
         const hasErrors = segmentErrors.length > 0;
-        const status = hasErrors ? (audioBuffers.length < totalExpected ? "error" : "ready") : "ready";
+        const status = hasErrors ? (segmentFiles.length < totalExpected ? "error" : "ready") : "ready";
 
         const updated = await storage.updateProgram(program.id, {
           audioUrl: `/audio/${filename}`,
@@ -4272,7 +4348,7 @@ ${programType.scriptTemplate}
           audioGeneratedAt: new Date(),
         });
 
-        res.json({ ...updated, segmentCount: audioBuffers.length, totalSegments: totalExpected, errors: segmentErrors });
+        res.json({ ...updated, segmentCount: segmentFiles.length, totalSegments: totalExpected, errors: segmentErrors });
       } else {
         const resolved = resolveAssignedVoices(voicesList, programType);
         const activeVoice = resolved.length > 0 ? resolved[0] : voicesList.find(v => v.isActive);
@@ -4299,6 +4375,38 @@ ${programType.scriptTemplate}
     } catch (error) {
       console.error("Error generating program audio:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate program audio" });
+    }
+  });
+
+  app.get("/api/programs/:id/download-audio", async (req, res) => {
+    try {
+      const program = await storage.getProgram(req.params.id);
+      if (!program) {
+        return res.status(404).json({ error: "Program not found" });
+      }
+      if (!program.audioUrl) {
+        return res.status(404).json({ error: "No audio file" });
+      }
+
+      const normalizedUrl = program.audioUrl.startsWith("/") ? program.audioUrl.slice(1) : program.audioUrl;
+      const audioPath = path.join(process.cwd(), "public", normalizedUrl);
+
+      try {
+        await fs.access(audioPath);
+      } catch {
+        return res.status(404).json({ error: "Audio file not found on disk" });
+      }
+
+      const filename = path.basename(audioPath);
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+
+      const { createReadStream } = await import("fs");
+      const stream = createReadStream(audioPath);
+      stream.pipe(res);
+    } catch (error) {
+      console.error("Error downloading audio:", error);
+      res.status(500).json({ error: "Failed to download audio" });
     }
   });
 
