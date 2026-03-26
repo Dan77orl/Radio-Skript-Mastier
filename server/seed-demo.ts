@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { db } from "./db";
 import { users, settings, voices, programTypes, programs } from "@shared/schema";
-import { eq, isNull } from "drizzle-orm";
+import { eq, isNull, notInArray, sql } from "drizzle-orm";
 
 async function fixOrphanedProgramTypes() {
   try {
@@ -18,6 +18,150 @@ async function fixOrphanedProgramTypes() {
     }
   } catch (e) {
     console.error("[seed] fixOrphanedProgramTypes error:", e);
+  }
+}
+
+async function ensureRuShowsExist() {
+  try {
+    const mainUser = await storage.getUserByEmail("test@test.com");
+    if (!mainUser) return;
+
+    const existingTypes = await storage.getProgramTypes(mainUser.id);
+    const existingNames = existingTypes.map(t => t.name.toLowerCase());
+
+    const ruShows = [
+      {
+        name: "Психофф",
+        slug: "psyhoff-" + mainUser.id.substring(0, 8),
+        description: "Это программа о психологии",
+        defaultPrompt: "Создай выпуск программы 'Психофф' о психологии. Полезные факты, упражнения для расслабления. Информация из университетов (MIT, Oxford, Harvard). Без политики, без лекарств.",
+        defaultDurationSeconds: 120,
+        icon: "radio",
+        dailyCount: 1,
+        assignedVoiceIds: ["9225d02d-2e6c-4a18-aaad-65839a9e2786", "cf880d56-2e1b-4606-bbb1-720aa5d7bab0"],
+        useFirecrawl: true,
+        firecrawlTopics: ["психология исследования новости 2025 2026", "ментальное здоровье лайфхаки советы наука", "нейробиология открытия мозг стресс тревожность"],
+        scriptTemplate: "Передача Алины Кочер. Алина ведет весь выпуск, Сергей говорит короткие фразы-перебивки.",
+        sortOrder: 200,
+      },
+      {
+        name: "ШоуБиZ на РуВэйв",
+        slug: "showbiz-" + mainUser.id.substring(0, 8),
+        description: "Новости шоу-бизнеса",
+        defaultPrompt: "Создай выпуск о новостях шоу-бизнеса. Мировой, российский и турецкий шоу-бизнес. Только позитив: премьеры, награды, концерты. Без скандалов и политики.",
+        defaultDurationSeconds: 120,
+        icon: "sparkles",
+        dailyCount: 1,
+        assignedVoiceIds: ["9319f0cd-7902-4bc7-b963-e6ec68d58c1c"],
+        useFirecrawl: true,
+        firecrawlTopics: ["шоубизнес России", "шоубизнес мировой", "шоубизнес Турции"],
+        scriptTemplate: "",
+        sortOrder: 201,
+      },
+      {
+        name: "Ваши метры",
+        slug: "vashi-metry-" + mainUser.id.substring(0, 8),
+        description: "Короткие выпуски о недвижимости на радио RuWave",
+        defaultPrompt: "Создай выпуск программы 'Ваши метры' о недвижимости. Ведущая Лена Суворова. 180-230 слов, простой язык, практические советы.",
+        defaultDurationSeconds: 120,
+        icon: "home",
+        dailyCount: 1,
+        assignedVoiceIds: ["9319f0cd-7902-4bc7-b963-e6ec68d58c1c"],
+        useFirecrawl: true,
+        firecrawlTopics: ["недвижимость Аланья Турция 2026", "рынок квартир Турция покупка"],
+        scriptTemplate: "",
+        sortOrder: 202,
+      },
+    ];
+
+    let created = 0;
+    for (const show of ruShows) {
+      if (!existingNames.includes(show.name.toLowerCase())) {
+        await db.insert(programTypes).values({
+          userId: mainUser.id,
+          name: show.name,
+          slug: show.slug,
+          description: show.description,
+          defaultPrompt: show.defaultPrompt,
+          defaultDurationSeconds: show.defaultDurationSeconds,
+          icon: show.icon,
+          dailyCount: show.dailyCount,
+          assignedVoiceIds: show.assignedVoiceIds,
+          isActive: true,
+          sortOrder: show.sortOrder,
+          useFirecrawl: show.useFirecrawl,
+          firecrawlTopics: show.firecrawlTopics,
+          scriptTemplate: show.scriptTemplate,
+        });
+        created++;
+      }
+    }
+
+    if (created > 0) {
+      console.log(`[seed] Created ${created} missing RU shows for test@test.com`);
+    }
+
+    await reassignOrphanedPrograms();
+  } catch (e: any) {
+    console.warn("[seed] ensureRuShowsExist error:", e.message);
+  }
+}
+
+async function reassignOrphanedPrograms() {
+  try {
+    const allTypeIds = await db.select({ id: programTypes.id }).from(programTypes);
+    const validIds = allTypeIds.map(t => t.id);
+    if (validIds.length === 0) return;
+
+    const orphans = await db.select({
+      id: programs.id,
+      title: programs.title,
+      programTypeId: programs.programTypeId,
+    }).from(programs).where(notInArray(programs.programTypeId, validIds));
+
+    if (orphans.length === 0) return;
+
+    const allTypes = await db.select().from(programTypes);
+
+    let reassigned = 0;
+    for (const orphan of orphans) {
+      const title = orphan.title.toLowerCase();
+      let matchedType = null;
+
+      for (const t of allTypes) {
+        const typeName = t.name.toLowerCase();
+        if (title.includes(typeName) || title.startsWith(typeName.split(" ")[0])) {
+          matchedType = t;
+          break;
+        }
+      }
+
+      if (!matchedType) {
+        if (title.includes("психо") || title.includes("гормон") || title.includes("эмоцион") || title.includes("тревож") || title.includes("привязан") || title.includes("мотивац") || title.includes("самозван") || title.includes("интуиц") || title.includes("нейро") || title.includes("стресс") || title.includes("выгоран") || title.includes("травм") || title.includes("привыч") || title.includes("сон")) {
+          matchedType = allTypes.find(t => t.name === "Психофф");
+        } else if (title.includes("метр") || title.includes("квартир") || title.includes("недвижим") || title.includes("дорог")) {
+          matchedType = allTypes.find(t => t.name === "Ваши метры");
+        } else if (title.includes("шоубиz") || title.includes("шоубиз") || title.includes("звёзд")) {
+          matchedType = allTypes.find(t => t.name === "ШоуБиZ на РуВэйв");
+        }
+      }
+
+      if (matchedType) {
+        await db.update(programs)
+          .set({ programTypeId: matchedType.id })
+          .where(eq(programs.id, orphan.id));
+        reassigned++;
+      }
+    }
+
+    if (reassigned > 0) {
+      console.log(`[seed] Reassigned ${reassigned}/${orphans.length} orphaned programs`);
+    }
+    if (orphans.length - reassigned > 0) {
+      console.log(`[seed] ${orphans.length - reassigned} programs remain orphaned (no matching type)`);
+    }
+  } catch (e: any) {
+    console.warn("[seed] reassignOrphanedPrograms error:", e.message);
   }
 }
 
@@ -85,6 +229,7 @@ async function ensureDemoShowsExist(userId: string) {
 export async function seedDemoIfNeeded() {
   try {
     await fixOrphanedProgramTypes();
+    await ensureRuShowsExist();
 
     const existing = await storage.getUserByEmail("demo@dallaswave.com");
     if (existing) {
