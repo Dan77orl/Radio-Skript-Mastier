@@ -56,13 +56,15 @@ Preferred communication style: Simple, everyday language.
 
 ### Admin Panel
 - **Route**: `/admin` — only accessible to users with `role="admin"`
-- **Backend middleware**: `requireAdmin` in `server/auth.ts` checks user role before allowing access to `/api/admin/*` routes
+- **Backend middleware**: `requireAdmin` in `server/auth.ts` checks user role; `requireAuth` checks blocked status and destroys session if blocked
 - **Dashboard**: GET `/api/admin/dashboard` — total users, new registrations (week/month), active/blocked counts
-- **User management**: GET `/api/admin/users` (list with stats), PATCH `/api/admin/users/:id` (role/block), DELETE `/api/admin/users/:id`
+- **User management**: GET `/api/admin/users` (list with stats), PATCH `/api/admin/users/:id` (role/block with Zod validation), DELETE `/api/admin/users/:id`
 - **Usage tracking**: `usage_logs` table tracks script generation, audio generation, ad generation per user; GET `/api/admin/usage` returns aggregated stats and recent logs
+- **Support inbox**: `support_messages` table persists all support chat conversations; GET `/api/admin/support-messages` returns grouped by session with user info
+- **API key visibility**: Admin API Keys tab shows configured/not-set status for all service keys; keys managed via Settings page
 - **Self-protection**: Admin cannot modify/delete their own account via admin API
-- **Frontend**: `client/src/pages/admin.tsx` — tabs for Dashboard, Users, Usage; sidebar shows Admin link only for admin users
-- **Usage instrumentation**: `logUsage()` helper called on successful script generation (Claude/OpenAI), audio generation, and ad generation
+- **Frontend**: `client/src/pages/admin.tsx` — tabs for Dashboard, Users, Usage, Support, API Keys; sidebar shows Admin link only for admin users
+- **Usage instrumentation**: `logUsage()` helper called on successful script generation (Claude/OpenAI), audio generation (dialog/program), and ad generation
 
 ### AI Support Chat
 - **Endpoint**: `POST /api/support-chat` — accessible without authentication (placed before auth middleware)

@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Activity, Shield, ShieldOff, Trash2, UserCheck, UserX, BarChart3, Clock } from "lucide-react";
+import { Users, Activity, Shield, ShieldOff, Trash2, UserCheck, UserX, BarChart3, Clock, MessageSquare, ChevronDown, ChevronRight, Key } from "lucide-react";
 
 interface UserWithStats {
   id: string;
@@ -49,6 +49,18 @@ interface UsageData {
   logs: UsageLog[];
 }
 
+interface SupportSession {
+  sessionId: string;
+  userId: string | null;
+  user: { email: string; name: string | null } | null;
+  messages: {
+    id: string;
+    role: string;
+    content: string;
+    createdAt: string;
+  }[];
+}
+
 export default function AdminPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -69,6 +81,16 @@ export default function AdminPage() {
 
   const { data: usage, isLoading: usageLoading } = useQuery<UsageData>({
     queryKey: ["/api/admin/usage"],
+    enabled: isAdmin,
+  });
+
+  const { data: supportSessions, isLoading: supportLoading } = useQuery<SupportSession[]>({
+    queryKey: ["/api/admin/support-messages"],
+    enabled: isAdmin,
+  });
+
+  const { data: settingsData } = useQuery<Record<string, unknown>>({
+    queryKey: ["/api/settings"],
     enabled: isAdmin,
   });
 
@@ -143,6 +165,14 @@ export default function AdminPage() {
           <TabsTrigger value="usage" data-testid="tab-usage">
             <Activity className="h-4 w-4 mr-1" />
             Usage
+          </TabsTrigger>
+          <TabsTrigger value="support" data-testid="tab-support">
+            <MessageSquare className="h-4 w-4 mr-1" />
+            Support
+          </TabsTrigger>
+          <TabsTrigger value="apikeys" data-testid="tab-apikeys">
+            <Key className="h-4 w-4 mr-1" />
+            API Keys
           </TabsTrigger>
         </TabsList>
 
@@ -365,7 +395,130 @@ export default function AdminPage() {
             </>
           )}
         </TabsContent>
+
+        <TabsContent value="support" className="space-y-4">
+          {supportLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+          ) : supportSessions && supportSessions.length > 0 ? (
+            <div className="space-y-3">
+              {supportSessions.map((session) => (
+                <SupportSessionCard key={session.sessionId} session={session} />
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                No support conversations yet.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="apikeys" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Service API Keys</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Service</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[
+                    { name: "Anthropic (Claude)", key: "anthropicApiKey" },
+                    { name: "ElevenLabs (TTS)", key: "elevenLabsApiKey" },
+                    { name: "Yandex Disk", key: "yandexDiskToken" },
+                    { name: "Freesound", key: "freesoundApiKey" },
+                  ].map((service) => (
+                    <TableRow key={service.key}>
+                      <TableCell className="font-medium">{service.name}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={settingsData && (settingsData as Record<string, string>)[service.key] && (settingsData as Record<string, string>)[service.key] !== "" ? "default" : "secondary"}
+                          data-testid={`badge-apikey-${service.key}`}
+                        >
+                          {settingsData && (settingsData as Record<string, string>)[service.key] && (settingsData as Record<string, string>)[service.key] !== ""
+                            ? "Configured"
+                            : "Not set"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <p className="text-sm text-muted-foreground mt-4">
+                API keys can be managed in the Settings page. Keys are visible only to admin users.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function SupportSessionCard({ session }: { session: SupportSession }) {
+  const [expanded, setExpanded] = useState(false);
+  const lastMsg = session.messages[session.messages.length - 1];
+  const userMsgCount = session.messages.filter(m => m.role === "user").length;
+
+  return (
+    <Card>
+      <CardHeader
+        className="cursor-pointer pb-2"
+        onClick={() => setExpanded(!expanded)}
+        data-testid={`support-session-${session.sessionId}`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <div>
+              <span className="font-medium">
+                {session.user?.name || session.user?.email || "Anonymous"}
+              </span>
+              {session.user?.email && (
+                <span className="text-xs text-muted-foreground ml-2">{session.user.email}</span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">{userMsgCount} messages</Badge>
+            <span className="text-xs text-muted-foreground">
+              {lastMsg ? new Date(lastMsg.createdAt).toLocaleDateString() : ""}
+            </span>
+          </div>
+        </div>
+      </CardHeader>
+      {expanded && (
+        <CardContent className="pt-0">
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {session.messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`p-3 rounded-lg text-sm ${
+                  msg.role === "user"
+                    ? "bg-blue-50 dark:bg-blue-950/30 ml-0 mr-12"
+                    : "bg-muted ml-12 mr-0"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <Badge variant={msg.role === "user" ? "default" : "secondary"} className="text-xs">
+                    {msg.role === "user" ? "User" : "AI"}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(msg.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      )}
+    </Card>
   );
 }

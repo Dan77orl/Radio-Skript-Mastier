@@ -208,6 +208,15 @@ export async function handleSupportChat(req: Request, res: Response) {
       history.splice(0, history.length - 40);
     }
 
+    try {
+      await storage.createSupportMessage({
+        userId: req.session?.userId || null,
+        sessionId,
+        role: "user",
+        content: message.trim(),
+      });
+    } catch (e) {}
+
     const systemPrompt = getSystemPrompt(lang);
 
     let assistantReply = "";
@@ -239,6 +248,15 @@ export async function handleSupportChat(req: Request, res: Response) {
     }
 
     history.push({ role: "assistant", content: assistantReply });
+
+    try {
+      await storage.createSupportMessage({
+        userId: req.session?.userId || null,
+        sessionId,
+        role: "assistant",
+        content: assistantReply,
+      });
+    } catch (e) {}
 
     res.json({ reply: assistantReply });
   } catch (error) {

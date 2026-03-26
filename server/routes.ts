@@ -836,6 +836,46 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/support-messages", requireAdmin, async (req, res) => {
+    try {
+      const messages = await storage.getSupportMessages(500);
+      const userIds = [...new Set(messages.map(m => m.userId).filter(Boolean))];
+      const userMap: Record<string, { email: string; name: string | null }> = {};
+      for (const uid of userIds) {
+        const u = await storage.getUser(uid!);
+        if (u) userMap[uid!] = { email: u.email, name: u.name };
+      }
+
+      const sessions: Record<string, { userId: string | null; user: { email: string; name: string | null } | null; messages: typeof messages }> = {};
+      for (const msg of messages) {
+        const key = msg.sessionId || msg.id;
+        if (!sessions[key]) {
+          sessions[key] = {
+            userId: msg.userId,
+            user: msg.userId ? userMap[msg.userId] || null : null,
+            messages: [],
+          };
+        }
+        sessions[key].messages.push(msg);
+      }
+
+      for (const s of Object.values(sessions)) {
+        s.messages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      }
+
+      const sorted = Object.entries(sessions).sort(([, a], [, b]) => {
+        const aLast = a.messages[a.messages.length - 1]?.createdAt;
+        const bLast = b.messages[b.messages.length - 1]?.createdAt;
+        return new Date(bLast).getTime() - new Date(aLast).getTime();
+      });
+
+      return res.json(sorted.map(([sessionId, data]) => ({ sessionId, ...data })));
+    } catch (error) {
+      console.error("Admin support messages error:", error);
+      return res.status(500).json({ error: "Failed to get support messages" });
+    }
+  });
+
   app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
     try {
       const allUsers = await storage.getAllUsers();
@@ -4539,6 +4579,7 @@ ${programType.scriptTemplate}
           audioGeneratedAt: new Date(),
         });
 
+        logUsage(req.session.userId!, "audio_generation", "program_multi_speaker");
         res.json({ ...updated, segmentCount: segmentFiles.length, totalSegments: totalExpected, errors: segmentErrors });
       } else {
         const resolved = resolveAssignedVoices(voicesList, programType);
@@ -4561,6 +4602,7 @@ ${programType.scriptTemplate}
           audioGeneratedAt: new Date(),
         });
 
+        logUsage(req.session.userId!, "audio_generation", "program_single_speaker");
         res.json(updated);
       }
     } catch (error) {

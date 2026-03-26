@@ -1,4 +1,4 @@
-import { users, settings, dialogs, newsSources, newsItems, ads, adPresets, voices, programTypes, programs, automations, automationRuns, scheduleTemplates, hostShifts, customHolidays, usageLogs, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdPreset, type InsertAdPreset, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun, type ScheduleTemplate, type InsertScheduleTemplate, type HostShift, type InsertHostShift, type CustomHoliday, type InsertCustomHoliday, type UsageLog, type InsertUsageLog } from "@shared/schema";
+import { users, settings, dialogs, newsSources, newsItems, ads, adPresets, voices, programTypes, programs, automations, automationRuns, scheduleTemplates, hostShifts, customHolidays, usageLogs, supportMessages, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdPreset, type InsertAdPreset, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun, type ScheduleTemplate, type InsertScheduleTemplate, type HostShift, type InsertHostShift, type CustomHoliday, type InsertCustomHoliday, type UsageLog, type InsertUsageLog, type SupportMessage, type InsertSupportMessage } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql, and, or, isNull } from "drizzle-orm";
 
@@ -101,6 +101,10 @@ export interface IStorage {
   createUsageLog(log: InsertUsageLog): Promise<UsageLog>;
   getUsageLogs(userId?: string, limit?: number): Promise<UsageLog[]>;
   getUsageStats(): Promise<{ userId: string; action: string; count: number }[]>;
+
+  createSupportMessage(msg: InsertSupportMessage): Promise<SupportMessage>;
+  getSupportMessages(limit?: number): Promise<SupportMessage[]>;
+  getSupportMessagesBySession(sessionId: string): Promise<SupportMessage[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -632,6 +636,19 @@ export class DatabaseStorage implements IStorage {
       count: sql<number>`count(*)`,
     }).from(usageLogs).groupBy(usageLogs.userId, usageLogs.action);
     return result.map(r => ({ userId: r.userId || "", action: r.action, count: Number(r.count) }));
+  }
+
+  async createSupportMessage(msg: InsertSupportMessage): Promise<SupportMessage> {
+    const [created] = await db.insert(supportMessages).values(msg).returning();
+    return created;
+  }
+
+  async getSupportMessages(limit?: number): Promise<SupportMessage[]> {
+    return db.select().from(supportMessages).orderBy(desc(supportMessages.createdAt)).limit(limit || 200);
+  }
+
+  async getSupportMessagesBySession(sessionId: string): Promise<SupportMessage[]> {
+    return db.select().from(supportMessages).where(eq(supportMessages.sessionId, sessionId)).orderBy(asc(supportMessages.createdAt));
   }
 }
 
