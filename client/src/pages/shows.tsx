@@ -31,6 +31,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getCleanVoiceName } from "@/lib/utils";
@@ -185,6 +186,9 @@ export default function ShowsPage() {
   const [newTypePrompt, setNewTypePrompt] = useState("");
   const [newTypeDailyCount, setNewTypeDailyCount] = useState(1);
   const [playingProgramId, setPlayingProgramId] = useState<string | null>(null);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioPlaybackRate, setAudioPlaybackRate] = useState(1);
   const [slotInputs, setSlotInputs] = useState<string[]>([]);
   const [firecrawlTopicInput, setFirecrawlTopicInput] = useState("");
   const [firecrawlTestResult, setFirecrawlTestResult] = useState<string | null>(null);
@@ -428,15 +432,6 @@ export default function ShowsPage() {
     }
   }, [activeTab, programTypes]);
 
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
-
   const resetNewTypeForm = () => {
     setNewTypeName("");
     setNewTypeSlug("");
@@ -451,20 +446,76 @@ export default function ShowsPage() {
     }
   };
 
+  const stopAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute("src");
+      audioRef.current = null;
+    }
+    setPlayingProgramId(null);
+    setAudioCurrentTime(0);
+    setAudioDuration(0);
+    setAudioPlaybackRate(1);
+  }, []);
+
   const playAudio = (audioUrl: string, programId: string) => {
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.removeAttribute("src");
+      audioRef.current = null;
     }
     if (playingProgramId === programId) {
-      setPlayingProgramId(null);
+      stopAudio();
       return;
     }
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
-    audio.play();
+    audio.playbackRate = audioPlaybackRate;
+    audio.ontimeupdate = () => {
+      setAudioCurrentTime(audio.currentTime);
+    };
+    audio.onloadedmetadata = () => {
+      setAudioDuration(audio.duration);
+    };
+    audio.onended = () => stopAudio();
+    audio.onerror = () => stopAudio();
+    audio.play().catch(() => stopAudio());
     setPlayingProgramId(programId);
-    audio.onended = () => setPlayingProgramId(null);
+    setAudioCurrentTime(0);
+    setAudioDuration(0);
   };
+
+  const seekAudio = (value: number[]) => {
+    if (audioRef.current && isFinite(value[0])) {
+      audioRef.current.currentTime = value[0];
+      setAudioCurrentTime(value[0]);
+    }
+  };
+
+  const changePlaybackRate = () => {
+    const rates = [1, 1.5, 2, 3];
+    const currentIdx = rates.indexOf(audioPlaybackRate);
+    const nextRate = rates[(currentIdx + 1) % rates.length];
+    setAudioPlaybackRate(nextRate);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = nextRate;
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    if (!isFinite(seconds) || seconds < 0) return "0:00";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  useEffect(() => {
+    return () => { stopAudio(); };
+  }, [stopAudio]);
+
+  useEffect(() => {
+    stopAudio();
+  }, [activeTab, statusFilter, stopAudio]);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { labelKey: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
@@ -1345,6 +1396,42 @@ export default function ShowsPage() {
                             </AlertDialog>
                           </div>
                         </div>
+                        {playingProgramId === program.id && (
+                          <div className="mt-3 flex items-center gap-3 bg-muted/50 rounded-lg px-3 py-2" data-testid={`audio-player-${program.id}`}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 shrink-0"
+                              onClick={() => stopAudio()}
+                              data-testid={`button-stop-${program.id}`}
+                            >
+                              <Pause className="h-4 w-4" />
+                            </Button>
+                            <span className="text-xs text-muted-foreground w-10 shrink-0 text-right tabular-nums" data-testid={`text-current-time-${program.id}`}>
+                              {formatTime(audioCurrentTime)}
+                            </span>
+                            <Slider
+                              value={[audioCurrentTime]}
+                              max={audioDuration || 1}
+                              step={0.5}
+                              onValueChange={seekAudio}
+                              className="flex-1"
+                              data-testid={`slider-seek-${program.id}`}
+                            />
+                            <span className="text-xs text-muted-foreground w-10 shrink-0 tabular-nums" data-testid={`text-duration-${program.id}`}>
+                              {formatTime(audioDuration)}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs font-mono shrink-0 min-w-[42px]"
+                              onClick={changePlaybackRate}
+                              data-testid={`button-speed-${program.id}`}
+                            >
+                              x{audioPlaybackRate}
+                            </Button>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                             ))}
