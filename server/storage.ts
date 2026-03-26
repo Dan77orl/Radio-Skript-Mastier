@@ -13,54 +13,54 @@ export interface IStorage {
   saveSettings(settings: InsertSettings, userId?: string): Promise<Settings>;
   
   getDialogs(userId: string): Promise<Dialog[]>;
-  getDialog(id: string): Promise<Dialog | undefined>;
+  getDialog(id: string, userId: string): Promise<Dialog | undefined>;
   createDialog(dialog: InsertDialog): Promise<Dialog>;
-  updateDialog(id: string, dialog: Partial<InsertDialog>): Promise<Dialog | undefined>;
-  deleteDialog(id: string): Promise<boolean>;
+  updateDialog(id: string, userId: string, dialog: Partial<InsertDialog>): Promise<Dialog | undefined>;
+  deleteDialog(id: string, userId: string): Promise<boolean>;
   
   getNewsSources(userId: string): Promise<NewsSource[]>;
-  getNewsSource(id: string): Promise<NewsSource | undefined>;
+  getNewsSource(id: string, userId?: string): Promise<NewsSource | undefined>;
   createNewsSource(source: InsertNewsSource): Promise<NewsSource>;
-  updateNewsSource(id: string, source: Partial<InsertNewsSource>): Promise<NewsSource | undefined>;
-  deleteNewsSource(id: string): Promise<boolean>;
+  updateNewsSource(id: string, userId: string, source: Partial<InsertNewsSource>): Promise<NewsSource | undefined>;
+  deleteNewsSource(id: string, userId: string): Promise<boolean>;
   
   getAds(userId: string): Promise<Ad[]>;
-  getAd(id: string): Promise<Ad | undefined>;
+  getAd(id: string, userId?: string): Promise<Ad | undefined>;
   createAd(ad: InsertAd): Promise<Ad>;
-  updateAd(id: string, ad: Partial<InsertAd>): Promise<Ad | undefined>;
-  deleteAd(id: string): Promise<boolean>;
+  updateAd(id: string, userId: string, ad: Partial<InsertAd>): Promise<Ad | undefined>;
+  deleteAd(id: string, userId: string): Promise<boolean>;
   
   getAdPresets(userId: string): Promise<AdPreset[]>;
-  getAdPreset(id: string): Promise<AdPreset | undefined>;
+  getAdPreset(id: string, userId?: string): Promise<AdPreset | undefined>;
   createAdPreset(preset: InsertAdPreset): Promise<AdPreset>;
-  updateAdPreset(id: string, preset: Partial<InsertAdPreset>): Promise<AdPreset | undefined>;
-  deleteAdPreset(id: string): Promise<boolean>;
+  updateAdPreset(id: string, userId: string, preset: Partial<InsertAdPreset>): Promise<AdPreset | undefined>;
+  deleteAdPreset(id: string, userId: string): Promise<boolean>;
   
   getVoices(userId: string): Promise<Voice[]>;
-  getVoice(id: string): Promise<Voice | undefined>;
+  getVoice(id: string, userId?: string): Promise<Voice | undefined>;
   createVoice(voice: InsertVoice): Promise<Voice>;
-  updateVoice(id: string, voice: Partial<InsertVoice>): Promise<Voice | undefined>;
-  deleteVoice(id: string): Promise<boolean>;
+  updateVoice(id: string, userId: string, voice: Partial<InsertVoice>): Promise<Voice | undefined>;
+  deleteVoice(id: string, userId: string): Promise<boolean>;
   getVoicesCount(userId: string): Promise<number>;
   
   getProgramTypes(userId?: string): Promise<ProgramType[]>;
-  getProgramType(id: string): Promise<ProgramType | undefined>;
+  getProgramType(id: string, userId?: string): Promise<ProgramType | undefined>;
   createProgramType(programType: InsertProgramType): Promise<ProgramType>;
-  updateProgramType(id: string, programType: Partial<InsertProgramType>): Promise<ProgramType | undefined>;
-  deleteProgramType(id: string): Promise<boolean>;
+  updateProgramType(id: string, userId: string, programType: Partial<InsertProgramType>): Promise<ProgramType | undefined>;
+  deleteProgramType(id: string, userId: string): Promise<boolean>;
   
   getPrograms(userId: string): Promise<Program[]>;
-  getProgramsByType(typeId: string): Promise<Program[]>;
-  getProgram(id: string): Promise<Program | undefined>;
+  getProgramsByType(typeId: string, userId?: string): Promise<Program[]>;
+  getProgram(id: string, userId?: string): Promise<Program | undefined>;
   createProgram(program: InsertProgram): Promise<Program>;
-  updateProgram(id: string, program: Partial<InsertProgram>): Promise<Program | undefined>;
-  deleteProgram(id: string): Promise<boolean>;
+  updateProgram(id: string, userId: string, program: Partial<InsertProgram>): Promise<Program | undefined>;
+  deleteProgram(id: string, userId: string): Promise<boolean>;
   
   getAutomations(userId: string): Promise<Automation[]>;
-  getAutomation(id: string): Promise<Automation | undefined>;
+  getAutomation(id: string, userId?: string): Promise<Automation | undefined>;
   createAutomation(automation: InsertAutomation): Promise<Automation>;
-  updateAutomation(id: string, automation: Partial<InsertAutomation>): Promise<Automation | undefined>;
-  deleteAutomation(id: string): Promise<boolean>;
+  updateAutomation(id: string, automation: Partial<InsertAutomation>, userId?: string): Promise<Automation | undefined>;
+  deleteAutomation(id: string, userId: string): Promise<boolean>;
   
   getAutomationRuns(automationId: string): Promise<AutomationRun[]>;
   createAutomationRun(run: InsertAutomationRun): Promise<AutomationRun>;
@@ -73,24 +73,24 @@ export interface IStorage {
   clearOldNewsItems(daysOld: number): Promise<void>;
 
   getScheduleTemplates(userId: string): Promise<ScheduleTemplate[]>;
-  getScheduleTemplate(id: string): Promise<ScheduleTemplate | undefined>;
+  getScheduleTemplate(id: string, userId?: string): Promise<ScheduleTemplate | undefined>;
   createScheduleTemplate(template: InsertScheduleTemplate): Promise<ScheduleTemplate>;
-  updateScheduleTemplate(id: string, template: Partial<InsertScheduleTemplate>): Promise<ScheduleTemplate | undefined>;
-  deleteScheduleTemplate(id: string): Promise<boolean>;
+  updateScheduleTemplate(id: string, userId: string, template: Partial<InsertScheduleTemplate>): Promise<ScheduleTemplate | undefined>;
+  deleteScheduleTemplate(id: string, userId: string): Promise<boolean>;
   getTemplateForWeekday(weekday: number, userId: string): Promise<ScheduleTemplate | undefined>;
 
   getHostShifts(templateId: string): Promise<HostShift[]>;
   getHostShift(id: string): Promise<HostShift | undefined>;
   createHostShift(shift: InsertHostShift): Promise<HostShift>;
-  updateHostShift(id: string, shift: Partial<InsertHostShift>): Promise<HostShift | undefined>;
-  deleteHostShift(id: string): Promise<boolean>;
+  updateHostShift(id: string, userId: string, shift: Partial<InsertHostShift>): Promise<HostShift | undefined>;
+  deleteHostShift(id: string, userId: string): Promise<boolean>;
   deleteHostShiftsByTemplate(templateId: string): Promise<void>;
 
   getCustomHolidays(userId: string): Promise<CustomHoliday[]>;
   getAllCustomHolidays(): Promise<CustomHoliday[]>;
   createCustomHoliday(holiday: InsertCustomHoliday): Promise<CustomHoliday>;
-  updateCustomHoliday(id: string, holiday: Partial<InsertCustomHoliday>): Promise<CustomHoliday | undefined>;
-  deleteCustomHoliday(id: string): Promise<boolean>;
+  updateCustomHoliday(id: string, userId: string, holiday: Partial<InsertCustomHoliday>): Promise<CustomHoliday | undefined>;
+  deleteCustomHoliday(id: string, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -122,24 +122,23 @@ export class DatabaseStorage implements IStorage {
     if (userId) {
       const [result] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
       if (result) return result;
-    }
-    const [result] = await db.select().from(settings).limit(1);
-    if (result) return result;
-    
-    const [defaultSettings] = await db.insert(settings).values({
-      userId: userId || null,
-      elevenLabsApiKey: null,
-      yandexDiskToken: null,
-      maleVoiceId: "onwK4e9ZLuTAKqWW03F9",
-      femaleVoiceId: "EXAVITQu4vr4xnSDxMaL",
-      dailyDialogsCount: 12,
-      defaultPrompt: `Создай короткий диалог между ведущими радио "Алания FM" (мужчина и женщина). 
+      const [defaultSettings] = await db.insert(settings).values({
+        userId,
+        elevenLabsApiKey: null,
+        yandexDiskToken: null,
+        maleVoiceId: "onwK4e9ZLuTAKqWW03F9",
+        femaleVoiceId: "EXAVITQu4vr4xnSDxMaL",
+        dailyDialogsCount: 12,
+        defaultPrompt: `Создай короткий диалог между ведущими радио "Алания FM" (мужчина и женщина). 
 Тема: жизнь экспатов в Аланье, Турция. 
 Стиль: дружелюбный, непринужденный, с юмором.
 Длительность: 30-50 секунд при чтении.
 Обязательно включи: приветствие слушателей, интересный факт или совет про жизнь в Турции.`,
-    }).returning();
-    return defaultSettings;
+      }).returning();
+      return defaultSettings;
+    }
+    const [result] = await db.select().from(settings).limit(1);
+    return result || undefined;
   }
 
   async saveSettings(newSettings: InsertSettings, userId?: string): Promise<Settings> {
@@ -171,8 +170,8 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(dialogs.createdAt));
   }
 
-  async getDialog(id: string): Promise<Dialog | undefined> {
-    const [dialog] = await db.select().from(dialogs).where(eq(dialogs.id, id));
+  async getDialog(id: string, userId: string): Promise<Dialog | undefined> {
+    const [dialog] = await db.select().from(dialogs).where(and(eq(dialogs.id, id), eq(dialogs.userId, userId)));
     return dialog || undefined;
   }
 
@@ -181,16 +180,16 @@ export class DatabaseStorage implements IStorage {
     return dialog;
   }
 
-  async updateDialog(id: string, updates: Partial<InsertDialog>): Promise<Dialog | undefined> {
+  async updateDialog(id: string, userId: string, updates: Partial<InsertDialog>): Promise<Dialog | undefined> {
     const [updated] = await db.update(dialogs)
       .set(updates)
-      .where(eq(dialogs.id, id))
+      .where(and(eq(dialogs.id, id), eq(dialogs.userId, userId)))
       .returning();
     return updated || undefined;
   }
 
-  async deleteDialog(id: string): Promise<boolean> {
-    const result = await db.delete(dialogs).where(eq(dialogs.id, id)).returning();
+  async deleteDialog(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(dialogs).where(and(eq(dialogs.id, id), eq(dialogs.userId, userId))).returning();
     return result.length > 0;
   }
 
@@ -200,8 +199,9 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(newsSources.createdAt));
   }
 
-  async getNewsSource(id: string): Promise<NewsSource | undefined> {
-    const [source] = await db.select().from(newsSources).where(eq(newsSources.id, id));
+  async getNewsSource(id: string, userId?: string): Promise<NewsSource | undefined> {
+    const conditions = userId ? and(eq(newsSources.id, id), eq(newsSources.userId, userId)) : eq(newsSources.id, id);
+    const [source] = await db.select().from(newsSources).where(conditions);
     return source || undefined;
   }
 
@@ -210,16 +210,16 @@ export class DatabaseStorage implements IStorage {
     return source;
   }
 
-  async updateNewsSource(id: string, updates: Partial<InsertNewsSource>): Promise<NewsSource | undefined> {
+  async updateNewsSource(id: string, userId: string, updates: Partial<InsertNewsSource>): Promise<NewsSource | undefined> {
     const [updated] = await db.update(newsSources)
       .set(updates)
-      .where(eq(newsSources.id, id))
+      .where(and(eq(newsSources.id, id), eq(newsSources.userId, userId)))
       .returning();
     return updated || undefined;
   }
 
-  async deleteNewsSource(id: string): Promise<boolean> {
-    const result = await db.delete(newsSources).where(eq(newsSources.id, id)).returning();
+  async deleteNewsSource(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(newsSources).where(and(eq(newsSources.id, id), eq(newsSources.userId, userId))).returning();
     return result.length > 0;
   }
 
@@ -229,8 +229,9 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(ads.createdAt));
   }
 
-  async getAd(id: string): Promise<Ad | undefined> {
-    const [ad] = await db.select().from(ads).where(eq(ads.id, id));
+  async getAd(id: string, userId?: string): Promise<Ad | undefined> {
+    const conditions = userId ? and(eq(ads.id, id), eq(ads.userId, userId)) : eq(ads.id, id);
+    const [ad] = await db.select().from(ads).where(conditions);
     return ad || undefined;
   }
 
@@ -239,16 +240,16 @@ export class DatabaseStorage implements IStorage {
     return ad;
   }
 
-  async updateAd(id: string, updates: Partial<InsertAd>): Promise<Ad | undefined> {
+  async updateAd(id: string, userId: string, updates: Partial<InsertAd>): Promise<Ad | undefined> {
     const [updated] = await db.update(ads)
       .set(updates)
-      .where(eq(ads.id, id))
+      .where(and(eq(ads.id, id), eq(ads.userId, userId)))
       .returning();
     return updated || undefined;
   }
 
-  async deleteAd(id: string): Promise<boolean> {
-    const result = await db.delete(ads).where(eq(ads.id, id)).returning();
+  async deleteAd(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(ads).where(and(eq(ads.id, id), eq(ads.userId, userId))).returning();
     return result.length > 0;
   }
 
@@ -258,8 +259,9 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(adPresets.sortOrder));
   }
 
-  async getAdPreset(id: string): Promise<AdPreset | undefined> {
-    const [preset] = await db.select().from(adPresets).where(eq(adPresets.id, id));
+  async getAdPreset(id: string, userId?: string): Promise<AdPreset | undefined> {
+    const conditions = userId ? and(eq(adPresets.id, id), eq(adPresets.userId, userId)) : eq(adPresets.id, id);
+    const [preset] = await db.select().from(adPresets).where(conditions);
     return preset || undefined;
   }
 
@@ -268,16 +270,16 @@ export class DatabaseStorage implements IStorage {
     return preset;
   }
 
-  async updateAdPreset(id: string, updates: Partial<InsertAdPreset>): Promise<AdPreset | undefined> {
+  async updateAdPreset(id: string, userId: string, updates: Partial<InsertAdPreset>): Promise<AdPreset | undefined> {
     const [updated] = await db.update(adPresets)
       .set(updates)
-      .where(eq(adPresets.id, id))
+      .where(and(eq(adPresets.id, id), eq(adPresets.userId, userId)))
       .returning();
     return updated || undefined;
   }
 
-  async deleteAdPreset(id: string): Promise<boolean> {
-    const result = await db.delete(adPresets).where(eq(adPresets.id, id)).returning();
+  async deleteAdPreset(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(adPresets).where(and(eq(adPresets.id, id), eq(adPresets.userId, userId))).returning();
     return result.length > 0;
   }
 
@@ -287,8 +289,9 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(voices.sortOrder));
   }
 
-  async getVoice(id: string): Promise<Voice | undefined> {
-    const [voice] = await db.select().from(voices).where(eq(voices.id, id));
+  async getVoice(id: string, userId?: string): Promise<Voice | undefined> {
+    const conditions = userId ? and(eq(voices.id, id), eq(voices.userId, userId)) : eq(voices.id, id);
+    const [voice] = await db.select().from(voices).where(conditions);
     return voice || undefined;
   }
 
@@ -297,16 +300,16 @@ export class DatabaseStorage implements IStorage {
     return voice;
   }
 
-  async updateVoice(id: string, updates: Partial<InsertVoice>): Promise<Voice | undefined> {
+  async updateVoice(id: string, userId: string, updates: Partial<InsertVoice>): Promise<Voice | undefined> {
     const [updated] = await db.update(voices)
       .set(updates)
-      .where(eq(voices.id, id))
+      .where(and(eq(voices.id, id), eq(voices.userId, userId)))
       .returning();
     return updated || undefined;
   }
 
-  async deleteVoice(id: string): Promise<boolean> {
-    const result = await db.delete(voices).where(eq(voices.id, id)).returning();
+  async deleteVoice(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(voices).where(and(eq(voices.id, id), eq(voices.userId, userId))).returning();
     return result.length > 0;
   }
 
@@ -325,8 +328,9 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(programTypes).orderBy(asc(programTypes.sortOrder));
   }
 
-  async getProgramType(id: string): Promise<ProgramType | undefined> {
-    const [programType] = await db.select().from(programTypes).where(eq(programTypes.id, id));
+  async getProgramType(id: string, userId?: string): Promise<ProgramType | undefined> {
+    const conditions = userId ? and(eq(programTypes.id, id), eq(programTypes.userId, userId)) : eq(programTypes.id, id);
+    const [programType] = await db.select().from(programTypes).where(conditions);
     return programType || undefined;
   }
 
@@ -335,16 +339,16 @@ export class DatabaseStorage implements IStorage {
     return programType;
   }
 
-  async updateProgramType(id: string, updates: Partial<InsertProgramType>): Promise<ProgramType | undefined> {
+  async updateProgramType(id: string, userId: string, updates: Partial<InsertProgramType>): Promise<ProgramType | undefined> {
     const [updated] = await db.update(programTypes)
       .set(updates)
-      .where(eq(programTypes.id, id))
+      .where(and(eq(programTypes.id, id), eq(programTypes.userId, userId)))
       .returning();
     return updated || undefined;
   }
 
-  async deleteProgramType(id: string): Promise<boolean> {
-    const result = await db.delete(programTypes).where(eq(programTypes.id, id)).returning();
+  async deleteProgramType(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(programTypes).where(and(eq(programTypes.id, id), eq(programTypes.userId, userId))).returning();
     return result.length > 0;
   }
 
@@ -354,12 +358,14 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(programs.createdAt));
   }
 
-  async getProgramsByType(typeId: string): Promise<Program[]> {
-    return db.select().from(programs).where(eq(programs.programTypeId, typeId)).orderBy(desc(programs.createdAt));
+  async getProgramsByType(typeId: string, userId?: string): Promise<Program[]> {
+    const conditions = userId ? and(eq(programs.programTypeId, typeId), eq(programs.userId, userId)) : eq(programs.programTypeId, typeId);
+    return db.select().from(programs).where(conditions).orderBy(desc(programs.createdAt));
   }
 
-  async getProgram(id: string): Promise<Program | undefined> {
-    const [program] = await db.select().from(programs).where(eq(programs.id, id));
+  async getProgram(id: string, userId?: string): Promise<Program | undefined> {
+    const conditions = userId ? and(eq(programs.id, id), eq(programs.userId, userId)) : eq(programs.id, id);
+    const [program] = await db.select().from(programs).where(conditions);
     return program || undefined;
   }
 
@@ -368,16 +374,16 @@ export class DatabaseStorage implements IStorage {
     return program;
   }
 
-  async updateProgram(id: string, updates: Partial<InsertProgram>): Promise<Program | undefined> {
+  async updateProgram(id: string, userId: string, updates: Partial<InsertProgram>): Promise<Program | undefined> {
     const [updated] = await db.update(programs)
       .set(updates)
-      .where(eq(programs.id, id))
+      .where(and(eq(programs.id, id), eq(programs.userId, userId)))
       .returning();
     return updated || undefined;
   }
 
-  async deleteProgram(id: string): Promise<boolean> {
-    const result = await db.delete(programs).where(eq(programs.id, id)).returning();
+  async deleteProgram(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(programs).where(and(eq(programs.id, id), eq(programs.userId, userId))).returning();
     return result.length > 0;
   }
 
@@ -387,8 +393,9 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(automations.createdAt));
   }
 
-  async getAutomation(id: string): Promise<Automation | undefined> {
-    const [automation] = await db.select().from(automations).where(eq(automations.id, id));
+  async getAutomation(id: string, userId?: string): Promise<Automation | undefined> {
+    const conditions = userId ? and(eq(automations.id, id), eq(automations.userId, userId)) : eq(automations.id, id);
+    const [automation] = await db.select().from(automations).where(conditions);
     return automation || undefined;
   }
 
@@ -397,17 +404,20 @@ export class DatabaseStorage implements IStorage {
     return automation;
   }
 
-  async updateAutomation(id: string, updates: Partial<InsertAutomation>): Promise<Automation | undefined> {
+  async updateAutomation(id: string, updates: Partial<InsertAutomation>, userId?: string): Promise<Automation | undefined> {
+    const conditions = userId ? and(eq(automations.id, id), eq(automations.userId, userId)) : eq(automations.id, id);
     const [updated] = await db.update(automations)
       .set(updates)
-      .where(eq(automations.id, id))
+      .where(conditions)
       .returning();
     return updated || undefined;
   }
 
-  async deleteAutomation(id: string): Promise<boolean> {
-    await db.delete(automationRuns).where(eq(automationRuns.automationId, id));
-    const result = await db.delete(automations).where(eq(automations.id, id)).returning();
+  async deleteAutomation(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(automations).where(and(eq(automations.id, id), eq(automations.userId, userId))).returning();
+    if (result.length > 0) {
+      await db.delete(automationRuns).where(eq(automationRuns.automationId, id));
+    }
     return result.length > 0;
   }
 
@@ -468,8 +478,9 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(scheduleTemplates.sortOrder));
   }
 
-  async getScheduleTemplate(id: string): Promise<ScheduleTemplate | undefined> {
-    const [template] = await db.select().from(scheduleTemplates).where(eq(scheduleTemplates.id, id));
+  async getScheduleTemplate(id: string, userId?: string): Promise<ScheduleTemplate | undefined> {
+    const conditions = userId ? and(eq(scheduleTemplates.id, id), eq(scheduleTemplates.userId, userId)) : eq(scheduleTemplates.id, id);
+    const [template] = await db.select().from(scheduleTemplates).where(conditions);
     return template || undefined;
   }
 
@@ -478,17 +489,19 @@ export class DatabaseStorage implements IStorage {
     return template;
   }
 
-  async updateScheduleTemplate(id: string, updates: Partial<InsertScheduleTemplate>): Promise<ScheduleTemplate | undefined> {
+  async updateScheduleTemplate(id: string, userId: string, updates: Partial<InsertScheduleTemplate>): Promise<ScheduleTemplate | undefined> {
     const [updated] = await db.update(scheduleTemplates)
       .set(updates)
-      .where(eq(scheduleTemplates.id, id))
+      .where(and(eq(scheduleTemplates.id, id), eq(scheduleTemplates.userId, userId)))
       .returning();
     return updated || undefined;
   }
 
-  async deleteScheduleTemplate(id: string): Promise<boolean> {
-    await db.delete(hostShifts).where(eq(hostShifts.templateId, id));
-    const result = await db.delete(scheduleTemplates).where(eq(scheduleTemplates.id, id)).returning();
+  async deleteScheduleTemplate(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(scheduleTemplates).where(and(eq(scheduleTemplates.id, id), eq(scheduleTemplates.userId, userId))).returning();
+    if (result.length > 0) {
+      await db.delete(hostShifts).where(eq(hostShifts.templateId, id));
+    }
     return result.length > 0;
   }
 
@@ -515,16 +528,16 @@ export class DatabaseStorage implements IStorage {
     return shift;
   }
 
-  async updateHostShift(id: string, updates: Partial<InsertHostShift>): Promise<HostShift | undefined> {
+  async updateHostShift(id: string, userId: string, updates: Partial<InsertHostShift>): Promise<HostShift | undefined> {
     const [updated] = await db.update(hostShifts)
       .set(updates)
-      .where(eq(hostShifts.id, id))
+      .where(and(eq(hostShifts.id, id), eq(hostShifts.userId, userId)))
       .returning();
     return updated || undefined;
   }
 
-  async deleteHostShift(id: string): Promise<boolean> {
-    const result = await db.delete(hostShifts).where(eq(hostShifts.id, id)).returning();
+  async deleteHostShift(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(hostShifts).where(and(eq(hostShifts.id, id), eq(hostShifts.userId, userId))).returning();
     return result.length > 0;
   }
 
@@ -548,13 +561,13 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateCustomHoliday(id: string, holiday: Partial<InsertCustomHoliday>): Promise<CustomHoliday | undefined> {
-    const [updated] = await db.update(customHolidays).set(holiday).where(eq(customHolidays.id, id)).returning();
+  async updateCustomHoliday(id: string, userId: string, holiday: Partial<InsertCustomHoliday>): Promise<CustomHoliday | undefined> {
+    const [updated] = await db.update(customHolidays).set(holiday).where(and(eq(customHolidays.id, id), eq(customHolidays.userId, userId))).returning();
     return updated;
   }
 
-  async deleteCustomHoliday(id: string): Promise<boolean> {
-    const result = await db.delete(customHolidays).where(eq(customHolidays.id, id)).returning();
+  async deleteCustomHoliday(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(customHolidays).where(and(eq(customHolidays.id, id), eq(customHolidays.userId, userId))).returning();
     return result.length > 0;
   }
 }

@@ -349,6 +349,7 @@ export type Automation = typeof automations.$inferSelect;
 export const automationRuns = pgTable("automation_runs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   automationId: varchar("automation_id").notNull(),
+  userId: varchar("user_id").references(() => users.id),
   status: text("status").notNull().default("running"),
   itemsCreated: integer("items_created").default(0),
   errorMessage: text("error_message"),

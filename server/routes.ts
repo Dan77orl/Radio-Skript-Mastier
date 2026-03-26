@@ -765,13 +765,10 @@ export async function registerRoutes(
         return res.status(400).json({ error: parsed.error.message });
       }
       const user = await storage.getUser(req.session.userId!);
-      const data = { ...parsed.data };
-      if (user?.role !== "admin") {
-        delete (data as any).elevenLabsApiKey;
-        delete (data as any).anthropicApiKey;
-        delete (data as any).yandexDiskToken;
-        delete (data as any).freesoundApiKey;
-      }
+      const { elevenLabsApiKey, anthropicApiKey, yandexDiskToken, freesoundApiKey, ...safeData } = parsed.data;
+      const data = user?.role === "admin"
+        ? parsed.data
+        : safeData;
       const settings = await storage.saveSettings(data, req.session.userId);
       if (user?.role !== "admin") {
         const { elevenLabsApiKey, anthropicApiKey, yandexDiskToken, freesoundApiKey, ...safe } = settings;
@@ -845,7 +842,7 @@ export async function registerRoutes(
 
   app.get("/api/dialogs/:id", async (req, res) => {
     try {
-      const dialog = await storage.getDialog(req.params.id);
+      const dialog = await storage.getDialog(req.params.id, req.session.userId!);
       if (!dialog) {
         return res.status(404).json({ error: "Dialog not found" });
       }
@@ -858,9 +855,9 @@ export async function registerRoutes(
 
   app.patch("/api/dialogs/:id", async (req, res) => {
     try {
-      const dialog = await storage.getDialog(req.params.id);
+      const dialog = await storage.getDialog(req.params.id, req.session.userId!);
       if (!dialog) return res.status(404).json({ error: "Dialog not found" });
-      const updated = await storage.updateDialog(req.params.id, req.body);
+      const updated = await storage.updateDialog(req.params.id, req.session.userId!, req.body);
       res.json(updated);
     } catch (error) {
       console.error("Error updating dialog:", error);
@@ -870,7 +867,7 @@ export async function registerRoutes(
 
   app.post("/api/dialogs/:id/auto-tags", async (req, res) => {
     try {
-      const dialog = await storage.getDialog(req.params.id);
+      const dialog = await storage.getDialog(req.params.id, req.session.userId!);
       if (!dialog) return res.status(404).json({ error: "Dialog not found" });
 
       const hasBothTexts = dialog.maleText && dialog.femaleText;
@@ -935,7 +932,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "AI did not return tagged text" });
       }
 
-      const updated = await storage.updateDialog(req.params.id, updateData);
+      const updated = await storage.updateDialog(req.params.id, req.session.userId!, updateData);
       res.json(updated);
     } catch (error) {
       console.error("Error auto-tagging dialog:", error);
@@ -1195,7 +1192,7 @@ ${styleInstructions}
       let femaleVoiceId: string | undefined;
 
       if (dialogId) {
-        const dialog = await storage.getDialog(dialogId);
+        const dialog = await storage.getDialog(dialogId, req.session.userId!);
         if (dialog?.hostVoiceIds && dialog.hostVoiceIds.length > 0) {
           for (const vid of dialog.hostVoiceIds) {
             const voice = voicesList.find(v => v.id === vid);
@@ -1293,7 +1290,7 @@ ${styleInstructions}
 
   app.delete("/api/dialogs/:id", async (req, res) => {
     try {
-      const deleted = await storage.deleteDialog(req.params.id);
+      const deleted = await storage.deleteDialog(req.params.id, req.session.userId!);
       if (!deleted) {
         return res.status(404).json({ error: "Dialog not found" });
       }
@@ -1573,7 +1570,7 @@ ${dialogStyle === "lively" ? `СТИЛЬ ДИАЛОГА — ЖИВАЯ СТУД�
           let dialog;
           
           if (existingDialogId) {
-            dialog = await storage.updateDialog(existingDialogId, {
+            dialog = await storage.updateDialog(existingDialogId, req.session.userId!, {
               title,
               prompt: userPrompt,
               scriptText: scriptText || `${maleText}\n\n${femaleText}`,
@@ -1631,7 +1628,7 @@ ${dialogStyle === "lively" ? `СТИЛЬ ДИАЛОГА — ЖИВАЯ СТУД�
       const { prompt } = req.body;
       const dialogId = req.params.id;
       
-      const dialog = await storage.getDialog(dialogId);
+      const dialog = await storage.getDialog(dialogId, req.session.userId!);
       if (!dialog) {
         return res.status(404).json({ error: "Dialog not found" });
       }
@@ -1706,7 +1703,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
         }
       }
 
-      const updatedDialog = await storage.updateDialog(dialogId, {
+      const updatedDialog = await storage.updateDialog(dialogId, req.session.userId!, {
         maleText,
         femaleText,
         scriptText: `${maleText}\n\n${femaleText}`,
@@ -1756,7 +1753,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
       }
 
       for (const dialog of dialogsForDate) {
-        await storage.updateDialog(dialog.id, { status: "generating" });
+        await storage.updateDialog(dialog.id, req.session.userId!, { status: "generating" });
       }
 
       res.json({ queued: dialogsForDate.length });
@@ -1828,7 +1825,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
             await fs.unlink(femaleFile2).catch(() => {});
 
             const stat = await fs.stat(combinedFile);
-            await storage.updateDialog(dialog.id, {
+            await storage.updateDialog(dialog.id, req.session.userId!, {
               audioUrl: `/audio/dialog_${dialog.id}_${timestamp}.mp3`,
               duration: Math.round(stat.size / (192000 / 8)),
               status: "ready",
@@ -1837,7 +1834,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
             console.log(`Audio generated for dialog ${dialog.id}`);
           } catch (error) {
             console.error(`Error generating audio for dialog ${dialog.id}:`, error);
-            await storage.updateDialog(dialog.id, { status: "error" });
+            await storage.updateDialog(dialog.id, req.session.userId!, { status: "error" });
           }
         }
       })();
@@ -1873,7 +1870,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
 
   app.patch("/api/news-sources/:id", async (req, res) => {
     try {
-      const updated = await storage.updateNewsSource(req.params.id, req.body);
+      const updated = await storage.updateNewsSource(req.params.id, req.session.userId!, req.body);
       if (!updated) {
         return res.status(404).json({ error: "News source not found" });
       }
@@ -1886,7 +1883,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
 
   app.delete("/api/news-sources/:id", async (req, res) => {
     try {
-      const deleted = await storage.deleteNewsSource(req.params.id);
+      const deleted = await storage.deleteNewsSource(req.params.id, req.session.userId!);
       if (!deleted) {
         return res.status(404).json({ error: "News source not found" });
       }
@@ -1910,7 +1907,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
 
   app.post("/api/news-sources/:id/fetch", async (req, res) => {
     try {
-      const source = await storage.getNewsSource(req.params.id);
+      const source = await storage.getNewsSource(req.params.id, req.session.userId!);
       if (!source) {
         return res.status(404).json({ error: "News source not found" });
       }
@@ -2012,7 +2009,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
       }
 
       if (dialogId) {
-        await storage.updateDialog(dialogId, {
+        await storage.updateDialog(dialogId, req.session.userId!, {
           moderationStatus: result.approved ? "approved" : "flagged",
           moderationNotes: result.notes,
         });
@@ -2160,7 +2157,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
     try {
       const { sourceId } = req.body;
       const sources = sourceId 
-        ? [await storage.getNewsSource(sourceId)].filter(Boolean)
+        ? [await storage.getNewsSource(sourceId, req.session.userId!)].filter(Boolean)
         : await storage.getNewsSources(req.session.userId!);
       
       const activeSources = sources.filter(s => s?.isActive);
@@ -2215,7 +2212,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
 
   app.get("/api/ad-presets/:id", async (req, res) => {
     try {
-      const preset = await storage.getAdPreset(req.params.id);
+      const preset = await storage.getAdPreset(req.params.id, req.session.userId!);
       if (!preset) {
         return res.status(404).json({ error: "Preset not found" });
       }
@@ -2247,7 +2244,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.message });
       }
-      const updated = await storage.updateAdPreset(req.params.id, parsed.data);
+      const updated = await storage.updateAdPreset(req.params.id, req.session.userId!, parsed.data);
       if (!updated) {
         return res.status(404).json({ error: "Preset not found" });
       }
@@ -2260,7 +2257,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
 
   app.delete("/api/ad-presets/:id", async (req, res) => {
     try {
-      const deleted = await storage.deleteAdPreset(req.params.id);
+      const deleted = await storage.deleteAdPreset(req.params.id, req.session.userId!);
       if (!deleted) {
         return res.status(404).json({ error: "Preset not found" });
       }
@@ -2297,7 +2294,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
 
   app.patch("/api/ads/:id", async (req, res) => {
     try {
-      const updated = await storage.updateAd(req.params.id, req.body);
+      const updated = await storage.updateAd(req.params.id, req.session.userId!, req.body);
       if (!updated) {
         return res.status(404).json({ error: "Ad not found" });
       }
@@ -2310,7 +2307,7 @@ ${ctx.knowledgeBase ? `\nБАЗА ЗНАНИЙ СТАНЦИИ:\n${ctx.knowledgeB
 
   app.delete("/api/ads/:id", async (req, res) => {
     try {
-      const deleted = await storage.deleteAd(req.params.id);
+      const deleted = await storage.deleteAd(req.params.id, req.session.userId!);
       if (!deleted) {
         return res.status(404).json({ error: "Ad not found" });
       }
@@ -2418,7 +2415,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
   app.post("/api/ads/:id/generate-variants", async (req, res) => {
     try {
       const { id } = req.params;
-      const ad = await storage.getAd(id);
+      const ad = await storage.getAd(id, req.session.userId!);
       if (!ad) {
         return res.status(404).json({ error: "Ad not found" });
       }
@@ -2479,7 +2476,7 @@ ${ad.clientName ? `- Клиент: ${ad.clientName}` : ""}
 
         const parsed = JSON.parse(jsonMatch[0]);
         
-        const updated = await storage.updateAd(id, {
+        const updated = await storage.updateAd(id, req.session.userId!, {
           variants: parsed.variants,
           speakersCount: parsed.speakersCount || 1,
           stage: "variants",
@@ -2505,7 +2502,7 @@ ${ad.clientName ? `- Клиент: ${ad.clientName}` : ""}
 
       const parsed = JSON.parse(content);
       
-      const updated = await storage.updateAd(id, {
+      const updated = await storage.updateAd(id, req.session.userId!, {
         variants: parsed.variants,
         speakersCount: parsed.speakersCount || 1,
         stage: "variants",
@@ -2523,7 +2520,7 @@ ${ad.clientName ? `- Клиент: ${ad.clientName}` : ""}
       const { id } = req.params;
       const { variantIndex } = req.body;
       
-      const ad = await storage.getAd(id);
+      const ad = await storage.getAd(id, req.session.userId!);
       if (!ad) {
         return res.status(404).json({ error: "Ad not found" });
       }
@@ -2532,7 +2529,7 @@ ${ad.clientName ? `- Клиент: ${ad.clientName}` : ""}
         return res.status(400).json({ error: "Invalid variant index" });
       }
 
-      const updated = await storage.updateAd(id, {
+      const updated = await storage.updateAd(id, req.session.userId!, {
         selectedVariantIndex: variantIndex,
         selectedVariantText: ad.variants[variantIndex],
         scriptText: ad.variants[variantIndex],
@@ -2551,7 +2548,7 @@ ${ad.clientName ? `- Клиент: ${ad.clientName}` : ""}
       const { id } = req.params;
       const { baseText, instructions } = req.body;
       
-      const ad = await storage.getAd(id);
+      const ad = await storage.getAd(id, req.session.userId!);
       if (!ad) {
         return res.status(404).json({ error: "Ad not found" });
       }
@@ -2587,7 +2584,7 @@ ${instructions || "Создай альтернативный вариант с �
         const newVariant = textContent.text.trim();
         const variants = [...(ad.variants || []), newVariant];
         
-        const updated = await storage.updateAd(id, { variants });
+        const updated = await storage.updateAd(id, req.session.userId!, { variants });
         return res.json({ variant: newVariant, ad: updated });
       }
 
@@ -2606,7 +2603,7 @@ ${instructions || "Создай альтернативный вариант с �
       }
 
       const variants = [...(ad.variants || []), newVariant];
-      const updated = await storage.updateAd(id, { variants });
+      const updated = await storage.updateAd(id, req.session.userId!, { variants });
       
       res.json({ variant: newVariant, ad: updated });
     } catch (error) {
@@ -2620,7 +2617,7 @@ ${instructions || "Создай альтернативный вариант с �
       const { id } = req.params;
       const { voiceIds } = req.body;
       
-      const ad = await storage.getAd(id);
+      const ad = await storage.getAd(id, req.session.userId!);
       if (!ad) {
         return res.status(404).json({ error: "Ad not found" });
       }
@@ -2636,7 +2633,7 @@ ${instructions || "Создай альтернативный вариант с �
 
       const voiceIdToUse = voiceIds?.[0] || settings.maleVoiceId || "onwK4e9ZLuTAKqWW03F9";
 
-      await storage.updateAd(id, { status: "generating", voiceIds });
+      await storage.updateAd(id, req.session.userId!, { status: "generating", voiceIds });
       res.json({ message: "Audio generation started" });
 
       (async () => {
@@ -2673,7 +2670,7 @@ ${instructions || "Создай альтернативный вариант с �
           const audioFile = path.join(audioDir, `ad_${id}_${timestamp}.mp3`);
           await fs.writeFile(audioFile, audioBuffer);
 
-          await storage.updateAd(id, {
+          await storage.updateAd(id, req.session.userId!, {
             audioUrl: `/audio/ad_${id}_${timestamp}.mp3`,
             duration: Math.round(audioBuffer.length / 24000),
             status: "ready",
@@ -2683,7 +2680,7 @@ ${instructions || "Создай альтернативный вариант с �
           console.log(`Audio generated for ad ${id}`);
         } catch (error) {
           console.error(`Error generating audio for ad ${id}:`, error);
-          await storage.updateAd(id, { status: "error" });
+          await storage.updateAd(id, req.session.userId!, { status: "error" });
         }
       })();
     } catch (error) {
@@ -2694,7 +2691,7 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.get("/api/ads/:id/download-audio", async (req, res) => {
     try {
-      const ad = await storage.getAd(req.params.id);
+      const ad = await storage.getAd(req.params.id, req.session.userId!);
       if (!ad) {
         return res.status(404).json({ error: "Ad not found" });
       }
@@ -2907,7 +2904,7 @@ ${instructions || "Создай альтернативный вариант с �
       if (updates.gender && !["male", "female"].includes(updates.gender)) {
         return res.status(400).json({ error: "Gender must be 'male' or 'female'" });
       }
-      const updated = await storage.updateVoice(req.params.id, updates);
+      const updated = await storage.updateVoice(req.params.id, req.session.userId!, updates);
       if (!updated) {
         return res.status(404).json({ error: "Voice not found" });
       }
@@ -2920,7 +2917,7 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.delete("/api/voices/:id", async (req, res) => {
     try {
-      const deleted = await storage.deleteVoice(req.params.id);
+      const deleted = await storage.deleteVoice(req.params.id, req.session.userId!);
       if (!deleted) {
         return res.status(404).json({ error: "Voice not found" });
       }
@@ -3088,7 +3085,7 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.patch("/api/program-types/:id", async (req, res) => {
     try {
-      const updated = await storage.updateProgramType(req.params.id, req.body);
+      const updated = await storage.updateProgramType(req.params.id, req.session.userId!, req.body);
       if (!updated) {
         return res.status(404).json({ error: "Program type not found" });
       }
@@ -3101,7 +3098,7 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.delete("/api/program-types/:id", async (req, res) => {
     try {
-      const deleted = await storage.deleteProgramType(req.params.id);
+      const deleted = await storage.deleteProgramType(req.params.id, req.session.userId!);
       if (!deleted) {
         return res.status(404).json({ error: "Program type not found" });
       }
@@ -3117,7 +3114,7 @@ ${instructions || "Создай альтернативный вариант с �
     try {
       const typeId = req.query.typeId as string | undefined;
       const programsList = typeId 
-        ? await storage.getProgramsByType(typeId)
+        ? await storage.getProgramsByType(typeId, req.session.userId!)
         : await storage.getPrograms(req.session.userId!);
       res.json(programsList);
     } catch (error) {
@@ -3128,7 +3125,7 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.get("/api/programs/:id", async (req, res) => {
     try {
-      const program = await storage.getProgram(req.params.id);
+      const program = await storage.getProgram(req.params.id, req.session.userId!);
       if (!program) {
         return res.status(404).json({ error: "Program not found" });
       }
@@ -3151,7 +3148,7 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.patch("/api/programs/:id", async (req, res) => {
     try {
-      const updated = await storage.updateProgram(req.params.id, req.body);
+      const updated = await storage.updateProgram(req.params.id, req.session.userId!, req.body);
       if (!updated) {
         return res.status(404).json({ error: "Program not found" });
       }
@@ -3164,7 +3161,7 @@ ${instructions || "Создай альтернативный вариант с �
 
   app.delete("/api/programs/:id", async (req, res) => {
     try {
-      const deleted = await storage.deleteProgram(req.params.id);
+      const deleted = await storage.deleteProgram(req.params.id, req.session.userId!);
       if (!deleted) {
         return res.status(404).json({ error: "Program not found" });
       }
@@ -3466,7 +3463,7 @@ ${existingList}
 
   app.post("/api/firecrawl/research/:typeId", async (req, res) => {
     try {
-      const programType = await storage.getProgramType(req.params.typeId);
+      const programType = await storage.getProgramType(req.params.typeId, req.session.userId!);
       if (!programType) return res.status(404).json({ error: "Type not found" });
 
       const topics = req.body.topics || programType.firecrawlTopics || [];
@@ -3545,7 +3542,7 @@ ${existingList}
 
   app.post("/api/programs/auto-create/:typeId", async (req, res) => {
     try {
-      const programType = await storage.getProgramType(req.params.typeId);
+      const programType = await storage.getProgramType(req.params.typeId, req.session.userId!);
       if (!programType) {
         return res.status(404).json({ error: "Program type not found" });
       }
@@ -3553,7 +3550,7 @@ ${existingList}
       const today = new Date();
       const dateStr = today.toISOString().split("T")[0];
 
-      const existingPrograms = await storage.getProgramsByType(programType.id);
+      const existingPrograms = await storage.getProgramsByType(programType.id, req.session.userId!);
       const todayPrograms = existingPrograms.filter(p => p.scheduledDate === dateStr);
       const nextSlot = todayPrograms.length + 1;
 
@@ -3886,7 +3883,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
   app.post("/api/programs/batch-create/:typeId", async (req, res) => {
     try {
-      const programType = await storage.getProgramType(req.params.typeId);
+      const programType = await storage.getProgramType(req.params.typeId, req.session.userId!);
       if (!programType) {
         return res.status(404).json({ error: "Program type not found" });
       }
@@ -3894,7 +3891,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const { count, referenceContent, referenceUrl } = req.body;
       const totalCount = Math.min(Math.max(count || 10, 5), 50);
 
-      const existingPrograms = await storage.getProgramsByType(programType.id);
+      const existingPrograms = await storage.getProgramsByType(programType.id, req.session.userId!);
       const existingTitles = existingPrograms
         .filter(p => p.title)
         .slice(-20)
@@ -4167,12 +4164,12 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
 
   app.post("/api/programs/:id/generate", async (req, res) => {
     try {
-      const program = await storage.getProgram(req.params.id);
+      const program = await storage.getProgram(req.params.id, req.session.userId!);
       if (!program) {
         return res.status(404).json({ error: "Program not found" });
       }
 
-      const programType = await storage.getProgramType(program.programTypeId);
+      const programType = await storage.getProgramType(program.programTypeId, req.session.userId!);
       if (!programType) {
         return res.status(404).json({ error: "Program type not found" });
       }
@@ -4273,7 +4270,7 @@ ${programType.scriptTemplate}
         scriptText = response.choices[0]?.message?.content || "";
       }
 
-      const updated = await storage.updateProgram(program.id, {
+      const updated = await storage.updateProgram(program.id, req.session.userId!, {
         scriptText,
         status: "script_ready",
         scriptGeneratedAt: new Date(),
@@ -4288,7 +4285,7 @@ ${programType.scriptTemplate}
 
   app.post("/api/programs/:id/generate-audio", async (req, res) => {
     try {
-      const program = await storage.getProgram(req.params.id);
+      const program = await storage.getProgram(req.params.id, req.session.userId!);
       if (!program) {
         return res.status(404).json({ error: "Program not found" });
       }
@@ -4303,7 +4300,7 @@ ${programType.scriptTemplate}
       }
 
       const voicesList = await storage.getVoices(req.session.userId!);
-      const programType = await storage.getProgramType(program.programTypeId);
+      const programType = await storage.getProgramType(program.programTypeId, req.session.userId!);
 
       const generateVoiceSegment = async (text: string, voiceId: string): Promise<Buffer> => {
         const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
@@ -4407,7 +4404,7 @@ ${programType.scriptTemplate}
         const hasErrors = segmentErrors.length > 0;
         const status = hasErrors ? (segmentFiles.length < totalExpected ? "error" : "ready") : "ready";
 
-        const updated = await storage.updateProgram(program.id, {
+        const updated = await storage.updateProgram(program.id, req.session.userId!, {
           audioUrl: `/audio/${filename}`,
           status,
           audioDurationSeconds: estimatedDuration,
@@ -4429,7 +4426,7 @@ ${programType.scriptTemplate}
 
         const estimatedDurationSingle = Math.round(buffer.length / (192000 / 8));
 
-        const updated = await storage.updateProgram(program.id, {
+        const updated = await storage.updateProgram(program.id, req.session.userId!, {
           audioUrl: `/audio/${filename}`,
           status: "ready",
           audioDurationSeconds: estimatedDurationSingle,
@@ -4446,7 +4443,7 @@ ${programType.scriptTemplate}
 
   app.get("/api/programs/:id/download-audio", async (req, res) => {
     try {
-      const program = await storage.getProgram(req.params.id);
+      const program = await storage.getProgram(req.params.id, req.session.userId!);
       if (!program) {
         return res.status(404).json({ error: "Program not found" });
       }
@@ -4480,7 +4477,7 @@ ${programType.scriptTemplate}
 
   app.post("/api/programs/:id/voice-isolate", async (req, res) => {
     try {
-      const program = await storage.getProgram(req.params.id);
+      const program = await storage.getProgram(req.params.id, req.session.userId!);
       if (!program) {
         return res.status(404).json({ error: "Program not found" });
       }
@@ -4528,7 +4525,7 @@ ${programType.scriptTemplate}
       const isolatedPath = path.join(audioDir, isolatedFilename);
       await fs.writeFile(isolatedPath, resultBuffer);
 
-      const updated = await storage.updateProgram(program.id, {
+      const updated = await storage.updateProgram(program.id, req.session.userId!, {
         audioUrl: `/audio/${isolatedFilename}`,
       });
 
@@ -4552,7 +4549,7 @@ ${programType.scriptTemplate}
 
   app.get("/api/automations/:id", async (req, res) => {
     try {
-      const automation = await storage.getAutomation(req.params.id);
+      const automation = await storage.getAutomation(req.params.id, req.session.userId!);
       if (!automation) {
         return res.status(404).json({ error: "Automation not found" });
       }
@@ -4593,7 +4590,7 @@ ${programType.scriptTemplate}
       if (req.body.itemsCount !== undefined) updates.itemsCount = typeof req.body.itemsCount === "number" ? req.body.itemsCount : 1;
       if (req.body.isActive !== undefined) updates.isActive = req.body.isActive;
       
-      const updated = await storage.updateAutomation(req.params.id, updates as any);
+      const updated = await storage.updateAutomation(req.params.id, updates as any, req.session.userId!);
       if (!updated) {
         return res.status(404).json({ error: "Automation not found" });
       }
@@ -4606,7 +4603,7 @@ ${programType.scriptTemplate}
 
   app.delete("/api/automations/:id", async (req, res) => {
     try {
-      const deleted = await storage.deleteAutomation(req.params.id);
+      const deleted = await storage.deleteAutomation(req.params.id, req.session.userId!);
       if (!deleted) {
         return res.status(404).json({ error: "Automation not found" });
       }
@@ -4619,6 +4616,10 @@ ${programType.scriptTemplate}
 
   app.get("/api/automations/:id/runs", async (req, res) => {
     try {
+      const automation = await storage.getAutomation(req.params.id, req.session.userId!);
+      if (!automation) {
+        return res.status(404).json({ error: "Automation not found" });
+      }
       const runs = await storage.getAutomationRuns(req.params.id);
       res.json(runs);
     } catch (error) {
@@ -4629,13 +4630,14 @@ ${programType.scriptTemplate}
 
   app.post("/api/automations/:id/run", async (req, res) => {
     try {
-      const automation = await storage.getAutomation(req.params.id);
+      const automation = await storage.getAutomation(req.params.id, req.session.userId!);
       if (!automation) {
         return res.status(404).json({ error: "Automation not found" });
       }
 
       const run = await storage.createAutomationRun({
         automationId: automation.id,
+        userId: req.session.userId!,
         status: "running",
         itemsCreated: 0,
       });
@@ -4725,7 +4727,7 @@ ${programType.scriptTemplate}
               await storage.markNewsItemUsed(newsItem.id);
             }
           } else if (automation.automationType === "program" && automation.programTypeId) {
-            const programType = await storage.getProgramType(automation.programTypeId);
+            const programType = await storage.getProgramType(automation.programTypeId, req.session.userId!);
             if (!programType) {
               await storage.updateAutomationRun(run.id, {
                 status: "error",
@@ -4765,7 +4767,7 @@ ${programType.scriptTemplate}
 
           await storage.updateAutomation(automation.id, {
             lastRunAt: new Date(),
-          } as any);
+          } as any, req.session.userId!);
 
         } catch (error) {
           console.error("Automation execution error:", error);
@@ -4977,7 +4979,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
   app.post("/api/programs/:typeId/auto-pipeline", async (req, res) => {
     try {
-      const programType = await storage.getProgramType(req.params.typeId);
+      const programType = await storage.getProgramType(req.params.typeId, req.session.userId!);
       if (!programType) {
         return res.status(404).json({ error: "Program type not found" });
       }
@@ -5060,7 +5062,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
                 if (uploadUrlRes.ok) {
                   const { href } = await uploadUrlRes.json();
                   await fetch(href, { method: "PUT", body: fileData });
-                  await storage.updateProgram(program.id, {
+                  await storage.updateProgram(program.id, req.session.userId!, {
                     uploadedToYandex: true,
                     yandexPath: `${yandexFolder}/${fileName}`,
                   });
@@ -5124,7 +5126,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
         weekStart.setDate(today.getDate() - mondayOffset);
         const weekStartStr = weekStart.toISOString().split("T")[0];
 
-        const existingPrograms = await storage.getProgramsByType(pType.id);
+        const existingPrograms = await storage.getProgramsByType(pType.id, pType.userId || undefined);
         const thisWeekPrograms = existingPrograms.filter(p => p.scheduledDate && p.scheduledDate >= weekStartStr && p.scheduledDate <= dateStr);
         const todayPrograms = existingPrograms.filter(p => p.scheduledDate === dateStr);
 
@@ -5266,7 +5268,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       if (req.body.date && !MMDD_REGEX.test(req.body.date)) {
         return res.status(400).json({ error: "Date must be in MM-DD format" });
       }
-      const holiday = await storage.updateCustomHoliday(req.params.id, req.body);
+      const holiday = await storage.updateCustomHoliday(req.params.id, req.session.userId!, req.body);
       if (!holiday) return res.status(404).json({ error: "Holiday not found" });
       await refreshCustomHolidays();
       res.json(holiday);
@@ -5277,7 +5279,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
   app.delete("/api/custom-holidays/:id", async (req, res) => {
     try {
-      const deleted = await storage.deleteCustomHoliday(req.params.id);
+      const deleted = await storage.deleteCustomHoliday(req.params.id, req.session.userId!);
       if (!deleted) return res.status(404).json({ error: "Holiday not found" });
       await refreshCustomHolidays();
       res.json({ success: true });
@@ -5297,7 +5299,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
   app.get("/api/schedule-templates/:id", async (req, res) => {
     try {
-      const template = await storage.getScheduleTemplate(req.params.id);
+      const template = await storage.getScheduleTemplate(req.params.id, req.session.userId!);
       if (!template) return res.status(404).json({ error: "Template not found" });
       res.json(template);
     } catch (error) {
@@ -5339,7 +5341,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       if (parsed.weekdays !== undefined && (!parsed.weekdays.length || !parsed.weekdays.every(d => d >= 1 && d <= 7))) {
         return res.status(400).json({ error: "weekdays must contain values 1-7" });
       }
-      const template = await storage.updateScheduleTemplate(req.params.id, parsed);
+      const template = await storage.updateScheduleTemplate(req.params.id, req.session.userId!, parsed);
       if (!template) return res.status(404).json({ error: "Template not found" });
       res.json(template);
     } catch (error: any) {
@@ -5352,7 +5354,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
   app.delete("/api/schedule-templates/:id", async (req, res) => {
     try {
-      const deleted = await storage.deleteScheduleTemplate(req.params.id);
+      const deleted = await storage.deleteScheduleTemplate(req.params.id, req.session.userId!);
       if (!deleted) return res.status(404).json({ error: "Template not found" });
       res.json({ success: true });
     } catch (error) {
@@ -5394,7 +5396,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       if (parsed.startHour !== undefined && parsed.endHour !== undefined && parsed.startHour === parsed.endHour) {
         return res.status(400).json({ error: "startHour and endHour cannot be the same" });
       }
-      const shift = await storage.updateHostShift(req.params.id, parsed);
+      const shift = await storage.updateHostShift(req.params.id, req.session.userId!, parsed);
       if (!shift) return res.status(404).json({ error: "Shift not found" });
       res.json(shift);
     } catch (error: any) {
@@ -5407,7 +5409,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
   app.delete("/api/host-shifts/:id", async (req, res) => {
     try {
-      const deleted = await storage.deleteHostShift(req.params.id);
+      const deleted = await storage.deleteHostShift(req.params.id, req.session.userId!);
       if (!deleted) return res.status(404).json({ error: "Shift not found" });
       res.json({ success: true });
     } catch (error) {

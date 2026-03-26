@@ -136,7 +136,7 @@ export function registerVoiceAgentRoutes(app: Express) {
           return res.status(404).json({ error: `Передача "${programTypeName}" не найдена` });
         }
         typeName = programType.name;
-        const programs = await storage.getProgramsByType(programType.id);
+        const programs = await storage.getProgramsByType(programType.id, AGENT_USER_ID);
         const dateStr = date || new Date().toISOString().split("T")[0];
         const toVoice = programs.filter(p =>
           p.scriptText && !p.audioUrl && p.scheduledDate === dateStr
@@ -258,7 +258,7 @@ export function registerVoiceAgentRoutes(app: Express) {
 
       const results: any[] = [];
       for (const type of activeTypes) {
-        const programs = await storage.getProgramsByType(type.id);
+        const programs = await storage.getProgramsByType(type.id, AGENT_USER_ID);
         const datePrograms = programs.filter(p => p.scheduledDate === date);
         if (datePrograms.length > 0) {
           results.push({
@@ -411,7 +411,7 @@ export function registerVoiceAgentRoutes(app: Express) {
         } catch {}
       }
 
-      const existingPrograms = await storage.getProgramsByType(programType.id);
+      const existingPrograms = await storage.getProgramsByType(programType.id, AGENT_USER_ID);
       const existingTitles = existingPrograms
         .filter(p => p.scriptText)
         .slice(-10)
