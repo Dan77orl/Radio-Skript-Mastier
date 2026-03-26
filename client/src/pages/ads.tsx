@@ -411,12 +411,20 @@ export default function AdsPage() {
     audio.onended = () => setPlayingAudio(false);
   };
 
+  const [versionProgress, setVersionProgress] = useState(0);
+  const [versionDurationSec, setVersionDurationSec] = useState(0);
+  const [versionCurrentTime, setVersionCurrentTime] = useState(0);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const playVersionAudio = (url: string) => {
     if (versionAudioRef.current) {
       versionAudioRef.current.pause();
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     }
     if (playingVersionUrl === url) {
       setPlayingVersionUrl(null);
+      setVersionProgress(0);
+      setVersionCurrentTime(0);
       return;
     }
     const audio = new Audio(url);
@@ -424,7 +432,37 @@ export default function AdsPage() {
     versionAudioRef.current = audio;
     audio.play().catch(console.error);
     setPlayingVersionUrl(url);
-    audio.onended = () => setPlayingVersionUrl(null);
+
+    audio.onloadedmetadata = () => {
+      setVersionDurationSec(audio.duration);
+    };
+
+    progressIntervalRef.current = setInterval(() => {
+      if (audio.duration) {
+        setVersionProgress((audio.currentTime / audio.duration) * 100);
+        setVersionCurrentTime(audio.currentTime);
+      }
+    }, 100);
+
+    audio.onended = () => {
+      setPlayingVersionUrl(null);
+      setVersionProgress(0);
+      setVersionCurrentTime(0);
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    };
+  };
+
+  const seekVersionAudio = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!versionAudioRef.current || !playingVersionUrl) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    versionAudioRef.current.currentTime = pct * versionAudioRef.current.duration;
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
   useEffect(() => {
@@ -432,6 +470,40 @@ export default function AdsPage() {
       versionAudioRef.current.playbackRate = playbackSpeed;
     }
   }, [playbackSpeed]);
+
+  useEffect(() => {
+    return () => {
+      if (versionAudioRef.current) {
+        versionAudioRef.current.pause();
+        versionAudioRef.current = null;
+      }
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    };
+  }, []);
+
+  const deleteVersionMutation = useMutation({
+    mutationFn: async ({ adId, versionIndex }: { adId: string; versionIndex: number }) => {
+      const res = await apiRequest("DELETE", `/api/ads/${adId}/audio-version/${versionIndex}`);
+      return res.json();
+    },
+    onMutate: () => {
+      if (versionAudioRef.current) {
+        versionAudioRef.current.pause();
+        versionAudioRef.current = null;
+      }
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      setPlayingVersionUrl(null);
+      setVersionProgress(0);
+      setVersionCurrentTime(0);
+    },
+    onSuccess: (updated) => {
+      setCurrentAd(updated);
+      queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
+    },
+  });
 
   const searchMusic = async () => {
     if (!musicSearchQuery.trim()) return;
@@ -627,24 +699,44 @@ export default function AdsPage() {
     return stageConfigs.findIndex(s => s.key === currentAd.stage) || 0;
   };
 
+  const navigateToStage = async (stageKey: string) => {
+    if (!currentAd) return;
+    const currentIndex = getCurrentStageIndex();
+    const targetIndex = stageConfigs.findIndex(s => s.key === stageKey);
+    if (targetIndex < currentIndex) {
+      try {
+        const res = await apiRequest("PATCH", `/api/ads/${currentAd.id}`, { stage: stageKey });
+        const updated = await res.json();
+        setCurrentAd(updated);
+      } catch (error) {
+        console.error("Error navigating to stage:", error);
+      }
+    }
+  };
+
   const renderStageProgress = () => {
     const currentIndex = getCurrentStageIndex();
     return (
-      <div className="flex items-center gap-2 mb-6">
+      <div className="flex items-center gap-2 mb-6 flex-wrap">
         {stageConfigs.map((stage, index) => {
           const Icon = stage.icon;
           const isActive = index === currentIndex;
           const isCompleted = index < currentIndex;
+          const canNavigate = isCompleted;
           return (
             <div key={stage.key} className="flex items-center gap-2">
-              <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm ${
-                isActive ? "bg-primary text-primary-foreground" :
-                isCompleted ? "bg-green-500/20 text-green-600 dark:text-green-400" :
-                "bg-muted text-muted-foreground"
-              }`}>
+              <button
+                className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-colors ${
+                  isActive ? "bg-primary text-primary-foreground" :
+                  isCompleted ? "bg-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-500/30 cursor-pointer" :
+                  "bg-muted text-muted-foreground"
+                } ${canNavigate ? "" : "cursor-default"}`}
+                onClick={() => canNavigate && navigateToStage(stage.key)}
+                data-testid={`stage-nav-${stage.key}`}
+              >
                 {isCompleted ? <Check className="h-3 w-3" /> : <Icon className="h-3 w-3" />}
                 <span className="hidden sm:inline">{t(stage.labelKey)}</span>
-              </div>
+              </button>
               {index < stageConfigs.length - 1 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
             </div>
           );
@@ -1051,10 +1143,15 @@ export default function AdsPage() {
       case "audio":
         const audioVersions: Array<{ url: string; voiceId: string; voiceName: string; createdAt: string; duration: number }> = (() => {
           try {
-            return currentAd.audioVersions ? JSON.parse(currentAd.audioVersions) : [];
+            if (currentAd.audioVersions) {
+              const parsed = JSON.parse(currentAd.audioVersions);
+              return Array.isArray(parsed) ? parsed : [];
+            }
+            return [];
           } catch { return []; }
         })();
-        const hasVersions = audioVersions.length > 0;
+        const latestVersion = audioVersions.length > 0 ? audioVersions[audioVersions.length - 1] : null;
+        const latestVoiceName = latestVersion?.voiceName || t("ads.audioReady");
         return (
           <Card>
             <CardHeader>
@@ -1064,142 +1161,270 @@ export default function AdsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-lg bg-green-500/10 border-green-500 border p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-full bg-green-500 flex items-center justify-center">
-                      <Check className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{t("ads.audioReady")}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {currentAd.duration ? `${currentAd.duration} ${t("ads.sec")}` : ""}
-                        {hasVersions && ` · ${audioVersions.length} ${audioVersions.length === 1 ? t("ads.version") : t("ads.versions")}`}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex border rounded-md overflow-hidden">
-                      {[1, 1.5, 2].map((speed) => (
-                        <button
-                          key={speed}
-                          className={`px-2 py-1 text-xs font-medium transition-colors ${
-                            playbackSpeed === speed
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted hover:bg-muted/80 text-muted-foreground"
-                          }`}
-                          onClick={() => setPlaybackSpeed(speed)}
-                          data-testid={`speed-${speed}x`}
-                        >
-                          {speed}x
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {hasVersions ? (
-                <div className="space-y-2">
-                  {audioVersions.map((version, idx) => {
-                    const isCurrentlyPlaying = playingVersionUrl === version.url;
-                    const isCurrent = version.url === currentAd.audioUrl;
-                    return (
-                      <div
-                        key={idx}
-                        className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
-                          isCurrent ? "border-green-500 bg-green-500/5" : ""
-                        } ${isCurrentlyPlaying ? "bg-primary/5" : ""}`}
-                        data-testid={`audio-version-${idx}`}
-                      >
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 shrink-0"
-                          onClick={() => playVersionAudio(version.url)}
-                          data-testid={`play-version-${idx}`}
-                        >
-                          {isCurrentlyPlaying ? (
-                            <PauseCircle className="h-5 w-5 text-primary" />
-                          ) : (
-                            <PlayCircle className="h-5 w-5" />
-                          )}
-                        </Button>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">#{idx + 1}</span>
-                            <span className="text-sm text-muted-foreground truncate">{version.voiceName}</span>
-                            {isCurrent && (
-                              <span className="text-xs bg-green-500/20 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded">{t("ads.current")}</span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {version.duration ? `${version.duration} ${t("ads.sec")}` : ""}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0"
-                          asChild
-                        >
-                          <a href={version.url} download={`${currentAd.title || "ad"}_v${idx + 1}.mp3`} data-testid={`download-version-${idx}`}>
-                            <Download className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : currentAd.audioUrl ? (
-                <div className="flex items-center gap-3 rounded-lg border p-3">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => playVersionAudio(currentAd.audioUrl!)}
-                    data-testid="button-play-audio"
-                  >
-                    {playingVersionUrl === currentAd.audioUrl ? (
-                      <PauseCircle className="h-5 w-5 text-primary" />
-                    ) : (
-                      <PlayCircle className="h-5 w-5" />
-                    )}
-                  </Button>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">#1</p>
-                    <p className="text-xs text-muted-foreground">
-                      {currentAd.duration ? `${currentAd.duration} ${t("ads.sec")}` : ""}
-                    </p>
-                  </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                    <a href={`/api/ads/${currentAd.id}/download-audio`} download={`${currentAd.title || "ad"}.mp3`} data-testid="button-download-audio">
-                      <Download className="h-4 w-4" />
-                    </a>
-                  </Button>
-                </div>
-              ) : null}
-
               <div className="rounded-lg bg-muted p-4">
                 <p className="text-sm">{currentAd.selectedVariantText}</p>
               </div>
 
-              <div className="border rounded-lg p-4 space-y-3">
-                <p className="text-sm font-medium">{t("ads.reRenderVoice")}</p>
-                <div className="flex gap-2 flex-wrap">
-                  {voices?.filter(v => v.isActive).map((voice) => (
-                    <Button
-                      key={voice.id}
-                      variant={selectedVoiceId === voice.elevenLabsVoiceId ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedVoiceId(voice.elevenLabsVoiceId)}
-                      data-testid={`rerender-voice-${voice.id}`}
-                    >
-                      <Volume2 className="mr-1 h-3 w-3" />
-                      {getCleanVoiceName(voice)}
-                    </Button>
-                  ))}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Volume2 className="h-4 w-4" />
+                    <span className="font-medium">{t("ads.audioVersionsTitle")}</span>
+                  </div>
+                  <div className="flex border rounded-md overflow-hidden">
+                    {[1, 1.5, 2].map((speed) => (
+                      <button
+                        key={speed}
+                        className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+                          playbackSpeed === speed
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-background hover:bg-muted text-muted-foreground"
+                        }`}
+                        onClick={() => setPlaybackSpeed(speed)}
+                        data-testid={`speed-${speed}x`}
+                      >
+                        {speed}x
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                <div className="space-y-1">
+                  {audioVersions.map((version, idx) => {
+                    const isCurrentlyPlaying = playingVersionUrl === version.url;
+                    const isCurrent = version.url === currentAd.audioUrl;
+                    return (
+                      <div key={idx} data-testid={`audio-version-${idx}`}>
+                        <div
+                          className={`flex items-center gap-2 rounded-lg border p-2.5 transition-colors ${
+                            isCurrent ? "border-green-500 bg-green-500/5" : ""
+                          } ${isCurrentlyPlaying ? "bg-primary/5" : ""}`}
+                        >
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            onClick={() => playVersionAudio(version.url)}
+                            data-testid={`play-version-${idx}`}
+                          >
+                            {isCurrentlyPlaying ? (
+                              <PauseCircle className="h-5 w-5 text-primary" />
+                            ) : (
+                              <PlayCircle className="h-5 w-5" />
+                            )}
+                          </Button>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-muted-foreground">#{idx + 1}</span>
+                              <span className="text-sm font-medium truncate">{version.voiceName}</span>
+                              {isCurrent && (
+                                <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                              )}
+                            </div>
+                            {version.duration > 0 && (
+                              <span className="text-xs text-muted-foreground">{version.duration} {t("ads.sec")}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                              <a href={version.url} download={`${currentAd.title || "ad"}_v${idx + 1}.mp3`} data-testid={`download-version-${idx}`}>
+                                <Download className="h-3.5 w-3.5" />
+                              </a>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => deleteVersionMutation.mutate({ adId: currentAd.id, versionIndex: idx })}
+                              disabled={deleteVersionMutation.isPending}
+                              data-testid={`delete-version-${idx}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {isCurrentlyPlaying && (
+                          <div className="px-2 pb-2 pt-1">
+                            <div
+                              className="h-1.5 bg-muted rounded-full cursor-pointer relative group"
+                              onClick={seekVersionAudio}
+                              data-testid={`seek-bar-${idx}`}
+                            >
+                              <div
+                                className="h-full bg-primary rounded-full transition-all relative"
+                                style={{ width: `${versionProgress}%` }}
+                              >
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                            </div>
+                            <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
+                              <span>{formatTime(versionCurrentTime)}</span>
+                              <span>{formatTime(versionDurationSec)}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {audioVersions.length === 0 && currentAd.audioUrl && (
+                  <div className="flex items-center gap-2 rounded-lg border p-2.5">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => playVersionAudio(currentAd.audioUrl!)}
+                      data-testid="button-play-audio"
+                    >
+                      {playingVersionUrl === currentAd.audioUrl ? (
+                        <PauseCircle className="h-5 w-5 text-primary" />
+                      ) : (
+                        <PlayCircle className="h-5 w-5" />
+                      )}
+                    </Button>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">#1</p>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                      <a href={currentAd.audioUrl} download={`${currentAd.title || "ad"}.mp3`} data-testid="button-download-audio">
+                        <Download className="h-3.5 w-3.5" />
+                      </a>
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">{t("ads.reRenderVoice")}</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowVoiceLibrary(!showVoiceLibrary)}
+                    data-testid="toggle-voice-library-audio"
+                  >
+                    {showVoiceLibrary ? t("ads.myVoices") : t("ads.voiceLibrary")}
+                  </Button>
+                </div>
+
+                {!showVoiceLibrary ? (
+                  <div className="flex gap-2 flex-wrap">
+                    {voices?.filter(v => v.isActive).map((voice) => (
+                      <Button
+                        key={voice.id}
+                        variant={selectedVoiceId === voice.elevenLabsVoiceId ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedVoiceId(voice.elevenLabsVoiceId)}
+                        data-testid={`rerender-voice-${voice.id}`}
+                      >
+                        <Volume2 className="mr-1 h-3 w-3" />
+                        {getCleanVoiceName(voice)}
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder={t("ads.searchVoicePlaceholder")}
+                        value={voiceSearchQuery}
+                        onChange={(e) => setVoiceSearchQuery(e.target.value)}
+                        className="flex-1"
+                        data-testid="input-voice-search-audio"
+                      />
+                      <Select value={voiceSearchLanguage} onValueChange={setVoiceSearchLanguage}>
+                        <SelectTrigger className="w-32" data-testid="select-voice-language-audio">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">{t("ads.allLanguages")}</SelectItem>
+                          <SelectItem value="arabic">العربية</SelectItem>
+                          <SelectItem value="chinese">中文</SelectItem>
+                          <SelectItem value="english">English</SelectItem>
+                          <SelectItem value="french">Français</SelectItem>
+                          <SelectItem value="german">Deutsch</SelectItem>
+                          <SelectItem value="italian">Italiano</SelectItem>
+                          <SelectItem value="japanese">日本語</SelectItem>
+                          <SelectItem value="korean">한국어</SelectItem>
+                          <SelectItem value="portuguese">Português</SelectItem>
+                          <SelectItem value="russian">Русский</SelectItem>
+                          <SelectItem value="spanish">Español</SelectItem>
+                          <SelectItem value="turkish">Türkçe</SelectItem>
+                          <SelectItem value="ukrainian">Українська</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={voiceSearchGender} onValueChange={setVoiceSearchGender}>
+                        <SelectTrigger className="w-24" data-testid="select-voice-gender-audio">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">{t("ads.allGenders")}</SelectItem>
+                          <SelectItem value="male">{t("ads.male")}</SelectItem>
+                          <SelectItem value="female">{t("ads.female")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {isSearchingVoices ? (
+                      <div className="flex justify-center py-3">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <ScrollArea className="h-[200px]">
+                        <div className="grid gap-1.5">
+                          {sharedVoicesData?.voices?.map((voice) => (
+                            <div
+                              key={voice.voice_id}
+                              className={`flex items-center gap-2 rounded-lg border p-2 cursor-pointer transition-colors hover:bg-muted/50 ${
+                                selectedVoiceId === voice.voice_id ? "border-primary bg-primary/5" : ""
+                              }`}
+                              onClick={() => setSelectedVoiceId(voice.voice_id)}
+                              data-testid={`audio-shared-voice-${voice.voice_id}`}
+                            >
+                              <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
+                                voice.labels?.gender === "male" ? "bg-blue-500/20" : "bg-pink-500/20"
+                              }`}>
+                                <User className={`h-4 w-4 ${
+                                  voice.labels?.gender === "male" ? "text-blue-500" : "text-pink-500"
+                                }`} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{voice.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {[voice.labels?.language, voice.labels?.gender, voice.labels?.accent].filter(Boolean).join(" · ")}
+                                </p>
+                              </div>
+                              {voice.preview_url && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 shrink-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    previewVoice(voice.preview_url!);
+                                  }}
+                                  data-testid={`audio-preview-voice-${voice.voice_id}`}
+                                >
+                                  {previewingVoiceUrl === voice.preview_url ? (
+                                    <PauseCircle className="h-4 w-4" />
+                                  ) : (
+                                    <PlayCircle className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              )}
+                              {selectedVoiceId === voice.voice_id && (
+                                <Check className="h-4 w-4 text-primary shrink-0" />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </div>
+                )}
+
                 <Button
                   onClick={() => {
                     if (selectedVoiceId) {
@@ -1210,8 +1435,7 @@ export default function AdsPage() {
                     }
                   }}
                   disabled={!selectedVoiceId || synthesizeAudioMutation.isPending}
-                  size="sm"
-                  variant="secondary"
+                  className="w-full"
                   data-testid="button-resynthesize"
                 >
                   {synthesizeAudioMutation.isPending ? (

@@ -571,7 +571,8 @@
     "resynthesizeVoice": "Sesi yeniden oluştur",
     "version": "versiyon",
     "versions": "versiyon",
-    "current": "mevcut"
+    "current": "mevcut",
+    "audioVersionsTitle": "Ses versiyonları"
   },
   "shows": {
     "title": "Programlar",

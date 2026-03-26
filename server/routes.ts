@@ -3182,6 +3182,61 @@ ${instructions || "Создай альтернативный вариант с �
     }
   });
 
+  app.delete("/api/ads/:id/audio-version/:versionIndex", async (req, res) => {
+    try {
+      const { id, versionIndex } = req.params;
+      const idx = parseInt(versionIndex);
+      if (isNaN(idx) || idx < 0) {
+        return res.status(400).json({ error: "Invalid version index" });
+      }
+
+      const ad = await storage.getAd(id, req.session.userId!);
+      if (!ad) return res.status(404).json({ error: "Ad not found" });
+
+      let versions: Array<{ url: string; voiceId: string; voiceName: string; createdAt: string; duration: number }> = [];
+      try {
+        if (ad.audioVersions) {
+          const parsed = JSON.parse(ad.audioVersions);
+          if (Array.isArray(parsed)) versions = parsed;
+        }
+      } catch {}
+
+      if (idx >= versions.length) {
+        return res.status(400).json({ error: "Invalid version index" });
+      }
+
+      const removedVersion = versions[idx];
+      versions.splice(idx, 1);
+
+      const updateData: any = { audioVersions: JSON.stringify(versions) };
+      if (ad.audioUrl === removedVersion.url && versions.length > 0) {
+        const lastVersion = versions[versions.length - 1];
+        updateData.audioUrl = lastVersion.url;
+        updateData.duration = lastVersion.duration;
+      } else if (versions.length === 0) {
+        updateData.audioUrl = null;
+        updateData.duration = null;
+        updateData.stage = "voices";
+      }
+
+      const updated = await storage.updateAd(id, req.session.userId!, updateData);
+
+      try {
+        const audioDir = path.resolve(process.cwd(), "public", "audio");
+        const normalizedUrl = removedVersion.url.startsWith("/") ? removedVersion.url.slice(1) : removedVersion.url;
+        const filePath = path.resolve(process.cwd(), "public", normalizedUrl);
+        if (filePath.startsWith(audioDir) && filePath.includes("ad_")) {
+          await fs.unlink(filePath);
+        }
+      } catch {}
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error deleting audio version:", error);
+      res.status(500).json({ error: "Failed to delete audio version" });
+    }
+  });
+
   app.get("/api/ads/:id/download-audio", async (req, res) => {
     try {
       const ad = await storage.getAd(req.params.id, req.session.userId!);

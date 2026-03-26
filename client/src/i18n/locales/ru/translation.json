@@ -603,7 +603,8 @@
     "resynthesizeVoice": "Перерендерить аудио",
     "version": "версия",
     "versions": "версий",
-    "current": "текущий"
+    "current": "текущий",
+    "audioVersionsTitle": "Рендеры аудио"
   },
   "shows": {
     "title": "Передачи",

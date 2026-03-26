@@ -585,7 +585,8 @@
     "resynthesizeVoice": "Re-render audio",
     "version": "version",
     "versions": "versions",
-    "current": "current"
+    "current": "current",
+    "audioVersionsTitle": "Audio renders"
   },
   "shows": {
     "title": "Shows",
