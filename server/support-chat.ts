@@ -209,6 +209,10 @@ export async function handleSupportChat(req: Request, res: Response) {
             content: m.content,
           }));
         sessionChats.set(sessionId, restored);
+        const restoredAdminIds = new Set(
+          dbMessages.filter(m => m.role === "admin").map(m => m.id)
+        );
+        adminReplyTracker.set(sessionId, restoredAdminIds);
       } catch (err) {
         console.error("[support-chat] Failed to restore session history:", err);
         sessionChats.set(sessionId, []);
