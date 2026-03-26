@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   name: text("name"),
   language: text("language"),
+  role: text("role").default("user"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
@@ -78,6 +79,7 @@ export type Settings = typeof settings.$inferSelect;
 
 export const dialogs = pgTable("dialogs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   prompt: text("prompt").notNull(),
   scriptText: text("script_text"),
@@ -100,6 +102,7 @@ export const dialogs = pgTable("dialogs", {
 
 export const newsSources = pgTable("news_sources", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   url: text("url").notNull(),
   type: text("type").notNull().default("rss"),
@@ -127,6 +130,7 @@ export type Dialog = typeof dialogs.$inferSelect;
 
 export const promptTemplates = pgTable("prompt_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   content: text("content").notNull(),
   category: text("category").default("general"),
@@ -144,6 +148,7 @@ export type PromptTemplate = typeof promptTemplates.$inferSelect;
 
 export const ads = pgTable("ads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   clientName: text("client_name"),
   prompt: text("prompt").notNull(),
@@ -180,6 +185,7 @@ export type Ad = typeof ads.$inferSelect;
 
 export const adPresets = pgTable("ad_presets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   miniPrompt: text("mini_prompt").notNull(),
@@ -206,6 +212,7 @@ export type AdPreset = typeof adPresets.$inferSelect;
 
 export const voices = pgTable("voices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   personaName: text("persona_name"),
   elevenLabsVoiceId: text("eleven_labs_voice_id").notNull(),
@@ -267,6 +274,7 @@ export type ProgramType = typeof programTypes.$inferSelect;
 
 export const programs = pgTable("programs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   programTypeId: varchar("program_type_id").notNull(),
   title: text("title").notNull(),
   prompt: text("prompt"),
@@ -315,6 +323,7 @@ export type DialogGenerationRequest = z.infer<typeof dialogGenerationRequestSche
 
 export const automations = pgTable("automations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   automationType: text("automation_type").notNull().default("dialog"),
   programTypeId: varchar("program_type_id"),
@@ -357,6 +366,7 @@ export type AutomationRun = typeof automationRuns.$inferSelect;
 
 export const scheduleTemplates = pgTable("schedule_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   weekdays: integer("weekdays").array().notNull(),
   startHour: integer("start_hour").notNull().default(7),
@@ -378,6 +388,7 @@ export type ScheduleTemplate = typeof scheduleTemplates.$inferSelect;
 
 export const hostShifts = pgTable("host_shifts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   templateId: varchar("template_id").notNull(),
   startHour: integer("start_hour").notNull(),
   endHour: integer("end_hour").notNull(),
@@ -397,6 +408,7 @@ export type HostShift = typeof hostShifts.$inferSelect;
 
 export const customHolidays = pgTable("custom_holidays", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   date: text("date").notNull(),
   name: text("name").notNull(),
   nameRu: text("name_ru").notNull(),
@@ -415,6 +427,7 @@ export type CustomHoliday = typeof customHolidays.$inferSelect;
 
 export const newsItems = pgTable("news_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   sourceId: varchar("source_id").notNull(),
   title: text("title").notNull(),
   summary: text("summary"),
