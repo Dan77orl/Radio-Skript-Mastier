@@ -621,6 +621,29 @@ async function concatMp3WithFfmpeg(segmentFiles: string[], outputFile: string, t
   }
 }
 
+const remuxedCache = new Set<string>();
+
+async function ensureRemuxed(filePath: string): Promise<string> {
+  if (remuxedCache.has(filePath)) return filePath;
+
+  try {
+    const { execFile } = await import("child_process");
+    const { promisify } = await import("util");
+    const execFileAsync = promisify(execFile);
+
+    const tmpFile = filePath + ".remux.tmp";
+    await execFileAsync("ffmpeg", ["-y", "-i", filePath, "-c", "copy", tmpFile], { timeout: 30000 });
+    await fs.rename(tmpFile, filePath);
+    remuxedCache.add(filePath);
+    console.log(`Remuxed: ${path.basename(filePath)}`);
+  } catch (err: any) {
+    console.warn(`Remux skipped for ${path.basename(filePath)}: ${err.message}`);
+    remuxedCache.add(filePath);
+  }
+
+  return filePath;
+}
+
 interface WeatherData {
   temperature: number;
   windspeed: number;
@@ -2649,12 +2672,14 @@ ${instructions || "Создай альтернативный вариант с �
         return res.status(404).json({ error: "Audio file not found on disk" });
       }
 
+      const remuxed = await ensureRemuxed(audioPath);
+
       const filename = `${ad.title || "ad"}.mp3`;
       res.setHeader("Content-Type", "audio/mpeg");
       res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
 
       const { createReadStream } = await import("fs");
-      const stream = createReadStream(audioPath);
+      const stream = createReadStream(remuxed);
       stream.pipe(res);
     } catch (error) {
       console.error("Error downloading ad audio:", error);
@@ -4397,12 +4422,14 @@ ${programType.scriptTemplate}
         return res.status(404).json({ error: "Audio file not found on disk" });
       }
 
+      const remuxed = await ensureRemuxed(audioPath);
+
       const filename = path.basename(audioPath);
       res.setHeader("Content-Type", "audio/mpeg");
       res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
 
       const { createReadStream } = await import("fs");
-      const stream = createReadStream(audioPath);
+      const stream = createReadStream(remuxed);
       stream.pipe(res);
     } catch (error) {
       console.error("Error downloading audio:", error);
@@ -5087,6 +5114,33 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
     runAutoScheduler();
     setInterval(runAutoScheduler, 60 * 60 * 1000);
   }, 30000);
+
+  app.post("/api/remux-audio", async (_req, res) => {
+    try {
+      const audioDir = path.join(process.cwd(), "public", "audio");
+      const { readdir } = await import("fs/promises");
+      const files = await readdir(audioDir);
+      const mp3Files = files.filter(f => f.endsWith(".mp3") && !f.startsWith("_"));
+
+      let fixed = 0;
+      let errors = 0;
+      for (const file of mp3Files) {
+        const filePath = path.join(audioDir, file);
+        if (remuxedCache.has(filePath)) continue;
+        try {
+          await ensureRemuxed(filePath);
+          fixed++;
+        } catch {
+          errors++;
+        }
+      }
+
+      res.json({ total: mp3Files.length, fixed, errors, cached: remuxedCache.size });
+    } catch (error) {
+      console.error("Error remuxing audio:", error);
+      res.status(500).json({ error: "Failed to remux audio files" });
+    }
+  });
 
   app.post("/api/run-scheduler", async (_req, res) => {
     runAutoScheduler();
