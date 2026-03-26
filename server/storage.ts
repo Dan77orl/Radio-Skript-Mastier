@@ -2,6 +2,18 @@ import { users, settings, dialogs, newsSources, newsItems, ads, adPresets, voice
 import { db } from "./db";
 import { eq, desc, asc, sql, and, or, isNull } from "drizzle-orm";
 
+const LANG_NAMES: Record<string, string> = {
+  ru: "Russian", en: "English", tr: "Turkish", de: "German", es: "Spanish", fr: "French",
+  pt: "Portuguese", it: "Italian", uk: "Ukrainian", pl: "Polish", nl: "Dutch", sv: "Swedish",
+  da: "Danish", no: "Norwegian", fi: "Finnish", cs: "Czech", sk: "Slovak", hu: "Hungarian",
+  ro: "Romanian", bg: "Bulgarian", el: "Greek", hr: "Croatian", sr: "Serbian", sl: "Slovenian",
+  bs: "Bosnian", mk: "Macedonian", sq: "Albanian", lt: "Lithuanian", lv: "Latvian", et: "Estonian",
+  kk: "Kazakh", uz: "Uzbek", ky: "Kyrgyz", tg: "Tajik", mn: "Mongolian", az: "Azerbaijani",
+  ka: "Georgian", hy: "Armenian", ar: "Arabic", he: "Hebrew", fa: "Persian", zh: "Chinese",
+  ja: "Japanese", ko: "Korean", hi: "Hindi", bn: "Bengali", ta: "Tamil", th: "Thai",
+  vi: "Vietnamese", id: "Indonesian", ms: "Malay", sw: "Swahili",
+};
+
 function getDefaultPromptForLanguage(lang: string): string {
   const prompts: Record<string, string> = {
     ru: `Создай короткий диалог между ведущими радио "Radio FM" (мужчина и женщина).
@@ -29,8 +41,55 @@ Sujet : vie locale, culture, faits intéressants.
 Style : amical, décontracté, avec humour.
 Durée : 30-50 secondes à la lecture.
 Doit inclure : salutation aux auditeurs, un fait intéressant ou un conseil utile.`,
+    pt: `Crie um diálogo curto entre os apresentadores de rádio (homem e mulher) da "Radio FM".
+Tema: vida local, cultura, fatos interessantes.
+Estilo: amigável, casual, com humor.
+Duração: 30-50 segundos ao ler em voz alta.
+Deve incluir: saudação aos ouvintes, um fato interessante ou dica útil.`,
+    it: `Crea un breve dialogo tra i conduttori radio (uomo e donna) di "Radio FM".
+Tema: vita locale, cultura, fatti interessanti.
+Stile: amichevole, informale, con umorismo.
+Durata: 30-50 secondi a voce alta.
+Deve includere: saluto agli ascoltatori, un fatto interessante o un consiglio utile.`,
+    uk: `Створи короткий діалог між ведучими радіо "Radio FM" (чоловік і жінка).
+Тема: місцеве життя, культура, цікаві факти.
+Стиль: дружній, невимушений, з гумором.
+Тривалість: 30-50 секунд при читанні.
+Обов'язково включи: привітання слухачів, цікавий факт або корисну пораду.`,
+    pl: `Stwórz krótki dialog między prowadzącymi radia "Radio FM" (mężczyzna i kobieta).
+Temat: lokalne życie, kultura, ciekawe fakty.
+Styl: przyjazny, swobodny, z humorem.
+Czas trwania: 30-50 sekund przy czytaniu na głos.
+Musi zawierać: powitanie słuchaczy, ciekawy fakt lub przydatną wskazówkę.`,
+    ar: `أنشئ حوارًا قصيرًا بين مقدمي البرامج الإذاعية (رجل وامرأة) في "Radio FM".
+الموضوع: الحياة المحلية، الثقافة، حقائق مثيرة للاهتمام.
+الأسلوب: ودي، عفوي، مع روح الدعابة.
+المدة: 30-50 ثانية عند القراءة بصوت عالٍ.
+يجب أن يتضمن: تحية للمستمعين، حقيقة مثيرة للاهتمام أو نصيحة مفيدة.`,
+    zh: `创建"Radio FM"电台主持人（男女）之间的简短对话。
+主题：当地生活、文化、有趣的事实。
+风格：友好、随意、幽默。
+时长：朗读时30-50秒。
+必须包含：向听众问好、一个有趣的事实或有用的建议。`,
+    ja: `「Radio FM」のラジオホスト（男女）の短い対話を作成してください。
+テーマ：地元の生活、文化、興味深い事実。
+スタイル：フレンドリー、カジュアル、ユーモアを交えて。
+長さ：読み上げ時30〜50秒。
+必ず含める：リスナーへの挨拶、興味深い事実または役立つアドバイス。`,
+    ko: `"Radio FM" 라디오 호스트(남녀) 사이의 짧은 대화를 만들어 주세요.
+주제: 지역 생활, 문화, 흥미로운 사실.
+스타일: 친근하고 캐주얼하며 유머러스하게.
+길이: 소리내어 읽을 때 30-50초.
+반드시 포함: 청취자 인사, 흥미로운 사실 또는 유용한 팁.`,
+    hi: `"Radio FM" के रेडियो होस्ट (पुरुष और महिला) के बीच एक छोटा संवाद बनाएं।
+विषय: स्थानीय जीवन, संस्कृति, दिलचस्प तथ्य।
+शैली: मित्रवत, अनौपचारिक, हास्य के साथ।
+अवधि: जोर से पढ़ने पर 30-50 सेकंड।
+अवश्य शामिल करें: श्रोताओं को अभिवादन, एक दिलचस्प तथ्य या उपयोगी सुझाव।`,
   };
-  return prompts[lang] || `Create a short dialog between radio hosts (male and female) of "Radio FM".
+  if (prompts[lang]) return prompts[lang];
+  const langName = LANG_NAMES[lang] || lang;
+  return `[Write entirely in ${langName}] Create a short dialog between radio hosts (male and female) of "Radio FM".
 Topic: local life, culture, interesting facts.
 Style: friendly, casual, with humor.
 Duration: 30-50 seconds when read aloud.
@@ -80,7 +139,9 @@ function getDefaultDailyPromptForLanguage(lang: string): string {
 - Pour les créneaux de la journée : conseils utiles, faits intéressants
 - Pour les créneaux du soir : sujets relaxants, résumé de la journée`,
   };
-  return prompts[lang] || `Today we are creating dialogs for the radio. Consider:
+  if (prompts[lang]) return prompts[lang];
+  const langName = LANG_NAMES[lang] || lang;
+  return `[Write entirely in ${langName}] Today we are creating dialogs for the radio. Consider:
 - Day of the week and time of day for each slot
 - Current events and holidays
 - Local news and weather
