@@ -2889,9 +2889,38 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       }
 
       const { variantsCount = 5 } = req.body;
-      const ctx = await buildStationContext(req.session.userId);
+      const user = await storage.getUser(req.session.userId!);
+      const userLang = user?.language || "en";
+      const ctx = await buildStationContext(req.session.userId, userLang);
       
-      const systemPrompt = `Ты - креативный копирайтер для радио "${ctx.stationName}".
+      const speakersCount = ad.speakersCount || 1;
+      const isMultiSpeaker = speakersCount > 1;
+
+      let multiSpeakerInstructions = "";
+      if (isMultiSpeaker) {
+        if (userLang === "ru") {
+          multiSpeakerInstructions = `
+ФОРМАТ МУЛЬТИСПИКЕР: Каждый вариант ОБЯЗАН использовать формат с ${speakersCount} дикторами.
+Каждая реплика начинается с тега [Имя Диктора]: (имена должны быть реалистичными).
+Добавляй эмоциональные теги в квадратных скобках перед текстом реплики для TTS: [energetic], [excited], [warm], [calm], [dramatic], [playful], [serious], [confident], [surprised], [happy].
+Пример формата:
+[Алексей]: [energetic] Друзья, у нас невероятные новости!
+[Марина]: [excited] Да, это нечто! Впервые в нашем городе...
+[Алексей]: [warm] И не забудьте — только до конца недели!`;
+        } else {
+          multiSpeakerInstructions = `
+MULTI-SPEAKER FORMAT: Each variant MUST use ${speakersCount} speakers format.
+Each line starts with [Speaker Name]: tag (use realistic names).
+Add emotion tags in brackets before the spoken text for TTS: [energetic], [excited], [warm], [calm], [dramatic], [playful], [serious], [confident], [surprised], [happy].
+Example format:
+[Alex]: [energetic] Hey everyone, we've got incredible news!
+[Sarah]: [excited] Yes, this is amazing! For the first time in our city...
+[Alex]: [warm] And remember — only until the end of the week!`;
+        }
+      }
+      
+      const systemPrompt = userLang === "ru" 
+        ? `Ты - креативный копирайтер для радио "${ctx.stationName}".
 Твоя задача - создать ${variantsCount} РАЗНЫХ вариантов рекламного ролика.
 
 Информация о рекламе:
@@ -2900,6 +2929,7 @@ ${ad.websiteUrl ? `- Сайт: ${ad.websiteUrl}` : ""}
 ${ad.instagramUrl ? `- Instagram: ${ad.instagramUrl}` : ""}
 ${ad.clientName ? `- Клиент: ${ad.clientName}` : ""}
 - Целевая длительность: ${ad.targetDurationSeconds || 30} секунд при чтении
+${multiSpeakerInstructions}
 
 Каждый вариант должен быть уникальным по стилю и подаче:
 1. Вариант с юмором
@@ -2908,7 +2938,7 @@ ${ad.clientName ? `- Клиент: ${ad.clientName}` : ""}
 4. Динамичный вариант
 5. Нестандартный/креативный вариант
 
-ВАЖНО: Ответ в формате JSON массива строк:
+ВАЖНО: Ответ в формате JSON:
 {
   "variants": [
     "Полный текст варианта 1...",
@@ -2917,10 +2947,37 @@ ${ad.clientName ? `- Клиент: ${ad.clientName}` : ""}
     "Полный текст варианта 4...",
     "Полный текст варианта 5..."
   ],
-  "speakersCount": 1 или 2 (рекомендуемое количество ведущих)
-}
+  "speakersCount": ${speakersCount}
+}`
+        : `You are a creative copywriter for radio station "${ctx.stationName}".
+Your task is to create ${variantsCount} DIFFERENT variants of a radio ad.
 
-Каждый вариант - это готовый текст для озвучки, без разметки на голоса.`;
+Ad information:
+- Description: ${ad.prompt}
+${ad.websiteUrl ? `- Website: ${ad.websiteUrl}` : ""}
+${ad.instagramUrl ? `- Instagram: ${ad.instagramUrl}` : ""}
+${ad.clientName ? `- Client: ${ad.clientName}` : ""}
+- Target duration: ${ad.targetDurationSeconds || 30} seconds when read aloud
+${multiSpeakerInstructions}
+
+Each variant should be unique in style and delivery:
+1. Humorous variant
+2. Emotional variant
+3. Informational variant
+4. Dynamic variant
+5. Creative/unconventional variant
+
+IMPORTANT: Response in JSON format:
+{
+  "variants": [
+    "Full text of variant 1...",
+    "Full text of variant 2...",
+    "Full text of variant 3...",
+    "Full text of variant 4...",
+    "Full text of variant 5..."
+  ],
+  "speakersCount": ${speakersCount}
+}`;
 
       const anthropic = await getAnthropicClient(req.session.userId);
       
@@ -3021,9 +3078,19 @@ ${ad.clientName ? `- Клиент: ${ad.clientName}` : ""}
         return res.status(404).json({ error: "Ad not found" });
       }
 
-      const ctx = await buildStationContext(req.session.userId);
+      const userRegen = await storage.getUser(req.session.userId!);
+      const userLangRegen = userRegen?.language || "en";
+      const ctx = await buildStationContext(req.session.userId, userLangRegen);
       
-      const systemPrompt = `Ты - креативный копирайтер для радио "${ctx.stationName}".
+      const isMultiSpeakerBase = isMultiSpeakerScript(baseText);
+      const multiSpeakerNote = isMultiSpeakerBase
+        ? (userLangRegen === "ru"
+          ? "\nВАЖНО: Сохрани формат мультиспикер с тегами [Имя Диктора]: и эмоциональными тегами [energetic], [excited] и т.д."
+          : "\nIMPORTANT: Keep the multi-speaker format with [Speaker Name]: tags and emotion tags [energetic], [excited] etc.")
+        : "";
+      
+      const systemPrompt = userLangRegen === "ru"
+        ? `Ты - креативный копирайтер для радио "${ctx.stationName}".
 Тебе дан текст рекламного ролика. Нужно создать новый вариант на его основе.
 
 Исходный текст:
@@ -3031,8 +3098,20 @@ ${baseText}
 
 Инструкции по изменению:
 ${instructions || "Создай альтернативный вариант с другой подачей"}
+${multiSpeakerNote}
 
-ВАЖНО: Верни только новый текст рекламы без JSON обертки.`;
+ВАЖНО: Верни только новый текст рекламы без JSON обертки.`
+        : `You are a creative copywriter for radio station "${ctx.stationName}".
+You are given a radio ad text. Create a new variant based on it.
+
+Original text:
+${baseText}
+
+Modification instructions:
+${instructions || "Create an alternative variant with a different style"}
+${multiSpeakerNote}
+
+IMPORTANT: Return only the new ad text without any JSON wrapping.`;
 
       const anthropic = await getAnthropicClient(req.session.userId);
       
@@ -3083,7 +3162,7 @@ ${instructions || "Создай альтернативный вариант с �
   app.post("/api/ads/:id/synthesize-audio", async (req, res) => {
     try {
       const { id } = req.params;
-      const { voiceIds, voiceName: requestVoiceName } = req.body;
+      const { voiceIds, voiceName: requestVoiceName, speakerVoiceMap: reqSpeakerVoiceMap } = req.body;
       
       const ad = await storage.getAd(id, req.session.userId!);
       if (!ad) {
@@ -3099,47 +3178,132 @@ ${instructions || "Создай альтернативный вариант с �
         return res.status(400).json({ error: "ElevenLabs API key not configured" });
       }
 
-      const voiceIdToUse = voiceIds?.[0] || settings.maleVoiceId || "onwK4e9ZLuTAKqWW03F9";
+      const defaultVoiceId = voiceIds?.[0] || settings.maleVoiceId || "onwK4e9ZLuTAKqWW03F9";
+      const scriptText = ad.selectedVariantText;
+      const isMultiSpeaker = isMultiSpeakerScript(scriptText);
 
-      await storage.updateAd(id, req.session.userId!, { status: "generating", voiceIds });
+      if (reqSpeakerVoiceMap) {
+        await storage.updateAd(id, req.session.userId!, { 
+          status: "generating", 
+          voiceIds, 
+          speakerVoiceMap: JSON.stringify(reqSpeakerVoiceMap) 
+        });
+      } else {
+        await storage.updateAd(id, req.session.userId!, { status: "generating", voiceIds });
+      }
       res.json({ message: "Audio generation started" });
 
       (async () => {
         try {
-          const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceIdToUse}`, {
-            method: "POST",
-            headers: {
-              "xi-api-key": settings.elevenLabsApiKey!,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              text: ad.selectedVariantText,
-              model_id: "eleven_v3",
-              output_format: "mp3_44100_192",
-              voice_settings: {
-                stability: 0.5,
-                similarity_boost: 0.75,
-              },
-            }),
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
-          }
-
-          const arrayBuffer = await response.arrayBuffer();
-          const audioBuffer = Buffer.from(arrayBuffer);
-
           const audioDir = path.join(process.cwd(), "public", "audio");
           await fs.mkdir(audioDir, { recursive: true });
-
           const timestamp = Date.now();
-          const audioFile = path.join(audioDir, `ad_${id}_${timestamp}.mp3`);
-          await fs.writeFile(audioFile, audioBuffer);
+
+          let finalAudioFile: string;
+          let voiceNameForVersion: string;
+
+          if (isMultiSpeaker) {
+            const segments = parseMultiSpeakerScript(scriptText);
+            const spkVoiceMap: Record<string, string> = reqSpeakerVoiceMap || {};
+
+            const allVoices = await storage.getVoices(req.session.userId!);
+            const voiceNameMap = new Map<string, string>();
+            for (const v of allVoices) {
+              voiceNameMap.set(v.elevenLabsVoiceId, v.personaName || v.name);
+            }
+
+            const segmentFiles: string[] = [];
+            const usedVoiceNames: string[] = [];
+
+            for (let i = 0; i < segments.length; i++) {
+              const seg = segments[i];
+              const cleanText = stripEmotionTags(seg.text);
+              if (!cleanText.trim()) continue;
+
+              let segVoiceId = spkVoiceMap[seg.speaker] || defaultVoiceId;
+              
+              if (!spkVoiceMap[seg.speaker]) {
+                for (const v of allVoices) {
+                  const cleanName = getCleanVoiceName(v);
+                  if (
+                    cleanName.toLowerCase() === seg.speaker.toLowerCase() ||
+                    seg.speaker.toLowerCase().includes(cleanName.toLowerCase()) ||
+                    cleanName.toLowerCase().includes(seg.speaker.toLowerCase())
+                  ) {
+                    segVoiceId = v.elevenLabsVoiceId;
+                    break;
+                  }
+                }
+              }
+
+              const segResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${segVoiceId}`, {
+                method: "POST",
+                headers: {
+                  "xi-api-key": settings.elevenLabsApiKey!,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  text: cleanText,
+                  model_id: "eleven_v3",
+                  output_format: "mp3_44100_192",
+                  voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+                }),
+              });
+
+              if (!segResponse.ok) {
+                const errorText = await segResponse.text();
+                throw new Error(`ElevenLabs API error for segment ${i}: ${segResponse.status} - ${errorText}`);
+              }
+
+              const segBuffer = Buffer.from(await segResponse.arrayBuffer());
+              const segFile = path.join(audioDir, `_ad_seg_${timestamp}_${i}.mp3`);
+              await fs.writeFile(segFile, segBuffer);
+              segmentFiles.push(segFile);
+
+              const vName = voiceNameMap.get(segVoiceId) || segVoiceId;
+              if (!usedVoiceNames.includes(vName)) usedVoiceNames.push(vName);
+            }
+
+            finalAudioFile = path.join(audioDir, `ad_${id}_${timestamp}.mp3`);
+            await concatMp3WithFfmpeg(segmentFiles, finalAudioFile, audioDir, timestamp);
+
+            for (const sf of segmentFiles) {
+              await fs.unlink(sf).catch(() => {});
+            }
+
+            voiceNameForVersion = usedVoiceNames.join(" + ");
+          } else {
+            const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${defaultVoiceId}`, {
+              method: "POST",
+              headers: {
+                "xi-api-key": settings.elevenLabsApiKey!,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                text: scriptText,
+                model_id: "eleven_v3",
+                output_format: "mp3_44100_192",
+                voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+              }),
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
+            }
+
+            const audioBuffer = Buffer.from(await response.arrayBuffer());
+            finalAudioFile = path.join(audioDir, `ad_${id}_${timestamp}.mp3`);
+            await fs.writeFile(finalAudioFile, audioBuffer);
+
+            const allVoices = await storage.getVoices(req.session.userId!);
+            const usedVoice = allVoices.find(v => v.elevenLabsVoiceId === defaultVoiceId);
+            voiceNameForVersion = usedVoice ? (usedVoice.personaName || usedVoice.name) : (requestVoiceName || defaultVoiceId);
+          }
 
           const newAudioUrl = `/audio/ad_${id}_${timestamp}.mp3`;
-          const estimatedDuration = Math.round(audioBuffer.length / 24000);
+          const fileStats = await fs.stat(finalAudioFile);
+          const estimatedDuration = Math.round(fileStats.size / 24000);
 
           const freshAd = await storage.getAd(id, req.session.userId!);
           let existingVersions: Array<{ url: string; voiceId: string; voiceName: string; createdAt: string; duration: number }> = [];
@@ -3150,14 +3314,10 @@ ${instructions || "Создай альтернативный вариант с �
             }
           } catch {}
 
-          const allVoices = await storage.getVoices(req.session.userId!);
-          const usedVoice = allVoices.find(v => v.elevenLabsVoiceId === voiceIdToUse);
-          const voiceName = usedVoice ? (usedVoice.personaName || usedVoice.name) : (requestVoiceName || voiceIdToUse);
-
           existingVersions.push({
             url: newAudioUrl,
-            voiceId: voiceIdToUse,
-            voiceName,
+            voiceId: defaultVoiceId,
+            voiceName: voiceNameForVersion,
             createdAt: new Date().toISOString(),
             duration: estimatedDuration,
           });
@@ -3170,7 +3330,7 @@ ${instructions || "Создай альтернативный вариант с �
             stage: "audio",
           });
 
-          console.log(`Audio generated for ad ${id} (version ${existingVersions.length})`);
+          console.log(`Audio generated for ad ${id} (version ${existingVersions.length})${isMultiSpeaker ? " [multi-speaker]" : ""}`);
         } catch (error) {
           console.error(`Error generating audio for ad ${id}:`, error);
           await storage.updateAd(id, req.session.userId!, { status: "error" });

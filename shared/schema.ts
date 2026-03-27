@@ -163,6 +163,7 @@ export const ads = pgTable("ads", {
   voiceIds: text("voice_ids").array(),
   speakersCount: integer("speakers_count").default(1),
   scriptText: text("script_text"),
+  speakerVoiceMap: text("speaker_voice_map"),
   audioUrl: text("audio_url"),
   audioVersions: text("audio_versions"),
   audioWithMusicUrl: text("audio_with_music_url"),

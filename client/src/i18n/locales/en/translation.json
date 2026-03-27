@@ -485,6 +485,8 @@
     "step2Desc": "Choose a variant to refine or send directly for voiceover",
     "step3Title": "Step 3: Select a voice",
     "step3Desc": "Recommended number of speakers: {{count}}",
+    "step3DescMulti": "Assign a voice to each speaker in your script",
+    "assignVoices": "Assign voices to speakers",
     "step4Title": "Step 4: Listen to the result",
     "step4Desc": "Audio is ready! You can listen or add music",
     "yourDescription": "Your description",

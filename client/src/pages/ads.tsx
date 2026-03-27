@@ -131,6 +131,84 @@ export default function AdsPage() {
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isAutoSelectingMusic, setIsAutoSelectingMusic] = useState(false);
   const [autoSelectReasoning, setAutoSelectReasoning] = useState<string | null>(null);
+  const [adSpeakerVoiceMap, setAdSpeakerVoiceMap] = useState<Record<string, string>>({});
+  const [editingScriptText, setEditingScriptText] = useState<string | null>(null);
+
+  const speakerColors = [
+    "text-violet-600 dark:text-violet-400",
+    "text-emerald-600 dark:text-emerald-400",
+    "text-blue-600 dark:text-blue-400",
+    "text-orange-600 dark:text-orange-400",
+    "text-pink-600 dark:text-pink-400",
+  ];
+
+  const emotionTagPattern = /\[(energetic|fast|slow|surprised|thoughtful|happy|sad|exclaims|announcer|serious|calm|excited|warm|dramatic|whisper|loud|gentle|playful|confident|nervous|angry|romantic|mysterious|urgent|casual|formal|ironic|sarcastic)\]/gi;
+
+  const renderTextWithEmotionTags = (text: string) => {
+    const parts: Array<{ type: "text" | "tag"; value: string }> = [];
+    let lastIdx = 0;
+    let m;
+    const regex = new RegExp(emotionTagPattern.source, "gi");
+    while ((m = regex.exec(text)) !== null) {
+      if (m.index > lastIdx) {
+        parts.push({ type: "text", value: text.slice(lastIdx, m.index) });
+      }
+      parts.push({ type: "tag", value: m[0] });
+      lastIdx = regex.lastIndex;
+    }
+    if (lastIdx < text.length) {
+      parts.push({ type: "text", value: text.slice(lastIdx) });
+    }
+    return parts.map((p, j) =>
+      p.type === "tag" ? (
+        <span key={j} className="inline-block px-1 rounded text-xs bg-violet-100 dark:bg-violet-900 text-violet-700 dark:text-violet-300 mx-0.5">{p.value}</span>
+      ) : (
+        <span key={j}>{p.value}</span>
+      )
+    );
+  };
+
+  const renderMultiSpeakerScript = (scriptText: string) => {
+    const lines = scriptText.split("\n");
+    const speakerMap = new Map<string, number>();
+    let speakerIdx = 0;
+    return lines.map((line, i) => {
+      const match = line.match(/^\s*\[([^\]]+)\]:\s*(.*)/);
+      if (match) {
+        const speaker = match[1];
+        const content = match[2];
+        if (!speakerMap.has(speaker)) {
+          speakerMap.set(speaker, speakerIdx++);
+        }
+        const colorIdx = speakerMap.get(speaker)! % speakerColors.length;
+        return (
+          <div key={i} className="py-1.5 border-b border-border/30 last:border-0">
+            <span className={`font-semibold ${speakerColors[colorIdx]}`}>[{speaker}]:</span>{" "}
+            {renderTextWithEmotionTags(content)}
+          </div>
+        );
+      }
+      if (line.trim()) {
+        return <div key={i} className="py-0.5 text-muted-foreground">{line}</div>;
+      }
+      return null;
+    });
+  };
+
+  const hasFormattedSpeakers = (text: string) => {
+    const matches = text.match(/^\s*\[([^\]]+)\]:/gm);
+    return !!matches && matches.length >= 2;
+  };
+
+  const extractSpeakers = (text: string): string[] => {
+    const speakers: string[] = [];
+    const regex = /^\s*\[([^\]]+)\]:/gm;
+    let m;
+    while ((m = regex.exec(text)) !== null) {
+      if (!speakers.includes(m[1])) speakers.push(m[1]);
+    }
+    return speakers;
+  };
 
   const { data: ads, isLoading } = useQuery<Ad[]>({
     queryKey: ["/api/ads"],
@@ -355,8 +433,8 @@ export default function AdsPage() {
   });
 
   const synthesizeAudioMutation = useMutation({
-    mutationFn: async ({ adId, voiceIds, voiceName }: { adId: string; voiceIds: string[]; voiceName?: string }) => {
-      const response = await apiRequest("POST", `/api/ads/${adId}/synthesize-audio`, { voiceIds, voiceName });
+    mutationFn: async ({ adId, voiceIds, voiceName, speakerVoiceMap }: { adId: string; voiceIds: string[]; voiceName?: string; speakerVoiceMap?: Record<string, string> }) => {
+      const response = await apiRequest("POST", `/api/ads/${adId}/synthesize-audio`, { voiceIds, voiceName, speakerVoiceMap });
       return response.json();
     },
     onSuccess: () => {
@@ -392,6 +470,19 @@ export default function AdsPage() {
       }
     }
   }, [ads, currentAd]);
+
+  useEffect(() => {
+    if (currentAd?.speakerVoiceMap) {
+      try {
+        const parsed = JSON.parse(currentAd.speakerVoiceMap);
+        if (typeof parsed === "object" && parsed !== null) {
+          setAdSpeakerVoiceMap(parsed);
+        }
+      } catch {}
+    } else {
+      setAdSpeakerVoiceMap({});
+    }
+  }, [currentAd?.id, currentAd?.speakerVoiceMap]);
 
   const onSubmit = (data: AdFormValues) => {
     createAdMutation.mutate(data);
@@ -894,7 +985,9 @@ export default function AdsPage() {
                           <Badge variant="secondary">{t("ads.selected")}</Badge>
                         )}
                       </div>
-                      <p className="text-sm whitespace-pre-wrap">{variant}</p>
+                      <div className="text-sm whitespace-pre-wrap">
+                        {hasFormattedSpeakers(variant) ? renderMultiSpeakerScript(variant) : variant}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -904,88 +997,107 @@ export default function AdsPage() {
         );
 
       case "voices":
+        const scriptForVoices = currentAd.selectedVariantText || "";
+        const isMultiSpeakerAd = hasFormattedSpeakers(scriptForVoices);
+        const adSpeakers = isMultiSpeakerAd ? extractSpeakers(scriptForVoices) : [];
+        const allVoiceOptions = [
+          ...(voices?.filter(v => v.isActive).map(v => ({ id: v.elevenLabsVoiceId, name: getCleanVoiceName(v), gender: v.gender })) || []),
+          ...(!voices?.length && elevenLabsVoices?.voices ? elevenLabsVoices.voices.slice(0, 8).map(v => ({ id: v.voice_id, name: v.name, gender: v.labels?.gender })) : []),
+        ];
+        const canSynthesize = isMultiSpeakerAd
+          ? adSpeakers.every(s => adSpeakerVoiceMap[s])
+          : !!selectedVoiceId;
+
         return (
           <Card>
             <CardHeader>
               <CardTitle>{t("ads.step3Title")}</CardTitle>
               <CardDescription>
-                {t("ads.step3Desc", { count: currentAd.speakersCount })}
+                {isMultiSpeakerAd ? t("ads.step3DescMulti") : t("ads.step3Desc", { count: currentAd.speakersCount })}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg bg-muted p-4 mb-4">
                 <p className="text-sm font-medium mb-2">{t("ads.selectedText")}:</p>
-                <p className="text-sm">{currentAd.selectedVariantText}</p>
-              </div>
-
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium">{t("ads.myVoices")}</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowVoiceLibrary(!showVoiceLibrary)}
-                  data-testid="button-add-persona"
-                >
-                  {showVoiceLibrary ? <X className="mr-1 h-4 w-4" /> : <Plus className="mr-1 h-4 w-4" />}
-                  {showVoiceLibrary ? t("common.close") : t("ads.addPersona")}
-                </Button>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                {voices?.filter(v => v.isActive).map((voice) => (
-                  <div
-                    key={voice.id}
-                    className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors hover-elevate ${
-                      selectedVoiceId === voice.elevenLabsVoiceId ? "border-primary bg-primary/5" : ""
-                    }`}
-                    onClick={() => { setSelectedVoiceId(voice.elevenLabsVoiceId); setSelectedVoiceName(getCleanVoiceName(voice)); }}
-                    data-testid={`voice-${voice.id}`}
-                  >
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                      voice.gender === "male" ? "bg-blue-500/20" : "bg-pink-500/20"
-                    }`}>
-                      <Volume2 className={`h-5 w-5 ${
-                        voice.gender === "male" ? "text-blue-500" : "text-pink-500"
-                      }`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{getCleanVoiceName(voice)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {voice.gender === "male" ? t("ads.male") : t("ads.female")}
-                      </p>
-                    </div>
-                    {selectedVoiceId === voice.elevenLabsVoiceId && (
-                      <Check className="h-5 w-5 text-primary" />
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {(!voices || voices.length === 0) && elevenLabsVoices?.voices && (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {elevenLabsVoices.voices.slice(0, 8).map((voice) => (
-                    <div
-                      key={voice.voice_id}
-                      className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors hover-elevate ${
-                        selectedVoiceId === voice.voice_id ? "border-primary bg-primary/5" : ""
-                      }`}
-                      onClick={() => { setSelectedVoiceId(voice.voice_id); setSelectedVoiceName(voice.name); }}
-                    >
-                      <div className="h-10 w-10 rounded-full flex items-center justify-center bg-muted">
-                        <Volume2 className="h-5 w-5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{voice.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {voice.labels?.gender || "ElevenLabs"}
-                        </p>
-                      </div>
-                      {selectedVoiceId === voice.voice_id && (
-                        <Check className="h-5 w-5 text-primary" />
-                      )}
-                    </div>
-                  ))}
+                <div className="text-sm">
+                  {isMultiSpeakerAd ? renderMultiSpeakerScript(scriptForVoices) : scriptForVoices}
                 </div>
+              </div>
+
+              {isMultiSpeakerAd && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Users className="h-4 w-4" />
+                    <p className="text-sm font-medium">{t("ads.assignVoices")}</p>
+                  </div>
+                  {adSpeakers.map((speaker, sIdx) => {
+                    const colorIdx = sIdx % speakerColors.length;
+                    return (
+                      <div key={speaker} className="flex items-center gap-3 rounded-lg border p-3" data-testid={`speaker-mapping-${sIdx}`}>
+                        <span className={`font-semibold text-sm ${speakerColors[colorIdx]}`}>[{speaker}]</span>
+                        <Select
+                          value={adSpeakerVoiceMap[speaker] || ""}
+                          onValueChange={(val) => setAdSpeakerVoiceMap(prev => ({ ...prev, [speaker]: val }))}
+                        >
+                          <SelectTrigger className="flex-1" data-testid={`select-speaker-voice-${sIdx}`}>
+                            <SelectValue placeholder={t("ads.selectVoice")} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allVoiceOptions.map(v => (
+                              <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {!isMultiSpeakerAd && (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium">{t("ads.myVoices")}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowVoiceLibrary(!showVoiceLibrary)}
+                      data-testid="button-add-persona"
+                    >
+                      {showVoiceLibrary ? <X className="mr-1 h-4 w-4" /> : <Plus className="mr-1 h-4 w-4" />}
+                      {showVoiceLibrary ? t("common.close") : t("ads.addPersona")}
+                    </Button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {voices?.filter(v => v.isActive).map((voice) => (
+                      <div
+                        key={voice.id}
+                        className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors hover-elevate ${
+                          selectedVoiceId === voice.elevenLabsVoiceId ? "border-primary bg-primary/5" : ""
+                        }`}
+                        onClick={() => { setSelectedVoiceId(voice.elevenLabsVoiceId); setSelectedVoiceName(getCleanVoiceName(voice)); }}
+                        data-testid={`voice-${voice.id}`}
+                      >
+                        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                          voice.gender === "male" ? "bg-blue-500/20" : "bg-pink-500/20"
+                        }`}>
+                          <Volume2 className={`h-5 w-5 ${
+                            voice.gender === "male" ? "text-blue-500" : "text-pink-500"
+                          }`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{getCleanVoiceName(voice)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {voice.gender === "male" ? t("ads.male") : t("ads.female")}
+                          </p>
+                        </div>
+                        {selectedVoiceId === voice.elevenLabsVoiceId && (
+                          <Check className="h-5 w-5 text-primary" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
 
               {showVoiceLibrary && (
@@ -1115,7 +1227,14 @@ export default function AdsPage() {
 
               <Button
                 onClick={() => {
-                  if (selectedVoiceId) {
+                  if (isMultiSpeakerAd) {
+                    const firstVoiceId = Object.values(adSpeakerVoiceMap)[0] || "";
+                    synthesizeAudioMutation.mutate({
+                      adId: currentAd.id,
+                      voiceIds: Object.values(adSpeakerVoiceMap),
+                      speakerVoiceMap: adSpeakerVoiceMap,
+                    });
+                  } else if (selectedVoiceId) {
                     synthesizeAudioMutation.mutate({
                       adId: currentAd.id,
                       voiceIds: [selectedVoiceId],
@@ -1123,7 +1242,7 @@ export default function AdsPage() {
                     });
                   }
                 }}
-                disabled={!selectedVoiceId || synthesizeAudioMutation.isPending}
+                disabled={!canSynthesize || synthesizeAudioMutation.isPending}
                 className="w-full"
                 data-testid="button-synthesize"
               >
@@ -1165,7 +1284,11 @@ export default function AdsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg bg-muted p-4">
-                <p className="text-sm">{currentAd.selectedVariantText}</p>
+                <div className="text-sm">
+                  {currentAd.selectedVariantText && hasFormattedSpeakers(currentAd.selectedVariantText)
+                    ? renderMultiSpeakerScript(currentAd.selectedVariantText)
+                    : currentAd.selectedVariantText}
+                </div>
               </div>
 
               <div className="space-y-3">
