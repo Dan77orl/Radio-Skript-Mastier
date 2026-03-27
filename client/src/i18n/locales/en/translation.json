@@ -1315,7 +1315,11 @@
       "addShift": "Add a host shift to assign specific voices to time blocks",
       "addHoliday": "Add a custom holiday that affects content generation",
       "editHoliday": "Edit this custom holiday",
-      "deleteHoliday": "Remove this custom holiday"
+      "deleteHoliday": "Remove this custom holiday",
+      "weekdayToggle": "Toggle this weekday on or off for the schedule template",
+      "startHour": "Set the broadcast start hour for this template",
+      "endHour": "Set the broadcast end hour for this template",
+      "slotsPerHour": "Set how many dialog slots per hour"
     },
     "automations": {
       "createAutomation": "Create a new automation rule for scheduled content generation",
@@ -1323,7 +1327,13 @@
       "viewRuns": "View the history of runs for this automation",
       "editAutomation": "Edit this automation's settings and schedule",
       "deleteAutomation": "Remove this automation permanently",
-      "saveAutomation": "Save the automation settings"
+      "saveAutomation": "Save the automation settings",
+      "statusRunning": "This automation is currently running",
+      "statusCompleted": "This run completed successfully",
+      "statusError": "This run encountered an error",
+      "statusDefault": "Automation run status",
+      "badgeActive": "This automation is active and will run on schedule",
+      "badgeInactive": "This automation is paused and won't run automatically"
     },
     "podvodki": {
       "settingsTab": "Configure schedule templates, host shifts, and holidays",

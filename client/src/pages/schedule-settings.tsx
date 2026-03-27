@@ -572,16 +572,17 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
               <Label>{t("scheduleSettings.weekdays")}</Label>
               <div className="flex gap-2 flex-wrap">
                 {WEEKDAY_VALUES.map((day, i) => (
-                  <Button
-                    key={day}
-                    type="button"
-                    size="sm"
-                    variant={formWeekdays.includes(day) ? "default" : "outline"}
-                    onClick={() => toggleWeekday(day)}
-                    data-testid={`button-weekday-${day}`}
-                  >
-                    {t(`schedule.weekdays.${WEEKDAY_KEYS[i]}`)}
-                  </Button>
+                  <HintTooltip key={day} hint={t("hints.scheduleSettings.weekdayToggle")}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={formWeekdays.includes(day) ? "default" : "outline"}
+                      onClick={() => toggleWeekday(day)}
+                      data-testid={`button-weekday-${day}`}
+                    >
+                      {t(`schedule.weekdays.${WEEKDAY_KEYS[i]}`)}
+                    </Button>
+                  </HintTooltip>
                 ))}
               </div>
             </div>
@@ -590,9 +591,11 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
               <div className="space-y-2">
                 <Label>{t("scheduleSettings.from")}</Label>
                 <Select value={String(formStartHour)} onValueChange={v => setFormStartHour(Number(v))}>
-                  <SelectTrigger data-testid="select-start-hour">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <HintTooltip hint={t("hints.scheduleSettings.startHour")}>
+                    <SelectTrigger data-testid="select-start-hour">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </HintTooltip>
                   <SelectContent>
                     {Array.from({ length: 24 }, (_, i) => (
                       <SelectItem key={i} value={String(i)}>{`${i}:00`}</SelectItem>
@@ -603,9 +606,11 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
               <div className="space-y-2">
                 <Label>{t("scheduleSettings.to")}</Label>
                 <Select value={String(formEndHour)} onValueChange={v => setFormEndHour(Number(v))}>
-                  <SelectTrigger data-testid="select-end-hour">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <HintTooltip hint={t("hints.scheduleSettings.endHour")}>
+                    <SelectTrigger data-testid="select-end-hour">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </HintTooltip>
                   <SelectContent>
                     {Array.from({ length: 24 }, (_, i) => i + 1).map(h => (
                       <SelectItem key={h} value={String(h)}>{`${h}:00`}</SelectItem>
@@ -616,9 +621,11 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
               <div className="space-y-2">
                 <Label>{t("scheduleSettings.slotsPerHour")}</Label>
                 <Select value={String(formSlotsPerHour)} onValueChange={v => setFormSlotsPerHour(Number(v))}>
-                  <SelectTrigger data-testid="select-slots-per-hour">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <HintTooltip hint={t("hints.scheduleSettings.slotsPerHour")}>
+                    <SelectTrigger data-testid="select-slots-per-hour">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </HintTooltip>
                   <SelectContent>
                     <SelectItem value="1">1</SelectItem>
                     <SelectItem value="2">2</SelectItem>

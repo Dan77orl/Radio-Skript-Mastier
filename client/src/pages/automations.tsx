@@ -167,16 +167,23 @@ export default function AutomationsPage() {
     }
   };
 
+  const automationStatusHints: Record<string, string> = {
+    running: t("hints.automations.statusRunning"),
+    completed: t("hints.automations.statusCompleted"),
+    error: t("hints.automations.statusError"),
+  };
+
   const getStatusBadge = (status: string) => {
+    const hint = automationStatusHints[status] || t("hints.automations.statusDefault");
     switch (status) {
       case "running":
-        return <Badge variant="secondary"><Loader2 className="h-3 w-3 mr-1 animate-spin" />{t("common.loading")}</Badge>;
+        return <HintTooltip hint={hint}><Badge variant="secondary"><Loader2 className="h-3 w-3 mr-1 animate-spin" />{t("common.loading")}</Badge></HintTooltip>;
       case "completed":
-        return <Badge variant="default"><CheckCircle className="h-3 w-3 mr-1" />{t("common.success")}</Badge>;
+        return <HintTooltip hint={hint}><Badge variant="default"><CheckCircle className="h-3 w-3 mr-1" />{t("common.success")}</Badge></HintTooltip>;
       case "error":
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />{t("common.error")}</Badge>;
+        return <HintTooltip hint={hint}><Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />{t("common.error")}</Badge></HintTooltip>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <HintTooltip hint={hint}><Badge variant="outline">{status}</Badge></HintTooltip>;
     }
   };
 
@@ -519,9 +526,11 @@ export default function AutomationsPage() {
                       {getTypeName(automation.automationType)}
                     </CardDescription>
                   </div>
-                  <Badge variant={automation.isActive ? "default" : "secondary"} className="shrink-0">
-                    {automation.isActive ? t("common.active") : t("common.inactive")}
-                  </Badge>
+                  <HintTooltip hint={automation.isActive ? t("hints.automations.badgeActive") : t("hints.automations.badgeInactive")}>
+                    <Badge variant={automation.isActive ? "default" : "secondary"} className="shrink-0">
+                      {automation.isActive ? t("common.active") : t("common.inactive")}
+                    </Badge>
+                  </HintTooltip>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
