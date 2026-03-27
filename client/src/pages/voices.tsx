@@ -521,18 +521,18 @@ export default function VoicesPage() {
                             />
                           </div>
                         </HintTooltip>
-                        <HintTooltip hint={t("hints.voices.genderFilter")}>
-                          <Select value={searchGender} onValueChange={setSearchGender}>
+                        <Select value={searchGender} onValueChange={setSearchGender}>
+                          <HintTooltip hint={t("hints.voices.genderFilter")}>
                             <SelectTrigger className="w-32" data-testid="select-search-gender">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">{t("common.all")}</SelectItem>
-                              <SelectItem value="male">{t("common.male")}</SelectItem>
-                              <SelectItem value="female">{t("common.female")}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </HintTooltip>
+                          </HintTooltip>
+                          <SelectContent>
+                            <SelectItem value="all">{t("common.all")}</SelectItem>
+                            <SelectItem value="male">{t("common.male")}</SelectItem>
+                            <SelectItem value="female">{t("common.female")}</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                       {isSearching ? (
                         <div className="flex items-center justify-center py-8">

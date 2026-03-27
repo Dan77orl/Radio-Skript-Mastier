@@ -114,18 +114,27 @@ export default function Dashboard() {
 
   const isLoading = programsLoading || typesLoading || settingsLoading;
 
+  const statusHints: Record<string, string> = {
+    ready: t("hints.dashboard.statusReady"),
+    script_ready: t("hints.dashboard.statusScriptReady"),
+    generating: t("hints.dashboard.statusGenerating"),
+    error: t("hints.dashboard.statusError"),
+    pending: t("hints.dashboard.statusPending"),
+  };
+
   function getStatusBadge(status: string) {
+    const hint = statusHints[status] || statusHints.pending;
     switch (status) {
       case "ready":
-        return <Badge variant="default" className="bg-green-600 text-xs"><CheckCircle className="mr-1 h-3 w-3" />{t("statuses.ready")}</Badge>;
+        return <HintTooltip hint={hint}><Badge variant="default" className="bg-green-600 text-xs"><CheckCircle className="mr-1 h-3 w-3" />{t("statuses.ready")}</Badge></HintTooltip>;
       case "script_ready":
-        return <Badge variant="secondary" className="text-xs"><CheckCircle className="mr-1 h-3 w-3" />{t("statuses.script_ready")}</Badge>;
+        return <HintTooltip hint={hint}><Badge variant="secondary" className="text-xs"><CheckCircle className="mr-1 h-3 w-3" />{t("statuses.script_ready")}</Badge></HintTooltip>;
       case "generating":
-        return <Badge variant="secondary" className="text-xs"><Clock className="mr-1 h-3 w-3 animate-spin" />{t("statuses.generating")}</Badge>;
+        return <HintTooltip hint={hint}><Badge variant="secondary" className="text-xs"><Clock className="mr-1 h-3 w-3 animate-spin" />{t("statuses.generating")}</Badge></HintTooltip>;
       case "error":
-        return <Badge variant="destructive" className="text-xs"><AlertCircle className="mr-1 h-3 w-3" />{t("statuses.error")}</Badge>;
+        return <HintTooltip hint={hint}><Badge variant="destructive" className="text-xs"><AlertCircle className="mr-1 h-3 w-3" />{t("statuses.error")}</Badge></HintTooltip>;
       default:
-        return <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3" />{t("statuses.pending")}</Badge>;
+        return <HintTooltip hint={hint}><Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3" />{t("statuses.pending")}</Badge></HintTooltip>;
     }
   }
 

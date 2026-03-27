@@ -1052,21 +1052,21 @@ export default function AdsPage() {
                     return (
                       <div key={speaker} className="flex items-center gap-3 rounded-lg border p-3" data-testid={`speaker-mapping-${sIdx}`}>
                         <span className={`font-semibold text-sm ${speakerColors[colorIdx]}`}>[{speaker}]</span>
-                        <HintTooltip hint={t("hints.ads.assignVoice")}>
-                          <Select
-                            value={adSpeakerVoiceMap[speaker] || ""}
-                            onValueChange={(val) => setAdSpeakerVoiceMap(prev => ({ ...prev, [speaker]: val }))}
-                          >
+                        <Select
+                          value={adSpeakerVoiceMap[speaker] || ""}
+                          onValueChange={(val) => setAdSpeakerVoiceMap(prev => ({ ...prev, [speaker]: val }))}
+                        >
+                          <HintTooltip hint={t("hints.ads.assignVoice")}>
                             <SelectTrigger className="flex-1" data-testid={`select-speaker-voice-${sIdx}`}>
                               <SelectValue placeholder={t("ads.selectVoice")} />
                             </SelectTrigger>
-                            <SelectContent>
-                              {allVoiceOptions.map(v => (
-                                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </HintTooltip>
+                          </HintTooltip>
+                          <SelectContent>
+                            {allVoiceOptions.map(v => (
+                              <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     );
                   })}

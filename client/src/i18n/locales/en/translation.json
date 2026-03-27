@@ -1211,7 +1211,13 @@
       "playAudio": "Play or pause the generated audio",
       "downloadAudio": "Download the audio file to your computer",
       "isolateVoice": "Remove background noise from the audio using voice isolation",
-      "deleteProgram": "Delete this program permanently"
+      "deleteProgram": "Delete this program permanently",
+      "statusFilter": "Filter programs by their current status",
+      "clearFilter": "Clear all filters and show all programs",
+      "statusPending": "Script hasn't been generated yet",
+      "statusScriptReady": "Script is ready but audio not yet synthesized",
+      "statusReady": "Program is fully complete with script and audio",
+      "statusError": "An error occurred during generation"
     },
     "ads": {
       "generateVariants": "Generate several AI-written script variants to choose from",
@@ -1258,7 +1264,12 @@
       "errorsToday": "Programs that encountered errors and need attention",
       "autoGeneration": "Show types with automatic generation enabled",
       "totalPrograms": "Total number of programs created across all time",
-      "playAudio": "Play or pause the audio for this episode"
+      "playAudio": "Play or pause the audio for this episode",
+      "statusReady": "This program is fully ready with script and audio",
+      "statusScriptReady": "Script is generated but audio hasn't been created yet",
+      "statusGenerating": "AI is currently generating content for this program",
+      "statusError": "An error occurred during generation — check details",
+      "statusPending": "This program hasn't been generated yet"
     },
     "voices": {
       "addPersona": "Create a new voice persona by selecting an ElevenLabs voice",

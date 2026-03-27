@@ -518,6 +518,13 @@ export default function ShowsPage() {
     stopAudio();
   }, [activeTab, statusFilter, stopAudio]);
 
+  const showsStatusHints: Record<string, string> = {
+    pending: t("hints.shows.statusPending"),
+    script_ready: t("hints.shows.statusScriptReady"),
+    ready: t("hints.shows.statusReady"),
+    error: t("hints.shows.statusError"),
+  };
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { labelKey: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
       pending: { labelKey: "shows.statusPending", variant: "outline" },
@@ -526,7 +533,8 @@ export default function ShowsPage() {
       error: { labelKey: "shows.statusError", variant: "destructive" },
     };
     const config = variants[status] || variants.pending;
-    return <Badge variant={config.variant}>{t(config.labelKey)}</Badge>;
+    const hint = showsStatusHints[status] || showsStatusHints.pending;
+    return <HintTooltip hint={hint}><Badge variant={config.variant}>{t(config.labelKey)}</Badge></HintTooltip>;
   };
 
   const speakerColors = [
@@ -968,10 +976,12 @@ export default function ShowsPage() {
               );
             })}
           </TabsList>
-          <Button variant="outline" size="sm" onClick={() => setIsAddTypeDialogOpen(true)} data-testid="button-add-type">
-            <Plus className="mr-2 h-4 w-4" />
-            {t("shows.newType")}
-          </Button>
+          <HintTooltip hint={t("hints.shows.addType")}>
+            <Button variant="outline" size="sm" onClick={() => setIsAddTypeDialogOpen(true)} data-testid="button-add-type">
+              <Plus className="mr-2 h-4 w-4" />
+              {t("shows.newType")}
+            </Button>
+          </HintTooltip>
         </div>
 
         {programTypes?.map((type) => {
@@ -1147,10 +1157,12 @@ export default function ShowsPage() {
                   />
                 </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[180px] h-9" data-testid="select-status-filter">
-                    <Filter className="h-3.5 w-3.5 mr-1.5" />
-                    <SelectValue />
-                  </SelectTrigger>
+                  <HintTooltip hint={t("hints.shows.statusFilter")}>
+                    <SelectTrigger className="w-[180px] h-9" data-testid="select-status-filter">
+                      <Filter className="h-3.5 w-3.5 mr-1.5" />
+                      <SelectValue />
+                    </SelectTrigger>
+                  </HintTooltip>
                   <SelectContent>
                     <SelectItem value="all">{t("shows.allStatuses")}</SelectItem>
                     <SelectItem value="pending">{t("shows.noScript")}</SelectItem>
@@ -1161,14 +1173,16 @@ export default function ShowsPage() {
                   </SelectContent>
                 </Select>
                 {(programFilter || statusFilter !== "all") && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => { setProgramFilter(""); setStatusFilter("all"); }}
-                    data-testid="button-clear-filter"
-                  >
-                    <XCircle className="h-4 w-4 mr-1" /> {t("shows.reset")}
-                  </Button>
+                  <HintTooltip hint={t("hints.shows.clearFilter")}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setProgramFilter(""); setStatusFilter("all"); }}
+                      data-testid="button-clear-filter"
+                    >
+                      <XCircle className="h-4 w-4 mr-1" /> {t("shows.reset")}
+                    </Button>
+                  </HintTooltip>
                 )}
                 <span className="text-xs text-muted-foreground">{t("shows.ofTotal", { count: filteredPrograms.length, total: allTypePrograms.length })}</span>
               </div>
