@@ -106,7 +106,7 @@ function getEffectiveElevenLabsKey(settings: any): string | null {
 }
 
 function getEffectiveAnthropicKey(settings: any): string | null {
-  return settings?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || null;
+  return process.env.ANTHROPIC_API_KEY || settings?.anthropicApiKey || null;
 }
 
 function withEffectiveKeys(settings: any): any {
