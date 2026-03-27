@@ -60,6 +60,7 @@ import {
   Plus, Pencil, Users, User, Mic, Settings2, FileStack, Download
 } from "lucide-react";
 import type { Ad, Voice, AdPreset } from "@shared/schema";
+import { HintTooltip } from "@/components/hint-tooltip";
 
 interface ExtractedFile {
   filename: string;
@@ -866,24 +867,26 @@ export default function AdsPage() {
                   </p>
                 )}
               </div>
-              <Button
-                onClick={() => generateVariantsMutation.mutate(currentAd.id)}
-                disabled={generateVariantsMutation.isPending}
-                className="w-full"
-                data-testid="button-generate-variants"
-              >
-                {generateVariantsMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {t("ads.generatingVariants")}
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    {t("ads.generate5Variants")}
-                  </>
-                )}
-              </Button>
+              <HintTooltip hint={t("hints.ads.generateVariants")}>
+                <Button
+                  onClick={() => generateVariantsMutation.mutate(currentAd.id)}
+                  disabled={generateVariantsMutation.isPending}
+                  className="w-full"
+                  data-testid="button-generate-variants"
+                >
+                  {generateVariantsMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {t("ads.generatingVariants")}
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      {t("ads.generate5Variants")}
+                    </>
+                  )}
+                </Button>
+              </HintTooltip>
             </CardContent>
           </Card>
         );
@@ -1225,39 +1228,41 @@ export default function AdsPage() {
                 </div>
               )}
 
-              <Button
-                onClick={() => {
-                  if (isMultiSpeakerAd) {
-                    const firstVoiceId = Object.values(adSpeakerVoiceMap)[0] || "";
-                    synthesizeAudioMutation.mutate({
-                      adId: currentAd.id,
-                      voiceIds: Object.values(adSpeakerVoiceMap),
-                      speakerVoiceMap: adSpeakerVoiceMap,
-                    });
-                  } else if (selectedVoiceId) {
-                    synthesizeAudioMutation.mutate({
-                      adId: currentAd.id,
-                      voiceIds: [selectedVoiceId],
-                      voiceName: selectedVoiceName || undefined,
-                    });
-                  }
-                }}
-                disabled={!canSynthesize || synthesizeAudioMutation.isPending}
-                className="w-full"
-                data-testid="button-synthesize"
-              >
-                {synthesizeAudioMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {t("ads.synthesizing")}
-                  </>
-                ) : (
-                  <>
-                    <Volume2 className="mr-2 h-4 w-4" />
-                    {t("ads.synthesizeAudio")}
-                  </>
-                )}
-              </Button>
+              <HintTooltip hint={t("hints.ads.synthesize")}>
+                <Button
+                  onClick={() => {
+                    if (isMultiSpeakerAd) {
+                      const firstVoiceId = Object.values(adSpeakerVoiceMap)[0] || "";
+                      synthesizeAudioMutation.mutate({
+                        adId: currentAd.id,
+                        voiceIds: Object.values(adSpeakerVoiceMap),
+                        speakerVoiceMap: adSpeakerVoiceMap,
+                      });
+                    } else if (selectedVoiceId) {
+                      synthesizeAudioMutation.mutate({
+                        adId: currentAd.id,
+                        voiceIds: [selectedVoiceId],
+                        voiceName: selectedVoiceName || undefined,
+                      });
+                    }
+                  }}
+                  disabled={!canSynthesize || synthesizeAudioMutation.isPending}
+                  className="w-full"
+                  data-testid="button-synthesize"
+                >
+                  {synthesizeAudioMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {t("ads.synthesizing")}
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="mr-2 h-4 w-4" />
+                      {t("ads.synthesizeAudio")}
+                    </>
+                  )}
+                </Button>
+              </HintTooltip>
             </CardContent>
           </Card>
         );
@@ -1945,15 +1950,17 @@ export default function AdsPage() {
                   >
                     <Upload className="h-4 w-4" />
                   </Button>
-                  <Button
-                    type="button"
-                    onClick={handleSmartParse}
-                    disabled={isParsingPrompt || (smartPrompt.trim().length < 5 && !smartImage)}
-                    size="icon"
-                    data-testid="button-smart-parse"
-                  >
-                    {isParsingPrompt ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  </Button>
+                  <HintTooltip hint={t("hints.ads.smartParse")}>
+                    <Button
+                      type="button"
+                      onClick={handleSmartParse}
+                      disabled={isParsingPrompt || (smartPrompt.trim().length < 5 && !smartImage)}
+                      size="icon"
+                      data-testid="button-smart-parse"
+                    >
+                      {isParsingPrompt ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    </Button>
+                  </HintTooltip>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-2">{t("ads.smartPromptHint")}</p>
@@ -2192,24 +2199,26 @@ export default function AdsPage() {
                     </div>
                   )}
 
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={createAdMutation.isPending}
-                    data-testid="button-create-ad"
-                  >
-                    {createAdMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {t("ads.creating")}
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        {t("ads.createAd")}
-                      </>
-                    )}
-                  </Button>
+                  <HintTooltip hint={t("hints.ads.createAd")}>
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={createAdMutation.isPending}
+                      data-testid="button-create-ad"
+                    >
+                      {createAdMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {t("ads.creating")}
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          {t("ads.createAd")}
+                        </>
+                      )}
+                    </Button>
+                  </HintTooltip>
                 </form>
               </Form>
             </CardContent>

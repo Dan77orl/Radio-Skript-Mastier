@@ -1147,5 +1147,87 @@
     "voiceInputTitle": "Voice input (Gemini)",
     "stopRecordingTitle": "Stop recording"
   },
-  "themeToggle": "Toggle theme"
+  "themeToggle": "Toggle theme",
+  "onboarding": {
+    "welcomeTitle": "Welcome to RadioFlow AI!",
+    "welcomeDesc": "Your AI-powered platform for automating radio content creation. Let's set everything up so you can start producing professional content right away.",
+    "feature1": "AI-generated scripts for shows, news, and ads",
+    "feature2": "Natural text-to-speech with multiple voices",
+    "feature3": "Automated scheduling and cloud upload",
+    "skipSetup": "Skip for now",
+    "letsStart": "Let's get started",
+    "sectionsTitle": "What would you like to set up first?",
+    "sectionsDesc": "Click on any section to start configuring it. You can always come back to other sections later.",
+    "finishSetup": "Done, go to dashboard",
+    "section": {
+      "shows": {
+        "title": "Shows & Programs",
+        "badge": "Content",
+        "desc": "Configure show types (news, weather, digest), set prompts, and generate scripts automatically"
+      },
+      "ads": {
+        "title": "Advertisements",
+        "badge": "Ads",
+        "desc": "Create ad campaigns with AI scripts, multi-speaker voices, and background music"
+      },
+      "podvodki": {
+        "title": "Host Dialogs",
+        "badge": "Dialogs",
+        "desc": "Generate short conversational dialogs between radio hosts for transitions"
+      },
+      "voices": {
+        "title": "Voice Library",
+        "badge": "Voices",
+        "desc": "Browse and select AI voices from ElevenLabs for your hosts and characters"
+      },
+      "settings": {
+        "title": "Station Settings",
+        "badge": "Setup",
+        "desc": "Set your station name, location, API keys, and general preferences"
+      }
+    }
+  },
+  "hints": {
+    "showHints": "Show hints",
+    "showHintsDesc": "Display helpful tooltips when you hover over buttons and controls",
+    "shows": {
+      "seedTypes": "Create default show types (News, Weather, Digest, etc.) to get started quickly",
+      "createCustomType": "Create a new custom show type with your own settings",
+      "addType": "Add a new show type to your lineup",
+      "editPrompt": "Edit the AI prompt template used to generate scripts for this show type",
+      "typeSettings": "Open detailed settings for this show type (schedule, voices, automation)",
+      "autoCreate": "Generate a single script automatically using AI for today",
+      "batchCreate": "Generate multiple scripts at once in a batch operation",
+      "bulkVoice": "Synthesize audio for all scripts that don't have audio yet",
+      "runPipeline": "Run the full automation pipeline: generate scripts, synthesize audio, and upload",
+      "analyzePrompt": "Use AI to improve and optimize your prompt for better scripts",
+      "toggleFirecrawl": "Enable web research to enrich scripts with real-time data from the internet",
+      "toggleAutoGenerate": "Automatically generate scripts on schedule without manual intervention",
+      "toggleAutoVoice": "Automatically synthesize audio after scripts are generated",
+      "toggleAutoUpload": "Automatically upload finished audio to cloud storage"
+    },
+    "ads": {
+      "generateVariants": "Generate several AI-written script variants to choose from",
+      "regenerate": "Regenerate this variant with a fresh AI-written version",
+      "useVariant": "Select this script variant as the final version to use",
+      "synthesize": "Convert the selected script to audio using the chosen voice",
+      "playAudio": "Listen to the generated audio",
+      "downloadAudio": "Download the audio file to your computer",
+      "searchMusic": "Search for background music tracks to add to your ad",
+      "autoSelectMusic": "Let AI automatically find and select matching background music",
+      "mixAudio": "Combine voice audio with background music into a final mix",
+      "createAd": "Create a new advertisement from scratch or from a preset",
+      "smartParse": "Extract ad details (title, description, contacts) from an uploaded image or text",
+      "newPreset": "Save current settings as a reusable preset for future ads"
+    },
+    "settings": {
+      "saveSettings": "Save all your current settings",
+      "checkApi": "Test connection to this service to make sure it's working",
+      "uploadLogo": "Upload your radio station's logo image",
+      "uploadAttachment": "Upload documents to use as knowledge base for AI content generation"
+    },
+    "dashboard": {
+      "viewAll": "See all programs and their details"
+    }
+  }
 }

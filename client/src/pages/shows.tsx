@@ -72,6 +72,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import type { ProgramType, Program, Settings as AppSettings, Voice } from "@shared/schema";
+import { HintTooltip } from "@/components/hint-tooltip";
 
 const getDefaultProgramTypes = (stationName: string, t: (key: string) => string) => [
   {
@@ -819,21 +820,25 @@ export default function ShowsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center gap-4">
-            <Button onClick={seedDefaultTypes} disabled={createTypeMutation.isPending} data-testid="button-seed-types">
-              {createTypeMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t("shows.creating")}
-                </>
-              ) : (
-                t("shows.createDefaultTypes")
-              )}
-            </Button>
+            <HintTooltip hint={t("hints.shows.seedTypes")}>
+              <Button onClick={seedDefaultTypes} disabled={createTypeMutation.isPending} data-testid="button-seed-types">
+                {createTypeMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t("shows.creating")}
+                  </>
+                ) : (
+                  t("shows.createDefaultTypes")
+                )}
+              </Button>
+            </HintTooltip>
             <span className="text-sm text-muted-foreground">{t("shows.or")}</span>
-            <Button variant="outline" onClick={() => setIsAddTypeDialogOpen(true)} data-testid="button-create-custom-type">
-              <Plus className="mr-2 h-4 w-4" />
-              {t("shows.createCustomType")}
-            </Button>
+            <HintTooltip hint={t("hints.shows.createCustomType")}>
+              <Button variant="outline" onClick={() => setIsAddTypeDialogOpen(true)} data-testid="button-create-custom-type">
+                <Plus className="mr-2 h-4 w-4" />
+                {t("shows.createCustomType")}
+              </Button>
+            </HintTooltip>
           </CardContent>
         </Card>
         {renderAddTypeDialog()}
@@ -1008,27 +1013,31 @@ export default function ShowsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingType(type);
-                          setIsEditPromptDialogOpen(true);
-                        }}
-                        data-testid="button-edit-prompt"
-                      >
-                        <FileText className="mr-2 h-4 w-4" />
-                        {t("shows.prompt")}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openSettingsDialog(type)}
-                        data-testid="button-type-settings"
-                      >
-                        <Settings className="mr-2 h-4 w-4" />
-                        {t("shows.settings")}
-                      </Button>
+                      <HintTooltip hint={t("hints.shows.editPrompt")}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingType(type);
+                            setIsEditPromptDialogOpen(true);
+                          }}
+                          data-testid="button-edit-prompt"
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          {t("shows.prompt")}
+                        </Button>
+                      </HintTooltip>
+                      <HintTooltip hint={t("hints.shows.typeSettings")}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openSettingsDialog(type)}
+                          data-testid="button-type-settings"
+                        >
+                          <Settings className="mr-2 h-4 w-4" />
+                          {t("shows.settings")}
+                        </Button>
+                      </HintTooltip>
                     </div>
                   </div>
 
@@ -1036,31 +1045,35 @@ export default function ShowsPage() {
                     <div className="flex items-center gap-2 rounded-lg border px-3 py-2 bg-muted/30">
                       <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">{t("shows.manual")}</span>
                       <div className="flex items-center gap-1.5">
-                        <Button
-                          size="sm"
-                          onClick={() => autoCreateMutation.mutate(type.id)}
-                          disabled={generatingTypeIds.has(type.id)}
-                          data-testid="button-auto-create"
-                        >
-                          {generatingTypeIds.has(type.id) ? (
-                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Zap className="mr-1.5 h-4 w-4" />
-                          )}
-                          {t("shows.script")}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            resetBatchDialog();
-                            setIsBatchDialogOpen(true);
-                          }}
-                          data-testid="button-batch-create"
-                        >
-                          <PackagePlus className="mr-1.5 h-4 w-4" />
-                          {t("shows.batch")}
-                        </Button>
+                        <HintTooltip hint={t("hints.shows.autoCreate")}>
+                          <Button
+                            size="sm"
+                            onClick={() => autoCreateMutation.mutate(type.id)}
+                            disabled={generatingTypeIds.has(type.id)}
+                            data-testid="button-auto-create"
+                          >
+                            {generatingTypeIds.has(type.id) ? (
+                              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Zap className="mr-1.5 h-4 w-4" />
+                            )}
+                            {t("shows.script")}
+                          </Button>
+                        </HintTooltip>
+                        <HintTooltip hint={t("hints.shows.batchCreate")}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              resetBatchDialog();
+                              setIsBatchDialogOpen(true);
+                            }}
+                            data-testid="button-batch-create"
+                          >
+                            <PackagePlus className="mr-1.5 h-4 w-4" />
+                            {t("shows.batch")}
+                          </Button>
+                        </HintTooltip>
                         {selectedPrograms.size > 0 && (
                           <Button
                             size="sm"
@@ -1104,6 +1117,7 @@ export default function ShowsPage() {
                           onClick={() => pipelineMutation.mutate({ typeId: type.id, count: Math.ceil((type.weeklyCount || 7) / 7) })}
                           disabled={pipelineTypeIds.has(type.id)}
                           data-testid="button-run-pipeline"
+                          title={t("hints.shows.runPipeline")}
                         >
                           {pipelineTypeIds.has(type.id) ? (
                             <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -1832,14 +1846,16 @@ export default function ShowsPage() {
                   {t("shows.firecrawlDesc")}
                 </p>
                 <div className="flex items-center gap-3">
-                  <Button
-                    size="sm"
-                    variant={settingsType.useFirecrawl ? "default" : "outline"}
-                    onClick={() => setSettingsType(prev => prev ? { ...prev, useFirecrawl: !prev.useFirecrawl } : null)}
-                    data-testid="button-toggle-firecrawl"
-                  >
-                    {settingsType.useFirecrawl ? t("shows.enabled") : t("shows.disabled")}
-                  </Button>
+                  <HintTooltip hint={t("hints.shows.toggleFirecrawl")}>
+                    <Button
+                      size="sm"
+                      variant={settingsType.useFirecrawl ? "default" : "outline"}
+                      onClick={() => setSettingsType(prev => prev ? { ...prev, useFirecrawl: !prev.useFirecrawl } : null)}
+                      data-testid="button-toggle-firecrawl"
+                    >
+                      {settingsType.useFirecrawl ? t("shows.enabled") : t("shows.disabled")}
+                    </Button>
+                  </HintTooltip>
                 </div>
                 {settingsType.useFirecrawl && (
                   <div className="space-y-3 mt-2">
@@ -1933,14 +1949,16 @@ export default function ShowsPage() {
                   {t("shows.autoGenDesc")}
                 </p>
                 <div className="flex items-center gap-3">
-                  <Button
-                    size="sm"
-                    variant={settingsType.autoGenerate ? "default" : "outline"}
-                    onClick={() => setSettingsType(prev => prev ? { ...prev, autoGenerate: !prev.autoGenerate } : null)}
-                    data-testid="button-toggle-auto-generate"
-                  >
-                    {settingsType.autoGenerate ? t("shows.autoGenEnabled") : t("shows.autoGenDisabled")}
-                  </Button>
+                  <HintTooltip hint={t("hints.shows.toggleAutoGenerate")}>
+                    <Button
+                      size="sm"
+                      variant={settingsType.autoGenerate ? "default" : "outline"}
+                      onClick={() => setSettingsType(prev => prev ? { ...prev, autoGenerate: !prev.autoGenerate } : null)}
+                      data-testid="button-toggle-auto-generate"
+                    >
+                      {settingsType.autoGenerate ? t("shows.autoGenEnabled") : t("shows.autoGenDisabled")}
+                    </Button>
+                  </HintTooltip>
                 </div>
                 {settingsType.autoGenerate && (
                   <div className="space-y-3 mt-2">

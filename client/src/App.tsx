@@ -27,6 +27,8 @@ import SettingsPage from "@/pages/settings";
 import AdminPage from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 import { VoiceAgentWidget } from "@/components/voice-agent-widget";
+import { OnboardingWizard } from "@/components/onboarding-wizard";
+import { HintsProvider } from "@/contexts/hints-context";
 
 function AdminRouter() {
   return (
@@ -108,7 +110,14 @@ function AppContent() {
     );
   }
 
-  return <AdminLayout />;
+  const showOnboarding = user?.hasCompletedOnboarding === false;
+
+  return (
+    <>
+      <AdminLayout />
+      <OnboardingWizard open={showOnboarding} />
+    </>
+  );
 }
 
 function App() {
@@ -116,9 +125,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="radio-dialog-theme">
         <TooltipProvider>
-          <AppContent />
-          <VoiceAgentWidget />
-          <Toaster />
+          <HintsProvider>
+            <AppContent />
+            <VoiceAgentWidget />
+            <Toaster />
+          </HintsProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

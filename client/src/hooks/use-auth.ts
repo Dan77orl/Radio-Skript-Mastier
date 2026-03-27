@@ -8,6 +8,7 @@ interface AuthUser {
   name: string | null;
   language?: string | null;
   role?: string | null;
+  hasCompletedOnboarding?: boolean;
 }
 
 export function useAuth() {

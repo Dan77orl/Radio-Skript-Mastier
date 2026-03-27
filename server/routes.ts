@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { registerUser, loginUser, logoutUser, getCurrentUser, updateUserLanguage, requireAuth, requireAdmin } from "./auth";
+import { registerUser, loginUser, logoutUser, getCurrentUser, completeOnboarding, updateUserLanguage, requireAuth, requireAdmin } from "./auth";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
@@ -759,6 +759,7 @@ export async function registerRoutes(
   app.post("/api/auth/logout", logoutUser);
   app.get("/api/auth/me", getCurrentUser);
   app.patch("/api/auth/language", updateUserLanguage);
+  app.post("/api/auth/complete-onboarding", completeOnboarding);
 
   app.post("/api/support-chat", handleSupportChat);
 

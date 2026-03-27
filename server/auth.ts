@@ -47,6 +47,7 @@ export async function registerUser(req: Request, res: Response) {
       name: user.name,
       language: user.language || null,
       role: user.role || "user",
+      hasCompletedOnboarding: user.hasCompletedOnboarding || false,
     });
   } catch (error) {
     console.error("Registration error:", error);
@@ -85,6 +86,7 @@ export async function loginUser(req: Request, res: Response) {
       name: user.name,
       language: user.language || null,
       role: user.role || "user",
+      hasCompletedOnboarding: user.hasCompletedOnboarding || false,
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -118,7 +120,16 @@ export async function getCurrentUser(req: Request, res: Response) {
     name: user.name,
     language: user.language || null,
     role: user.role || "user",
+    hasCompletedOnboarding: user.hasCompletedOnboarding || false,
   });
+}
+
+export async function completeOnboarding(req: Request, res: Response) {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  await storage.completeOnboarding(req.session.userId);
+  return res.json({ ok: true });
 }
 
 export async function updateUserLanguage(req: Request, res: Response) {

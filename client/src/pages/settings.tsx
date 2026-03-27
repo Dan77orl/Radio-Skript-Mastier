@@ -15,11 +15,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Save, Key, Mic, Settings2, Eye, EyeOff, Loader2, CheckCircle, AlertCircle, HardDrive, Radio, Upload, Globe, X, FileText, User, BookOpen, Wifi, WifiOff, Volume2, Brain, Search, Cloud, Sparkles } from "lucide-react";
+import { Save, Key, Mic, Settings2, Eye, EyeOff, Loader2, CheckCircle, AlertCircle, HardDrive, Radio, Upload, Globe, X, FileText, User, BookOpen, Wifi, WifiOff, Volume2, Brain, Search, Cloud, Sparkles, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { VoiceInput } from "@/components/voice-input";
 import { useAuth } from "@/hooks/use-auth";
 import type { Settings } from "@shared/schema";
+import { HintTooltip } from "@/components/hint-tooltip";
 
 const settingsFormSchema = z.object({
   elevenLabsApiKey: z.string().optional(),
@@ -925,17 +926,53 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <HelpCircle className="h-5 w-5" />
+                    {t("hints.showHints")}
+                  </CardTitle>
+                  <CardDescription>{t("hints.showHintsDesc")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="show-hints-toggle">{t("hints.showHints")}</Label>
+                    <Switch
+                      id="show-hints-toggle"
+                      checked={settings?.showHints !== false}
+                      onCheckedChange={async (checked) => {
+                        try {
+                          await apiRequest("POST", "/api/settings", { showHints: checked });
+                          queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+                          toast({
+                            title: t("common.saved"),
+                          });
+                        } catch {
+                          toast({
+                            title: t("common.error"),
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      data-testid="toggle-show-hints"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <div className="flex justify-end">
-              <Button type="submit" disabled={saveMutation.isPending} data-testid="button-save-settings">
-                {saveMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                {t("settings.saveSettings")}
-              </Button>
+              <HintTooltip hint={t("hints.settings.saveSettings")}>
+                <Button type="submit" disabled={saveMutation.isPending} data-testid="button-save-settings">
+                  {saveMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  {t("settings.saveSettings")}
+                </Button>
+              </HintTooltip>
             </div>
           </Tabs>
         </form>

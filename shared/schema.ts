@@ -12,6 +12,7 @@ export const users = pgTable("users", {
   language: text("language"),
   role: text("role").default("user"),
   blocked: boolean("blocked").default(false),
+  hasCompletedOnboarding: boolean("has_completed_onboarding").default(false),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
@@ -69,6 +70,7 @@ Must include: greeting to listeners, an interesting fact or useful tip.`),
   globalFirecrawlTopics: text("global_firecrawl_topics").array(),
   dialogStyle: text("dialog_style").default("lively"),
   dialogReplicas: integer("dialog_replicas").default(4),
+  showHints: boolean("show_hints").default(true),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).omit({

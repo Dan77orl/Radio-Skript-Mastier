@@ -157,6 +157,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserLanguage(id: string, language: string): Promise<void>;
+  completeOnboarding(id: string): Promise<void>;
   updateDefaultPromptsForLanguage(userId: string, language: string): Promise<void>;
   
   getSettings(userId?: string): Promise<Settings | undefined>;
@@ -280,6 +281,10 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserLanguage(id: string, language: string): Promise<void> {
     await db.update(users).set({ language }).where(eq(users.id, id));
+  }
+
+  async completeOnboarding(id: string): Promise<void> {
+    await db.update(users).set({ hasCompletedOnboarding: true }).where(eq(users.id, id));
   }
 
   async updateDefaultPromptsForLanguage(userId: string, language: string): Promise<void> {
