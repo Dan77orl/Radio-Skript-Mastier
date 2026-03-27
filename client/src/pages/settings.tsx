@@ -342,19 +342,25 @@ export default function SettingsPage() {
           <Tabs defaultValue={isAdmin ? "api-keys" : "knowledge"} className="space-y-6">
             <TabsList className={`grid w-full ${isAdmin ? "grid-cols-3" : "grid-cols-2"}`} data-testid="tabs-settings">
               {isAdmin && (
-                <TabsTrigger value="api-keys" data-testid="tab-api-keys">
-                  <Key className="mr-2 h-4 w-4" />
-                  {t("settings.apiKeys")}
-                </TabsTrigger>
+                <HintTooltip hint={t("hints.settings.apiKeysTab")}>
+                  <TabsTrigger value="api-keys" data-testid="tab-api-keys">
+                    <Key className="mr-2 h-4 w-4" />
+                    {t("settings.apiKeys")}
+                  </TabsTrigger>
+                </HintTooltip>
               )}
-              <TabsTrigger value="knowledge" data-testid="tab-knowledge">
-                <BookOpen className="mr-2 h-4 w-4" />
-                {t("settings.knowledge")}
-              </TabsTrigger>
-              <TabsTrigger value="account" data-testid="tab-account">
-                <User className="mr-2 h-4 w-4" />
-                {t("settings.account")}
-              </TabsTrigger>
+              <HintTooltip hint={t("hints.settings.knowledgeTab")}>
+                <TabsTrigger value="knowledge" data-testid="tab-knowledge">
+                  <BookOpen className="mr-2 h-4 w-4" />
+                  {t("settings.knowledge")}
+                </TabsTrigger>
+              </HintTooltip>
+              <HintTooltip hint={t("hints.settings.accountTab")}>
+                <TabsTrigger value="account" data-testid="tab-account">
+                  <User className="mr-2 h-4 w-4" />
+                  {t("settings.account")}
+                </TabsTrigger>
+              </HintTooltip>
             </TabsList>
 
             {isAdmin && <TabsContent value="api-keys" className="space-y-6">

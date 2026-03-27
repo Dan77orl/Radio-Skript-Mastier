@@ -1218,7 +1218,9 @@
       "mixAudio": "Combine voice audio with background music into a final mix",
       "createAd": "Create a new advertisement from scratch or from a preset",
       "smartParse": "Extract ad details (title, description, contacts) from an uploaded image or text",
-      "newPreset": "Save current settings as a reusable preset for future ads"
+      "newPreset": "Save current settings as a reusable preset for future ads",
+      "createTab": "Create new ads and manage existing ones",
+      "presetsTab": "View and manage reusable ad presets and templates"
     },
     "settings": {
       "saveSettings": "Save all your current settings",
@@ -1227,7 +1229,10 @@
       "toggleApiVisibility": "Show or hide this API key",
       "uploadLogo": "Upload your radio station's logo image",
       "removeLogo": "Remove the current station logo",
-      "uploadAttachment": "Upload documents to use as knowledge base for AI content generation"
+      "uploadAttachment": "Upload documents to use as knowledge base for AI content generation",
+      "apiKeysTab": "Manage API keys for external services (ElevenLabs, Anthropic, Yandex Disk, Freesound)",
+      "knowledgeTab": "Station information and knowledge base for AI content generation",
+      "accountTab": "User account settings and preferences"
     },
     "dashboard": {
       "viewAll": "See all programs and their details",
@@ -1241,7 +1246,9 @@
       "editVoice": "Edit this voice persona's name, gender, or assigned shows",
       "deleteVoice": "Remove this voice persona permanently",
       "searchLibrary": "Search the ElevenLabs shared voice library for new voices",
-      "assignShows": "Choose which show types this voice should be used for"
+      "assignShows": "Choose which show types this voice should be used for",
+      "myVoicesTab": "View your saved voice personas",
+      "searchVoicesTab": "Search the ElevenLabs library for new voices to add"
     },
     "generator": {
       "selectDate": "Pick a date to view or generate dialogs for that day",

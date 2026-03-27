@@ -1865,14 +1865,18 @@ export default function AdsPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="create" data-testid="tab-create">
-            <Sparkles className="mr-2 h-4 w-4" />
-            {t("ads.creation")}
-          </TabsTrigger>
-          <TabsTrigger value="presets" data-testid="tab-presets">
-            <FileStack className="mr-2 h-4 w-4" />
-            {t("ads.presets")}
-          </TabsTrigger>
+          <HintTooltip hint={t("hints.ads.createTab")}>
+            <TabsTrigger value="create" data-testid="tab-create">
+              <Sparkles className="mr-2 h-4 w-4" />
+              {t("ads.creation")}
+            </TabsTrigger>
+          </HintTooltip>
+          <HintTooltip hint={t("hints.ads.presetsTab")}>
+            <TabsTrigger value="presets" data-testid="tab-presets">
+              <FileStack className="mr-2 h-4 w-4" />
+              {t("ads.presets")}
+            </TabsTrigger>
+          </HintTooltip>
         </TabsList>
 
         <TabsContent value="create" className="mt-6">

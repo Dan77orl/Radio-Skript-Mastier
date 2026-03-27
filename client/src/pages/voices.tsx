@@ -423,12 +423,16 @@ export default function VoicesPage() {
                   <label className="text-sm font-medium">{t("voices.elevenLabsVoice")}</label>
                   <Tabs value={voiceTab} onValueChange={(v) => setVoiceTab(v as "my" | "search")}>
                     <TabsList className="w-full">
-                      <TabsTrigger value="my" className="flex-1" data-testid="tab-my-voices" onClick={() => setSelectedElevenLabsVoice(null)}>
-                        <Mic className="h-4 w-4 mr-1" /> {t("voices.myVoices")}
-                      </TabsTrigger>
-                      <TabsTrigger value="search" className="flex-1" data-testid="tab-search-voices" onClick={() => setSelectedElevenLabsVoice(null)}>
-                        <Globe className="h-4 w-4 mr-1" /> {t("voices.searchLibrary")}
-                      </TabsTrigger>
+                      <HintTooltip hint={t("hints.voices.myVoicesTab")}>
+                        <TabsTrigger value="my" className="flex-1" data-testid="tab-my-voices" onClick={() => setSelectedElevenLabsVoice(null)}>
+                          <Mic className="h-4 w-4 mr-1" /> {t("voices.myVoices")}
+                        </TabsTrigger>
+                      </HintTooltip>
+                      <HintTooltip hint={t("hints.voices.searchVoicesTab")}>
+                        <TabsTrigger value="search" className="flex-1" data-testid="tab-search-voices" onClick={() => setSelectedElevenLabsVoice(null)}>
+                          <Globe className="h-4 w-4 mr-1" /> {t("voices.searchLibrary")}
+                        </TabsTrigger>
+                      </HintTooltip>
                     </TabsList>
                     <TabsContent value="my" className="mt-2">
                       {isLoadingElevenLabs ? (
