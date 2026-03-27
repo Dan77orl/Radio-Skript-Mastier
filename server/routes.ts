@@ -3398,6 +3398,49 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
     }
   });
 
+  app.get("/api/stream-audio/*", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
+      const filePath = req.params[0];
+      if (!filePath || filePath.includes("..")) {
+        return res.status(400).json({ error: "Invalid path" });
+      }
+      const audioPath = path.join(process.cwd(), "public", "audio", filePath);
+      try {
+        await fs.access(audioPath);
+      } catch {
+        return res.status(404).json({ error: "Audio file not found" });
+      }
+      const fileStat = await fs.stat(audioPath);
+      const fileSize = fileStat.size;
+      const range = req.headers.range;
+      const { createReadStream } = await import("fs");
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunkSize = end - start + 1;
+        res.writeHead(206, {
+          "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+          "Accept-Ranges": "bytes",
+          "Content-Length": chunkSize,
+          "Content-Type": "audio/mpeg",
+        });
+        createReadStream(audioPath, { start, end }).pipe(res);
+      } else {
+        res.writeHead(200, {
+          "Content-Length": fileSize,
+          "Content-Type": "audio/mpeg",
+          "Accept-Ranges": "bytes",
+        });
+        createReadStream(audioPath).pipe(res);
+      }
+    } catch (error) {
+      console.error("Error streaming audio:", error);
+      res.status(500).json({ error: "Failed to stream audio" });
+    }
+  });
+
   app.get("/api/ads/:id/download-audio", async (req, res) => {
     try {
       const ad = await storage.getAd(req.params.id, req.session.userId!);

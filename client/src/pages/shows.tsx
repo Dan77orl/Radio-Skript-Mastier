@@ -469,7 +469,9 @@ export default function ShowsPage() {
       stopAudio();
       return;
     }
-    const audio = new Audio(audioUrl);
+    const filename = audioUrl.startsWith("/audio/") ? audioUrl.slice(7) : audioUrl.replace(/^audio\//, "");
+    const streamUrl = `/api/stream-audio/${encodeURIComponent(filename)}`;
+    const audio = new Audio(streamUrl);
     audioRef.current = audio;
     audio.playbackRate = audioPlaybackRate;
     audio.ontimeupdate = () => {

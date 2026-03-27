@@ -489,6 +489,16 @@ export default function AdsPage() {
     createAdMutation.mutate(data);
   };
 
+  const resolveAudioUrl = (url: string) => {
+    if (url.startsWith("/audio/")) {
+      return `/api/stream-audio/${encodeURIComponent(url.slice(7))}`;
+    }
+    if (url.startsWith("audio/")) {
+      return `/api/stream-audio/${encodeURIComponent(url.slice(6))}`;
+    }
+    return url;
+  };
+
   const playAudio = (url: string) => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -497,7 +507,7 @@ export default function AdsPage() {
       setPlayingAudio(false);
       return;
     }
-    const audio = new Audio(url);
+    const audio = new Audio(resolveAudioUrl(url));
     audioRef.current = audio;
     audio.play().catch(console.error);
     setPlayingAudio(true);
@@ -520,7 +530,7 @@ export default function AdsPage() {
       setVersionCurrentTime(0);
       return;
     }
-    const audio = new Audio(url);
+    const audio = new Audio(resolveAudioUrl(url));
     audio.playbackRate = playbackSpeed;
     versionAudioRef.current = audio;
     audio.play().catch(console.error);
