@@ -437,13 +437,15 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                     )}
                   </CardDescription>
                 </div>
-                <Input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-auto"
-                  data-testid="input-date"
-                />
+                <HintTooltip hint={t("hints.generator.selectDate")}>
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-auto"
+                    data-testid="input-date"
+                  />
+                </HintTooltip>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1101,37 +1103,39 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                     { value: "moderate", label: t("generator.dialogStyleModerate") },
                     { value: "simple", label: t("generator.dialogStyleSimple") },
                   ].map(opt => (
-                    <Button
-                      key={opt.value}
-                      size="sm"
-                      variant={dialogStyle === opt.value ? "default" : "outline"}
-                      onClick={() => {
-                        setDialogStyle(opt.value);
-                        apiRequest("POST", "/api/settings", { dialogStyle: opt.value });
-                      }}
-                      data-testid={`button-style-${opt.value}`}
-                    >
-                      {opt.label}
-                    </Button>
+                    <HintTooltip key={opt.value} hint={t("hints.generator.dialogStyle")}>
+                      <Button
+                        size="sm"
+                        variant={dialogStyle === opt.value ? "default" : "outline"}
+                        onClick={() => {
+                          setDialogStyle(opt.value);
+                          apiRequest("POST", "/api/settings", { dialogStyle: opt.value });
+                        }}
+                        data-testid={`button-style-${opt.value}`}
+                      >
+                        {opt.label}
+                      </Button>
+                    </HintTooltip>
                   ))}
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-muted-foreground">{t("generator.dialogReplicas")}:</span>
                   <div className="flex items-center gap-2">
                     {[3, 4, 5, 6, 8].map(n => (
-                      <Button
-                        key={n}
-                        size="sm"
-                        variant={dialogReplicas === n ? "default" : "outline"}
-                        className="h-7 w-7 p-0"
-                        onClick={() => {
-                          setDialogReplicas(n);
-                          apiRequest("POST", "/api/settings", { dialogReplicas: n });
-                        }}
-                        data-testid={`button-replicas-${n}`}
-                      >
-                        {n}
-                      </Button>
+                      <HintTooltip key={n} hint={t("hints.generator.replicasCount")}>
+                        <Button
+                          size="sm"
+                          variant={dialogReplicas === n ? "default" : "outline"}
+                          className="h-7 w-7 p-0"
+                          onClick={() => {
+                            setDialogReplicas(n);
+                            apiRequest("POST", "/api/settings", { dialogReplicas: n });
+                          }}
+                          data-testid={`button-replicas-${n}`}
+                        >
+                          {n}
+                        </Button>
+                      </HintTooltip>
                     ))}
                   </div>
                 </div>

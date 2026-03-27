@@ -1227,7 +1227,15 @@
       "smartParse": "Extract ad details (title, description, contacts) from an uploaded image or text",
       "newPreset": "Save current settings as a reusable preset for future ads",
       "createTab": "Create new ads and manage existing ones",
-      "presetsTab": "View and manage reusable ad presets and templates"
+      "presetsTab": "View and manage reusable ad presets and templates",
+      "stagePrompt": "Write or paste your ad script prompt",
+      "stageVariants": "Review and select from AI-generated script variants",
+      "stageVoices": "Choose voices for narration",
+      "stageAudio": "Generate and preview the spoken audio",
+      "stageMusic": "Add background music to the ad",
+      "assignVoice": "Assign a voice to this speaker for audio synthesis",
+      "previewVoiceLibrary": "Preview this voice from the ElevenLabs library",
+      "selectVariantCard": "Click to select this variant as the final script"
     },
     "settings": {
       "saveSettings": "Save all your current settings",
@@ -1249,7 +1257,8 @@
       "readyToday": "Programs ready today vs daily target",
       "errorsToday": "Programs that encountered errors and need attention",
       "autoGeneration": "Show types with automatic generation enabled",
-      "totalPrograms": "Total number of programs created across all time"
+      "totalPrograms": "Total number of programs created across all time",
+      "playAudio": "Play or pause the audio for this episode"
     },
     "voices": {
       "addPersona": "Create a new voice persona by selecting an ElevenLabs voice",
@@ -1259,7 +1268,12 @@
       "searchLibrary": "Search the ElevenLabs shared voice library for new voices",
       "assignShows": "Choose which show types this voice should be used for",
       "myVoicesTab": "View your saved voice personas",
-      "searchVoicesTab": "Search the ElevenLabs library for new voices to add"
+      "searchVoicesTab": "Search the ElevenLabs library for new voices to add",
+      "searchInput": "Search for voices by name in the ElevenLabs library",
+      "genderFilter": "Filter search results by gender",
+      "confirmAdd": "Confirm and add this voice persona to your collection",
+      "changeVoice": "Switch to a different ElevenLabs voice for this persona",
+      "saveChanges": "Save all changes to this voice persona"
     },
     "generator": {
       "selectDate": "Pick a date to view or generate dialogs for that day",
@@ -1271,7 +1285,9 @@
       "saveDailyPrompt": "Save the daily prompt that guides AI dialog generation",
       "regenerateSlot": "Regenerate this specific slot with a new AI-written dialog",
       "editSlot": "Edit the text of this dialog slot manually",
-      "saveSlotEdit": "Save your manual edits to this dialog"
+      "saveSlotEdit": "Save your manual edits to this dialog",
+      "dialogStyle": "Set the conversational style for generated dialogs",
+      "replicasCount": "Set the number of dialog lines (replicas) per slot"
     },
     "schedule": {
       "prevWeek": "Navigate to the previous week",

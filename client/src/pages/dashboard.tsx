@@ -401,19 +401,21 @@ export default function Dashboard() {
                       )}
                       {getStatusBadge(program.status)}
                       {program.audioUrl && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          data-testid={`button-play-${program.id}`}
-                          onClick={() => playAudio(program.audioUrl!, program.id)}
-                        >
-                          {playingId === program.id ? (
-                            <PauseCircle className="h-4 w-4" />
-                          ) : (
-                            <PlayCircle className="h-4 w-4" />
-                          )}
-                        </Button>
+                        <HintTooltip hint={t("hints.dashboard.playAudio")}>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            data-testid={`button-play-${program.id}`}
+                            onClick={() => playAudio(program.audioUrl!, program.id)}
+                          >
+                            {playingId === program.id ? (
+                              <PauseCircle className="h-4 w-4" />
+                            ) : (
+                              <PlayCircle className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </HintTooltip>
                       )}
                     </div>
                   </div>

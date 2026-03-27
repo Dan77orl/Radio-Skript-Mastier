@@ -509,26 +509,30 @@ export default function VoicesPage() {
                     </TabsContent>
                     <TabsContent value="search" className="mt-2 space-y-3">
                       <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder={t("voices.searchVoices")}
-                            value={voiceSearch}
-                            onChange={(e) => handleSearchInput(e.target.value)}
-                            className="pl-9"
-                            data-testid="input-voice-search"
-                          />
-                        </div>
-                        <Select value={searchGender} onValueChange={setSearchGender}>
-                          <SelectTrigger className="w-32" data-testid="select-search-gender">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">{t("common.all")}</SelectItem>
-                            <SelectItem value="male">{t("common.male")}</SelectItem>
-                            <SelectItem value="female">{t("common.female")}</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <HintTooltip hint={t("hints.voices.searchInput")}>
+                          <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder={t("voices.searchVoices")}
+                              value={voiceSearch}
+                              onChange={(e) => handleSearchInput(e.target.value)}
+                              className="pl-9"
+                              data-testid="input-voice-search"
+                            />
+                          </div>
+                        </HintTooltip>
+                        <HintTooltip hint={t("hints.voices.genderFilter")}>
+                          <Select value={searchGender} onValueChange={setSearchGender}>
+                            <SelectTrigger className="w-32" data-testid="select-search-gender">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">{t("common.all")}</SelectItem>
+                              <SelectItem value="male">{t("common.male")}</SelectItem>
+                              <SelectItem value="female">{t("common.female")}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </HintTooltip>
                       </div>
                       {isSearching ? (
                         <div className="flex items-center justify-center py-8">
@@ -614,13 +618,15 @@ export default function VoicesPage() {
                 <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                   {t("common.cancel")}
                 </Button>
-                <Button
-                  onClick={handleAddVoice}
-                  disabled={!selectedElevenLabsVoice || !personaName.trim() || createMutation.isPending}
-                  data-testid="button-confirm-add"
-                >
-                  {createMutation.isPending ? t("common.loading") : t("common.add")}
-                </Button>
+                <HintTooltip hint={t("hints.voices.confirmAdd")}>
+                  <Button
+                    onClick={handleAddVoice}
+                    disabled={!selectedElevenLabsVoice || !personaName.trim() || createMutation.isPending}
+                    data-testid="button-confirm-add"
+                  >
+                    {createMutation.isPending ? t("common.loading") : t("common.add")}
+                  </Button>
+                </HintTooltip>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -800,9 +806,11 @@ export default function VoicesPage() {
                 <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
                   <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
                   <span className="text-sm flex-1 truncate">{editingVoice?.description || editingVoice?.elevenLabsVoiceId}</span>
-                  <Button variant="outline" size="sm" onClick={() => setEditVoiceChanged(true)} data-testid="button-change-voice">
-                    {t("voices.changeVoice")}
-                  </Button>
+                  <HintTooltip hint={t("hints.voices.changeVoice")}>
+                    <Button variant="outline" size="sm" onClick={() => setEditVoiceChanged(true)} data-testid="button-change-voice">
+                      {t("voices.changeVoice")}
+                    </Button>
+                  </HintTooltip>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -902,13 +910,15 @@ export default function VoicesPage() {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button
-              onClick={handleSaveEdit}
-              disabled={updateMutation.isPending || (editVoiceChanged && !editSelectedElevenLabsVoice)}
-              data-testid="button-save-edit"
-            >
-              {updateMutation.isPending ? t("common.loading") : t("common.save")}
-            </Button>
+            <HintTooltip hint={t("hints.voices.saveChanges")}>
+              <Button
+                onClick={handleSaveEdit}
+                disabled={updateMutation.isPending || (editVoiceChanged && !editSelectedElevenLabsVoice)}
+                data-testid="button-save-edit"
+              >
+                {updateMutation.isPending ? t("common.loading") : t("common.save")}
+              </Button>
+            </HintTooltip>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -808,6 +808,14 @@ export default function AdsPage() {
     }
   };
 
+  const stageHintKeys: Record<string, string> = {
+    prompt: "hints.ads.stagePrompt",
+    variants: "hints.ads.stageVariants",
+    voices: "hints.ads.stageVoices",
+    audio: "hints.ads.stageAudio",
+    music: "hints.ads.stageMusic",
+  };
+
   const renderStageProgress = () => {
     const currentIndex = getCurrentStageIndex();
     return (
@@ -819,18 +827,20 @@ export default function AdsPage() {
           const canNavigate = isCompleted;
           return (
             <div key={stage.key} className="flex items-center gap-2">
-              <button
-                className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-colors ${
-                  isActive ? "bg-primary text-primary-foreground" :
-                  isCompleted ? "bg-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-500/30 cursor-pointer" :
-                  "bg-muted text-muted-foreground"
-                } ${canNavigate ? "" : "cursor-default"}`}
-                onClick={() => canNavigate && navigateToStage(stage.key)}
-                data-testid={`stage-nav-${stage.key}`}
-              >
-                {isCompleted ? <Check className="h-3 w-3" /> : <Icon className="h-3 w-3" />}
-                <span className="hidden sm:inline">{t(stage.labelKey)}</span>
-              </button>
+              <HintTooltip hint={t(stageHintKeys[stage.key])}>
+                <button
+                  className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-colors ${
+                    isActive ? "bg-primary text-primary-foreground" :
+                    isCompleted ? "bg-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-500/30 cursor-pointer" :
+                    "bg-muted text-muted-foreground"
+                  } ${canNavigate ? "" : "cursor-default"}`}
+                  onClick={() => canNavigate && navigateToStage(stage.key)}
+                  data-testid={`stage-nav-${stage.key}`}
+                >
+                  {isCompleted ? <Check className="h-3 w-3" /> : <Icon className="h-3 w-3" />}
+                  <span className="hidden sm:inline">{t(stage.labelKey)}</span>
+                </button>
+              </HintTooltip>
               {index < stageConfigs.length - 1 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
             </div>
           );
@@ -1042,19 +1052,21 @@ export default function AdsPage() {
                     return (
                       <div key={speaker} className="flex items-center gap-3 rounded-lg border p-3" data-testid={`speaker-mapping-${sIdx}`}>
                         <span className={`font-semibold text-sm ${speakerColors[colorIdx]}`}>[{speaker}]</span>
-                        <Select
-                          value={adSpeakerVoiceMap[speaker] || ""}
-                          onValueChange={(val) => setAdSpeakerVoiceMap(prev => ({ ...prev, [speaker]: val }))}
-                        >
-                          <SelectTrigger className="flex-1" data-testid={`select-speaker-voice-${sIdx}`}>
-                            <SelectValue placeholder={t("ads.selectVoice")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {allVoiceOptions.map(v => (
-                              <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <HintTooltip hint={t("hints.ads.assignVoice")}>
+                          <Select
+                            value={adSpeakerVoiceMap[speaker] || ""}
+                            onValueChange={(val) => setAdSpeakerVoiceMap(prev => ({ ...prev, [speaker]: val }))}
+                          >
+                            <SelectTrigger className="flex-1" data-testid={`select-speaker-voice-${sIdx}`}>
+                              <SelectValue placeholder={t("ads.selectVoice")} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allVoiceOptions.map(v => (
+                                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </HintTooltip>
                       </div>
                     );
                   })}
@@ -1202,23 +1214,25 @@ export default function AdsPage() {
                             </div>
                             <div className="flex items-center gap-1">
                               {voice.preview_url && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    previewVoice(voice.preview_url!);
-                                  }}
-                                  data-testid={`preview-voice-${voice.voice_id}`}
-                                >
-                                  {previewingVoiceUrl === voice.preview_url ? (
-                                    <PauseCircle className="h-4 w-4" />
-                                  ) : (
-                                    <PlayCircle className="h-4 w-4" />
-                                  )}
-                                </Button>
+                                <HintTooltip hint={t("hints.ads.previewVoiceLibrary")}>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      previewVoice(voice.preview_url!);
+                                    }}
+                                    data-testid={`preview-voice-${voice.voice_id}`}
+                                  >
+                                    {previewingVoiceUrl === voice.preview_url ? (
+                                      <PauseCircle className="h-4 w-4" />
+                                    ) : (
+                                      <PlayCircle className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </HintTooltip>
                               )}
                               {selectedVoiceId === voice.voice_id && (
                                 <Check className="h-4 w-4 text-primary" />
