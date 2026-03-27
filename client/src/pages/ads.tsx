@@ -1335,19 +1335,21 @@ export default function AdsPage() {
                             isCurrent ? "border-green-500 bg-green-500/5" : ""
                           } ${isCurrentlyPlaying ? "bg-primary/5" : ""}`}
                         >
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0"
-                            onClick={() => playVersionAudio(version.url)}
-                            data-testid={`play-version-${idx}`}
-                          >
-                            {isCurrentlyPlaying ? (
-                              <PauseCircle className="h-5 w-5 text-primary" />
-                            ) : (
-                              <PlayCircle className="h-5 w-5" />
-                            )}
-                          </Button>
+                          <HintTooltip hint={t("hints.ads.playAudio")}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              onClick={() => playVersionAudio(version.url)}
+                              data-testid={`play-version-${idx}`}
+                            >
+                              {isCurrentlyPlaying ? (
+                                <PauseCircle className="h-5 w-5 text-primary" />
+                              ) : (
+                                <PlayCircle className="h-5 w-5" />
+                              )}
+                            </Button>
+                          </HintTooltip>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-bold text-muted-foreground">#{idx + 1}</span>
@@ -1609,20 +1611,22 @@ export default function AdsPage() {
                     <Music className="h-4 w-4" />
                     <span className="font-medium">{t("ads.addBackgroundMusic")}</span>
                   </div>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={autoSelectMusic}
-                    disabled={isAutoSelectingMusic}
-                    data-testid="button-auto-select-music"
-                  >
-                    {isAutoSelectingMusic ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="mr-2 h-4 w-4" />
-                    )}
-                    {t("ads.autoSelect")}
-                  </Button>
+                  <HintTooltip hint={t("hints.ads.autoSelectMusic")}>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={autoSelectMusic}
+                      disabled={isAutoSelectingMusic}
+                      data-testid="button-auto-select-music"
+                    >
+                      {isAutoSelectingMusic ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-2 h-4 w-4" />
+                      )}
+                      {t("ads.autoSelect")}
+                    </Button>
+                  </HintTooltip>
                 </div>
 
                 {autoSelectReasoning && (
@@ -1640,18 +1644,20 @@ export default function AdsPage() {
                     onKeyDown={(e) => e.key === "Enter" && searchMusic()}
                     data-testid="input-music-search"
                   />
-                  <Button
-                    variant="outline"
-                    onClick={searchMusic}
-                    disabled={isSearchingMusic}
-                    data-testid="button-search-music"
-                  >
-                    {isSearchingMusic ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      t("ads.find")
-                    )}
-                  </Button>
+                  <HintTooltip hint={t("hints.ads.searchMusic")}>
+                    <Button
+                      variant="outline"
+                      onClick={searchMusic}
+                      disabled={isSearchingMusic}
+                      data-testid="button-search-music"
+                    >
+                      {isSearchingMusic ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        t("ads.find")
+                      )}
+                    </Button>
+                  </HintTooltip>
                 </div>
 
                 {musicSearchResults.length > 0 && (
@@ -1699,14 +1705,16 @@ export default function AdsPage() {
                 )}
 
                 {selectedMusicTrack && (
-                  <Button
-                    className="w-full"
-                    disabled
-                    data-testid="button-mix-audio"
-                  >
-                    <Music className="mr-2 h-4 w-4" />
-                    {t("ads.mixComingSoon")}
-                  </Button>
+                  <HintTooltip hint={t("hints.ads.mixAudio")}>
+                    <Button
+                      className="w-full"
+                      disabled
+                      data-testid="button-mix-audio"
+                    >
+                      <Music className="mr-2 h-4 w-4" />
+                      {t("ads.mixComingSoon")}
+                    </Button>
+                  </HintTooltip>
                 )}
               </div>
             </CardContent>

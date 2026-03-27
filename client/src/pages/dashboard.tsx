@@ -20,7 +20,8 @@ function StatCard({
   description,
   icon: Icon,
   loading,
-  color = "text-muted-foreground"
+  color = "text-muted-foreground",
+  hint
 }: {
   title: string;
   value: string | number;
@@ -28,8 +29,9 @@ function StatCard({
   icon: React.ElementType;
   loading?: boolean;
   color?: string;
+  hint?: string;
 }) {
-  return (
+  const card = (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -45,6 +47,7 @@ function StatCard({
       </CardContent>
     </Card>
   );
+  return hint ? <HintTooltip hint={hint}>{card}</HintTooltip> : card;
 }
 
 export default function Dashboard() {
@@ -163,6 +166,7 @@ export default function Dashboard() {
           icon={Activity}
           color="text-green-600"
           loading={isLoading}
+          hint={t("hints.dashboard.readyToday")}
         />
         <StatCard
           title={t("dashboard.errorsToday")}
@@ -171,6 +175,7 @@ export default function Dashboard() {
           icon={AlertCircle}
           color={todayErrors > 0 ? "text-red-500" : "text-muted-foreground"}
           loading={isLoading}
+          hint={t("hints.dashboard.errorsToday")}
         />
         <StatCard
           title={t("dashboard.autoGeneration")}
@@ -179,6 +184,7 @@ export default function Dashboard() {
           icon={Zap}
           color={autoTypes.length > 0 ? "text-yellow-500" : "text-muted-foreground"}
           loading={isLoading}
+          hint={t("hints.dashboard.autoGeneration")}
         />
         <StatCard
           title={t("dashboard.totalPrograms")}
@@ -186,6 +192,7 @@ export default function Dashboard() {
           description={t("common.allTime")}
           icon={BarChart3}
           loading={isLoading}
+          hint={t("hints.dashboard.totalPrograms")}
         />
       </div>
 

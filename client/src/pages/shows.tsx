@@ -1310,90 +1310,103 @@ export default function ShowsPage() {
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
                             {program.status === "pending" && (
-                              <Button
-                                size="sm"
-                                onClick={() => generateScriptMutation.mutate(program.id)}
-                                disabled={generateScriptMutation.isPending}
-                                data-testid={`button-generate-script-${program.id}`}
-                              >
-                                {generateScriptMutation.isPending ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  t("shows.generateScriptBtn")
-                                )}
-                              </Button>
+                              <HintTooltip hint={t("hints.shows.generateScript")}>
+                                <Button
+                                  size="sm"
+                                  onClick={() => generateScriptMutation.mutate(program.id)}
+                                  disabled={generateScriptMutation.isPending}
+                                  data-testid={`button-generate-script-${program.id}`}
+                                >
+                                  {generateScriptMutation.isPending ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    t("shows.generateScriptBtn")
+                                  )}
+                                </Button>
+                              </HintTooltip>
                             )}
                             {program.scriptText && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => setViewScriptProgram(program)}
-                                data-testid={`button-view-script-${program.id}`}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
+                              <HintTooltip hint={t("hints.shows.viewScript")}>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => setViewScriptProgram(program)}
+                                  data-testid={`button-view-script-${program.id}`}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </HintTooltip>
                             )}
                             {(program.status === "script_ready" || program.audioUrl) && (
-                              <Button
-                                size="sm"
-                                variant={program.audioUrl ? "outline" : "default"}
-                                onClick={() => enqueueAudio(program.id)}
-                                disabled={generatingAudioId === program.id || audioQueue.includes(program.id)}
-                                data-testid={`button-generate-audio-${program.id}`}
-                              >
-                                {generatingAudioId === program.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : audioQueue.includes(program.id) ? (
-                                  <>{t("shows.inQueue", { pos: audioQueue.indexOf(program.id) + 1 })}</>
-                                ) : program.audioUrl ? (
-                                  t("shows.revoice")
-                                ) : (
-                                  t("shows.voiceBtn")
-                                )}
-                              </Button>
+                              <HintTooltip hint={t("hints.shows.generateAudio")}>
+                                <Button
+                                  size="sm"
+                                  variant={program.audioUrl ? "outline" : "default"}
+                                  onClick={() => enqueueAudio(program.id)}
+                                  disabled={generatingAudioId === program.id || audioQueue.includes(program.id)}
+                                  data-testid={`button-generate-audio-${program.id}`}
+                                >
+                                  {generatingAudioId === program.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : audioQueue.includes(program.id) ? (
+                                    <>{t("shows.inQueue", { pos: audioQueue.indexOf(program.id) + 1 })}</>
+                                  ) : program.audioUrl ? (
+                                    t("shows.revoice")
+                                  ) : (
+                                    t("shows.voiceBtn")
+                                  )}
+                                </Button>
+                              </HintTooltip>
                             )}
                             {program.audioUrl && (
                               <>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={() => playAudio(program.audioUrl!, program.id)}
-                                  data-testid={`button-play-${program.id}`}
-                                >
-                                  {playingProgramId === program.id ? (
-                                    <Pause className="h-4 w-4" />
-                                  ) : (
-                                    <Play className="h-4 w-4" />
-                                  )}
-                                </Button>
-                                <a href={`/api/programs/${program.id}/download-audio`} download>
-                                  <Button size="icon" variant="outline" data-testid={`button-download-${program.id}`}>
-                                    <Download className="h-4 w-4" />
+                                <HintTooltip hint={t("hints.shows.playAudio")}>
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    onClick={() => playAudio(program.audioUrl!, program.id)}
+                                    data-testid={`button-play-${program.id}`}
+                                  >
+                                    {playingProgramId === program.id ? (
+                                      <Pause className="h-4 w-4" />
+                                    ) : (
+                                      <Play className="h-4 w-4" />
+                                    )}
                                   </Button>
-                                </a>
-                                <Button
-                                  size="icon"
-                                  variant={program.audioUrl?.includes("_isolated") ? "default" : "outline"}
-                                  className={program.audioUrl?.includes("_isolated") ? "bg-green-600 hover:bg-green-700 text-white" : ""}
-                                  title={program.audioUrl?.includes("_isolated") ? t("shows.noiseRemovedMark") : t("shows.voiceIsolator")}
-                                  onClick={() => voiceIsolateMutation.mutate(program.id)}
-                                  disabled={isolatingId === program.id}
-                                  data-testid={`button-isolate-${program.id}`}
-                                >
-                                  {isolatingId === program.id ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <AudioLines className="h-4 w-4" />
-                                  )}
-                                </Button>
+                                </HintTooltip>
+                                <HintTooltip hint={t("hints.shows.downloadAudio")}>
+                                  <a href={`/api/programs/${program.id}/download-audio`} download>
+                                    <Button size="icon" variant="outline" data-testid={`button-download-${program.id}`}>
+                                      <Download className="h-4 w-4" />
+                                    </Button>
+                                  </a>
+                                </HintTooltip>
+                                <HintTooltip hint={t("hints.shows.isolateVoice")}>
+                                  <Button
+                                    size="icon"
+                                    variant={program.audioUrl?.includes("_isolated") ? "default" : "outline"}
+                                    className={program.audioUrl?.includes("_isolated") ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                                    onClick={() => voiceIsolateMutation.mutate(program.id)}
+                                    disabled={isolatingId === program.id}
+                                    data-testid={`button-isolate-${program.id}`}
+                                  >
+                                    {isolatingId === program.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <AudioLines className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </HintTooltip>
                               </>
                             )}
                             <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button size="icon" variant="ghost" data-testid={`button-delete-${program.id}`}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
+                              <HintTooltip hint={t("hints.shows.deleteProgram")}>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="icon" variant="ghost" data-testid={`button-delete-${program.id}`}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                              </HintTooltip>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>{t("shows.deleteProgram")}</AlertDialogTitle>

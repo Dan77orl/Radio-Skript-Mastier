@@ -1204,7 +1204,14 @@
       "toggleFirecrawl": "Enable web research to enrich scripts with real-time data from the internet",
       "toggleAutoGenerate": "Automatically generate scripts on schedule without manual intervention",
       "toggleAutoVoice": "Automatically synthesize audio after scripts are generated",
-      "toggleAutoUpload": "Automatically upload finished audio to cloud storage"
+      "toggleAutoUpload": "Automatically upload finished audio to cloud storage",
+      "generateScript": "Generate an AI script for this program",
+      "viewScript": "View the generated script text",
+      "generateAudio": "Synthesize audio from the script using the assigned voice",
+      "playAudio": "Play or pause the generated audio",
+      "downloadAudio": "Download the audio file to your computer",
+      "isolateVoice": "Remove background noise from the audio using voice isolation",
+      "deleteProgram": "Delete this program permanently"
     },
     "ads": {
       "generateVariants": "Generate several AI-written script variants to choose from",
@@ -1238,7 +1245,11 @@
       "viewAll": "See all programs and their details",
       "goToShows": "Go to the Shows page to manage your show types and scripts",
       "goToPodvodki": "Go to the Dialog Generator for creating daily host dialogs",
-      "allShows": "View detailed status of all show types"
+      "allShows": "View detailed status of all show types",
+      "readyToday": "Programs ready today vs daily target",
+      "errorsToday": "Programs that encountered errors and need attention",
+      "autoGeneration": "Show types with automatic generation enabled",
+      "totalPrograms": "Total number of programs created across all time"
     },
     "voices": {
       "addPersona": "Create a new voice persona by selecting an ElevenLabs voice",
