@@ -126,15 +126,15 @@ export default function Dashboard() {
     const hint = statusHints[status] || statusHints.pending;
     switch (status) {
       case "ready":
-        return <HintTooltip hint={hint}><Badge variant="default" className="bg-green-600 text-xs"><CheckCircle className="mr-1 h-3 w-3" />{t("statuses.ready")}</Badge></HintTooltip>;
+        return <HintTooltip hint={hint}><span><Badge variant="default" className="bg-green-600 text-xs"><CheckCircle className="mr-1 h-3 w-3" />{t("statuses.ready")}</Badge></span></HintTooltip>;
       case "script_ready":
-        return <HintTooltip hint={hint}><Badge variant="secondary" className="text-xs"><CheckCircle className="mr-1 h-3 w-3" />{t("statuses.script_ready")}</Badge></HintTooltip>;
+        return <HintTooltip hint={hint}><span><Badge variant="secondary" className="text-xs"><CheckCircle className="mr-1 h-3 w-3" />{t("statuses.script_ready")}</Badge></span></HintTooltip>;
       case "generating":
-        return <HintTooltip hint={hint}><Badge variant="secondary" className="text-xs"><Clock className="mr-1 h-3 w-3 animate-spin" />{t("statuses.generating")}</Badge></HintTooltip>;
+        return <HintTooltip hint={hint}><span><Badge variant="secondary" className="text-xs"><Clock className="mr-1 h-3 w-3 animate-spin" />{t("statuses.generating")}</Badge></span></HintTooltip>;
       case "error":
-        return <HintTooltip hint={hint}><Badge variant="destructive" className="text-xs"><AlertCircle className="mr-1 h-3 w-3" />{t("statuses.error")}</Badge></HintTooltip>;
+        return <HintTooltip hint={hint}><span><Badge variant="destructive" className="text-xs"><AlertCircle className="mr-1 h-3 w-3" />{t("statuses.error")}</Badge></span></HintTooltip>;
       default:
-        return <HintTooltip hint={hint}><Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3" />{t("statuses.pending")}</Badge></HintTooltip>;
+        return <HintTooltip hint={hint}><span><Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3" />{t("statuses.pending")}</Badge></span></HintTooltip>;
     }
   }
 

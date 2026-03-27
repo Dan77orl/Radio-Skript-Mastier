@@ -3405,11 +3405,13 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
       if (!filePath || filePath.includes("..")) {
         return res.status(400).json({ error: "Invalid path" });
       }
-      const audioPath = path.join(process.cwd(), "public", "audio", filePath);
+      const decodedPath = decodeURIComponent(filePath);
+      const audioPath = path.join(process.cwd(), "public", "audio", decodedPath);
       try {
         await fs.access(audioPath);
       } catch {
-        return res.status(404).json({ error: "Audio file not found" });
+        console.error(`Audio file not found: ${audioPath}`);
+        return res.status(404).json({ error: "Audio file not found", path: decodedPath });
       }
       const fileStat = await fs.stat(audioPath);
       const fileSize = fileStat.size;

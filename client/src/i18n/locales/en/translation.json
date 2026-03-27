@@ -708,6 +708,7 @@
     "inQueue": "In queue ({{pos}})",
     "revoice": "Re-voice",
     "voiceBtn": "Voice",
+    "audioPlaybackError": "Could not play audio file",
     "noiseRemovedMark": "Noise removed",
     "voiceIsolator": "Voice isolator — remove noise",
     "deleteProgram": "Delete episode?",

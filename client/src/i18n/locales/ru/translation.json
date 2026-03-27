@@ -726,6 +726,7 @@
     "inQueue": "В очереди ({{pos}})",
     "revoice": "Переозвучить",
     "voiceBtn": "Озвучить",
+    "audioPlaybackError": "Не удалось воспроизвести аудиофайл",
     "noiseRemovedMark": "Шум убран ✓",
     "voiceIsolator": "Голосоизолятор — убрать шум",
     "deleteProgram": "Удалить передачу?",

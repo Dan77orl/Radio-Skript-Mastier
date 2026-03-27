@@ -177,13 +177,13 @@ export default function AutomationsPage() {
     const hint = automationStatusHints[status] || t("hints.automations.statusDefault");
     switch (status) {
       case "running":
-        return <HintTooltip hint={hint}><Badge variant="secondary"><Loader2 className="h-3 w-3 mr-1 animate-spin" />{t("common.loading")}</Badge></HintTooltip>;
+        return <HintTooltip hint={hint}><span><Badge variant="secondary"><Loader2 className="h-3 w-3 mr-1 animate-spin" />{t("common.loading")}</Badge></span></HintTooltip>;
       case "completed":
-        return <HintTooltip hint={hint}><Badge variant="default"><CheckCircle className="h-3 w-3 mr-1" />{t("common.success")}</Badge></HintTooltip>;
+        return <HintTooltip hint={hint}><span><Badge variant="default"><CheckCircle className="h-3 w-3 mr-1" />{t("common.success")}</Badge></span></HintTooltip>;
       case "error":
-        return <HintTooltip hint={hint}><Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />{t("common.error")}</Badge></HintTooltip>;
+        return <HintTooltip hint={hint}><span><Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />{t("common.error")}</Badge></span></HintTooltip>;
       default:
-        return <HintTooltip hint={hint}><Badge variant="outline">{status}</Badge></HintTooltip>;
+        return <HintTooltip hint={hint}><span><Badge variant="outline">{status}</Badge></span></HintTooltip>;
     }
   };
 
@@ -527,9 +527,9 @@ export default function AutomationsPage() {
                     </CardDescription>
                   </div>
                   <HintTooltip hint={automation.isActive ? t("hints.automations.badgeActive") : t("hints.automations.badgeInactive")}>
-                    <Badge variant={automation.isActive ? "default" : "secondary"} className="shrink-0">
+                    <span><Badge variant={automation.isActive ? "default" : "secondary"} className="shrink-0">
                       {automation.isActive ? t("common.active") : t("common.inactive")}
-                    </Badge>
+                    </Badge></span>
                   </HintTooltip>
                 </div>
               </CardHeader>

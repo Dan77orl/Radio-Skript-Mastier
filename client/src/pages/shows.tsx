@@ -481,8 +481,24 @@ export default function ShowsPage() {
       setAudioDuration(audio.duration);
     };
     audio.onended = () => stopAudio();
-    audio.onerror = () => stopAudio();
-    audio.play().catch(() => stopAudio());
+    audio.onerror = (e) => {
+      console.error("Audio playback error:", streamUrl, audio.error?.message || audio.error?.code || e);
+      toast({
+        title: t("shows.error"),
+        description: t("shows.audioPlaybackError", "Audio file could not be played"),
+        variant: "destructive",
+      });
+      stopAudio();
+    };
+    audio.play().catch((err) => {
+      console.error("Audio play() failed:", streamUrl, err);
+      toast({
+        title: t("shows.error"),
+        description: err.message || t("shows.audioPlaybackError", "Audio file could not be played"),
+        variant: "destructive",
+      });
+      stopAudio();
+    });
     setPlayingProgramId(programId);
     setAudioCurrentTime(0);
     setAudioDuration(0);
@@ -536,7 +552,7 @@ export default function ShowsPage() {
     };
     const config = variants[status] || variants.pending;
     const hint = showsStatusHints[status] || showsStatusHints.pending;
-    return <HintTooltip hint={hint}><Badge variant={config.variant}>{t(config.labelKey)}</Badge></HintTooltip>;
+    return <HintTooltip hint={hint}><span><Badge variant={config.variant}>{t(config.labelKey)}</Badge></span></HintTooltip>;
   };
 
   const speakerColors = [
