@@ -6220,5 +6220,35 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
     }
   });
 
+  app.post("/api/admin/fix-orphan-programs", async (req, res) => {
+    try {
+      if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Forbidden" });
+
+      const { pool } = await import("./db");
+      const typesResult = await pool.query("SELECT id, user_id FROM program_types WHERE user_id IS NOT NULL");
+      const typeOwnerMap = new Map<string, string>();
+      for (const t of typesResult.rows) {
+        typeOwnerMap.set(t.id, t.user_id);
+      }
+
+      const orphansResult = await pool.query("SELECT id, program_type_id FROM programs WHERE user_id IS NULL");
+      let fixed = 0;
+      for (const p of orphansResult.rows) {
+        const ownerId = typeOwnerMap.get(p.program_type_id);
+        if (ownerId) {
+          await pool.query("UPDATE programs SET user_id = $1 WHERE id = $2", [ownerId, p.id]);
+          fixed++;
+        }
+      }
+
+      res.json({ message: `Fixed ${fixed} orphan programs out of ${orphansResult.rows.length}` });
+    } catch (error) {
+      console.error("Error fixing orphan programs:", error);
+      res.status(500).json({ error: "Failed to fix orphan programs" });
+    }
+  });
+
   return httpServer;
 }
