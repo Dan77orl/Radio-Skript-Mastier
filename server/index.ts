@@ -91,6 +91,30 @@ app.use((req, res, next) => {
   registerVoiceAgentRoutes(app);
   await registerRoutes(httpServer, app);
 
+  try {
+    const { pool: dbPool } = await import("./db");
+    const orphanCheck = await dbPool.query("SELECT COUNT(*) as cnt FROM programs WHERE user_id IS NULL");
+    const orphanCount = parseInt(orphanCheck.rows[0]?.cnt || "0");
+    if (orphanCount > 0) {
+      console.log(`[migration] Found ${orphanCount} orphan programs, fixing...`);
+      const typesResult = await dbPool.query("SELECT id, user_id FROM program_types WHERE user_id IS NOT NULL");
+      const typeMap = new Map<string, string>();
+      for (const t of typesResult.rows) typeMap.set(t.id, t.user_id);
+      const orphans = await dbPool.query("SELECT id, program_type_id FROM programs WHERE user_id IS NULL");
+      let fixed = 0;
+      for (const p of orphans.rows) {
+        const ownerId = typeMap.get(p.program_type_id);
+        if (ownerId) {
+          await dbPool.query("UPDATE programs SET user_id = $1 WHERE id = $2", [ownerId, p.id]);
+          fixed++;
+        }
+      }
+      console.log(`[migration] Fixed ${fixed}/${orphanCount} orphan programs`);
+    }
+  } catch (e) {
+    console.error("[migration] Error fixing orphan programs:", e);
+  }
+
   // Serve static files from public folder (audio files, etc.)
   app.use(express.static(path.join(process.cwd(), "public")));
 
