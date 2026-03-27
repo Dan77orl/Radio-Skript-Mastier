@@ -19,6 +19,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, Play, Trash2, Clock, CheckCircle, XCircle, Loader2, Zap, Settings2, Mic, MicOff } from "lucide-react";
+import { HintTooltip } from "@/components/hint-tooltip";
 import type { Automation, AutomationRun, Voice, ProgramType } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -273,12 +274,14 @@ export default function AutomationsPage() {
           </p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-create-automation">
-              <Plus className="h-4 w-4 mr-2" />
-              {t("automations.createAutomation")}
-            </Button>
-          </DialogTrigger>
+          <HintTooltip hint={t("hints.automations.createAutomation")}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-create-automation">
+                <Plus className="h-4 w-4 mr-2" />
+                {t("automations.createAutomation")}
+              </Button>
+            </DialogTrigger>
+          </HintTooltip>
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>{t("automations.newAutomation")}</DialogTitle>
@@ -539,47 +542,55 @@ export default function AutomationsPage() {
                 <Separator />
 
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    size="sm"
-                    onClick={() => runMutation.mutate(automation.id)}
-                    disabled={runMutation.isPending || !automation.isActive}
-                    data-testid={`button-run-${automation.id}`}
-                  >
-                    {runMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    ) : (
-                      <Play className="h-4 w-4 mr-1" />
-                    )}
-                    {t("automations.run")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setShowRuns(showRuns === automation.id ? null : automation.id);
-                    }}
-                    data-testid={`button-runs-${automation.id}`}
-                  >
-                    <Clock className="h-4 w-4 mr-1" />
-                    {t("automations.history")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setSelectedAutomation(automation)}
-                    data-testid={`button-edit-${automation.id}`}
-                  >
-                    <Settings2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => deleteMutation.mutate(automation.id)}
-                    disabled={deleteMutation.isPending}
-                    data-testid={`button-delete-${automation.id}`}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <HintTooltip hint={t("hints.automations.runNow")}>
+                    <Button
+                      size="sm"
+                      onClick={() => runMutation.mutate(automation.id)}
+                      disabled={runMutation.isPending || !automation.isActive}
+                      data-testid={`button-run-${automation.id}`}
+                    >
+                      {runMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Play className="h-4 w-4 mr-1" />
+                      )}
+                      {t("automations.run")}
+                    </Button>
+                  </HintTooltip>
+                  <HintTooltip hint={t("hints.automations.viewRuns")}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setShowRuns(showRuns === automation.id ? null : automation.id);
+                      }}
+                      data-testid={`button-runs-${automation.id}`}
+                    >
+                      <Clock className="h-4 w-4 mr-1" />
+                      {t("automations.history")}
+                    </Button>
+                  </HintTooltip>
+                  <HintTooltip hint={t("hints.automations.editAutomation")}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSelectedAutomation(automation)}
+                      data-testid={`button-edit-${automation.id}`}
+                    >
+                      <Settings2 className="h-4 w-4" />
+                    </Button>
+                  </HintTooltip>
+                  <HintTooltip hint={t("hints.automations.deleteAutomation")}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => deleteMutation.mutate(automation.id)}
+                      disabled={deleteMutation.isPending}
+                      data-testid={`button-delete-${automation.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </HintTooltip>
                 </div>
 
                 {showRuns === automation.id && (

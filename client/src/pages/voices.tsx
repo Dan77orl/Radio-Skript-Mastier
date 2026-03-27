@@ -39,6 +39,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Play, Pause, Plus, Trash2, Volume2, User, Users, Mic, Edit2, Search, Loader2, Globe } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VoiceInput } from "@/components/voice-input";
+import { HintTooltip } from "@/components/hint-tooltip";
 import type { Voice, ProgramType } from "@shared/schema";
 
 interface ElevenLabsVoice {
@@ -333,12 +334,14 @@ export default function VoicesPage() {
             {voicesCount} {t("voices.personas")}
           </Badge>
           <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (open) { setVoiceTab("my"); setVoiceSearch(""); setVoiceSearchQuery(""); setSearchGender("all"); } setIsAddDialogOpen(open); }}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-add-voice">
-                <Plus className="mr-2 h-4 w-4" />
-                {t("voices.addPersona")}
-              </Button>
-            </DialogTrigger>
+            <HintTooltip hint={t("hints.voices.addPersona")}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-add-voice">
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t("voices.addPersona")}
+                </Button>
+              </DialogTrigger>
+            </HintTooltip>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{t("voices.addPersonaTitle")}</DialogTitle>
@@ -684,20 +687,24 @@ export default function VoicesPage() {
                         )}
                       </Button>
                     )}
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleEditVoice(voice)}
-                      data-testid={`button-edit-${voice.id}`}
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
+                    <HintTooltip hint={t("hints.voices.editVoice")}>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleEditVoice(voice)}
+                        data-testid={`button-edit-${voice.id}`}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    </HintTooltip>
                     <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="icon">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
+                      <HintTooltip hint={t("hints.voices.deleteVoice")}>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="icon">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                      </HintTooltip>
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>{t("voices.deleteVoice")}?</AlertDialogTitle>

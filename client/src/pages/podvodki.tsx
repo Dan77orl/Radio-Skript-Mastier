@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { HintTooltip } from "@/components/hint-tooltip";
 import { Wand2, Calendar, Settings2 } from "lucide-react";
 import Generator from "./generator";
 import Schedule from "./schedule";
@@ -21,18 +22,24 @@ export default function Podvodki() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="settings" className="gap-2" data-testid="tab-schedule-settings">
-            <Settings2 className="h-4 w-4" />
-            {t("podvodki.settings")}
-          </TabsTrigger>
-          <TabsTrigger value="generator" className="gap-2" data-testid="tab-generator">
-            <Wand2 className="h-4 w-4" />
-            {t("podvodki.generator")}
-          </TabsTrigger>
-          <TabsTrigger value="schedule" className="gap-2" data-testid="tab-schedule">
-            <Calendar className="h-4 w-4" />
-            {t("podvodki.schedule")}
-          </TabsTrigger>
+          <HintTooltip hint={t("hints.podvodki.settingsTab")}>
+            <TabsTrigger value="settings" className="gap-2" data-testid="tab-schedule-settings">
+              <Settings2 className="h-4 w-4" />
+              {t("podvodki.settings")}
+            </TabsTrigger>
+          </HintTooltip>
+          <HintTooltip hint={t("hints.podvodki.generatorTab")}>
+            <TabsTrigger value="generator" className="gap-2" data-testid="tab-generator">
+              <Wand2 className="h-4 w-4" />
+              {t("podvodki.generator")}
+            </TabsTrigger>
+          </HintTooltip>
+          <HintTooltip hint={t("hints.podvodki.scheduleTab")}>
+            <TabsTrigger value="schedule" className="gap-2" data-testid="tab-schedule">
+              <Calendar className="h-4 w-4" />
+              {t("podvodki.schedule")}
+            </TabsTrigger>
+          </HintTooltip>
         </TabsList>
 
         <TabsContent value="generator" className="mt-4">

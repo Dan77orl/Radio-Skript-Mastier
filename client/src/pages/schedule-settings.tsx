@@ -21,6 +21,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getCleanVoiceName } from "@/lib/utils";
+import { HintTooltip } from "@/components/hint-tooltip";
 import type { Voice, InsertScheduleTemplate, InsertHostShift, CustomHoliday, InsertCustomHoliday } from "@shared/schema";
 
 interface ScheduleTemplate {
@@ -390,10 +391,12 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
                   {t("scheduleSettings.subtitle")}
                 </CardDescription>
               </div>
-              <Button onClick={openCreateDialog} data-testid="button-create-template">
-                <Plus className="mr-2 h-4 w-4" />
-                {t("common.add")}
-              </Button>
+              <HintTooltip hint={t("hints.scheduleSettings.createTemplate")}>
+                <Button onClick={openCreateDialog} data-testid="button-create-template">
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t("common.add")}
+                </Button>
+              </HintTooltip>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -436,10 +439,12 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
                 <PartyPopper className="h-4 w-4" />
                 {t("scheduleSettings.holidays")}
               </CardTitle>
-              <Button variant="outline" size="sm" onClick={() => openHolidayDialog()} data-testid="button-add-holiday">
-                <Plus className="mr-1 h-3 w-3" />
-                {t("common.add")}
-              </Button>
+              <HintTooltip hint={t("hints.scheduleSettings.addHoliday")}>
+                <Button variant="outline" size="sm" onClick={() => openHolidayDialog()} data-testid="button-add-holiday">
+                  <Plus className="mr-1 h-3 w-3" />
+                  {t("common.add")}
+                </Button>
+              </HintTooltip>
             </CardHeader>
             <CardContent>
               {customHolidays && customHolidays.length > 0 && (

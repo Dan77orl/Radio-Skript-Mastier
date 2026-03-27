@@ -1227,7 +1227,60 @@
       "uploadAttachment": "Upload documents to use as knowledge base for AI content generation"
     },
     "dashboard": {
-      "viewAll": "See all programs and their details"
+      "viewAll": "See all programs and their details",
+      "goToShows": "Go to the Shows page to manage your show types and scripts",
+      "goToPodvodki": "Go to the Dialog Generator for creating daily host dialogs",
+      "allShows": "View detailed status of all show types"
+    },
+    "voices": {
+      "addPersona": "Create a new voice persona by selecting an ElevenLabs voice",
+      "previewVoice": "Listen to a preview of this voice",
+      "editVoice": "Edit this voice persona's name, gender, or assigned shows",
+      "deleteVoice": "Remove this voice persona permanently",
+      "searchLibrary": "Search the ElevenLabs shared voice library for new voices",
+      "assignShows": "Choose which show types this voice should be used for"
+    },
+    "generator": {
+      "selectDate": "Pick a date to view or generate dialogs for that day",
+      "generateAll": "Generate AI scripts for all empty slots on the selected day",
+      "sendToAutomation": "Send all ready scripts to the automation queue for audio processing",
+      "searchWeb": "Search the web for current topics to enrich dialog content",
+      "autoTopics": "Let AI suggest relevant search topics based on your prompt",
+      "addTopic": "Add a custom search topic for web research",
+      "saveDailyPrompt": "Save the daily prompt that guides AI dialog generation",
+      "regenerateSlot": "Regenerate this specific slot with a new AI-written dialog",
+      "editSlot": "Edit the text of this dialog slot manually",
+      "saveSlotEdit": "Save your manual edits to this dialog"
+    },
+    "schedule": {
+      "prevWeek": "Navigate to the previous week",
+      "nextWeek": "Navigate to the next week",
+      "today": "Jump to the current week",
+      "viewDay": "View all dialog details for this day",
+      "autoGenerate": "Auto-generate dialogs for this day using AI",
+      "playAudio": "Play the audio for this dialog"
+    },
+    "scheduleSettings": {
+      "createTemplate": "Create a new schedule template defining broadcast hours and slot frequency",
+      "editTemplate": "Edit this schedule template's settings",
+      "deleteTemplate": "Remove this schedule template permanently",
+      "addShift": "Add a host shift to assign specific voices to time blocks",
+      "addHoliday": "Add a custom holiday that affects content generation",
+      "editHoliday": "Edit this custom holiday",
+      "deleteHoliday": "Remove this custom holiday"
+    },
+    "automations": {
+      "createAutomation": "Create a new automation rule for scheduled content generation",
+      "runNow": "Run this automation immediately without waiting for the schedule",
+      "viewRuns": "View the history of runs for this automation",
+      "editAutomation": "Edit this automation's settings and schedule",
+      "deleteAutomation": "Remove this automation permanently",
+      "saveAutomation": "Save the automation settings"
+    },
+    "podvodki": {
+      "settingsTab": "Configure schedule templates, host shifts, and holidays",
+      "generatorTab": "Generate dialog scripts for specific dates",
+      "scheduleTab": "View the weekly calendar of generated dialogs"
     }
   }
 }

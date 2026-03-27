@@ -11,6 +11,7 @@ import {
   Radio, Zap, Volume2, Upload, AudioLines, TrendingUp, Activity, Podcast,
   ArrowRight, BarChart3
 } from "lucide-react";
+import { HintTooltip } from "@/components/hint-tooltip";
 import type { Program, ProgramType, Settings } from "@shared/schema";
 
 function StatCard({
@@ -136,16 +137,20 @@ export default function Dashboard() {
         </div>
         <div className="flex gap-2">
           <Link href="/shows">
-            <Button variant="outline" data-testid="button-go-shows">
-              <Podcast className="mr-2 h-4 w-4" />
-              {t("nav.shows")}
-            </Button>
+            <HintTooltip hint={t("hints.dashboard.goToShows")}>
+              <Button variant="outline" data-testid="button-go-shows">
+                <Podcast className="mr-2 h-4 w-4" />
+                {t("nav.shows")}
+              </Button>
+            </HintTooltip>
           </Link>
           <Link href="/podvodki">
-            <Button variant="outline" data-testid="button-go-podvodki">
-              <Mic className="mr-2 h-4 w-4" />
-              {t("nav.podvodki")}
-            </Button>
+            <HintTooltip hint={t("hints.dashboard.goToPodvodki")}>
+              <Button variant="outline" data-testid="button-go-podvodki">
+                <Mic className="mr-2 h-4 w-4" />
+                {t("nav.podvodki")}
+              </Button>
+            </HintTooltip>
           </Link>
         </div>
       </div>
@@ -193,10 +198,12 @@ export default function Dashboard() {
                 <CardDescription>{t("dashboard.statusForDate", { date: new Date().toLocaleDateString(undefined, { day: "numeric", month: "long" }) })}</CardDescription>
               </div>
               <Link href="/shows">
-                <Button variant="ghost" size="sm">
-                  {t("dashboard.allShows")}
-                  <ArrowRight className="ml-1 h-4 w-4" />
-                </Button>
+                <HintTooltip hint={t("hints.dashboard.allShows")}>
+                  <Button variant="ghost" size="sm">
+                    {t("dashboard.allShows")}
+                    <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </HintTooltip>
               </Link>
             </div>
           </CardHeader>

@@ -13,6 +13,7 @@ import { Wand2, Loader2, Calendar, Clock, User, Users, CheckCircle, Edit3, Send,
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { VoiceInput } from "@/components/voice-input";
+import { HintTooltip } from "@/components/hint-tooltip";
 import type { Settings, Dialog, NewsItem, Voice } from "@shared/schema";
 
 interface SlotInfo {
@@ -447,33 +448,37 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-3">
-                <Button
-                  onClick={onGenerateAllSlots}
-                  disabled={generatingDates.has(selectedDate)}
-                  data-testid="button-generate-all"
-                >
-                  {generatingDates.has(selectedDate) ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Wand2 className="mr-2 h-4 w-4" />
-                  )}
-                  {t("generator.generateAllSlots", { count: totalSlots })}
-                </Button>
-                
-                {hasAnyDialogs && (
+                <HintTooltip hint={t("hints.generator.generateAll")}>
                   <Button
-                    variant="outline"
-                    onClick={onSendToAutomation}
-                    disabled={sendToAutomationMutation.isPending || readyDialogsCount === 0}
-                    data-testid="button-send-automation"
+                    onClick={onGenerateAllSlots}
+                    disabled={generatingDates.has(selectedDate)}
+                    data-testid="button-generate-all"
                   >
-                    {sendToAutomationMutation.isPending ? (
+                    {generatingDates.has(selectedDate) ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                      <Send className="mr-2 h-4 w-4" />
+                      <Wand2 className="mr-2 h-4 w-4" />
                     )}
-                    {t("generator.sendToAutomation", { count: readyDialogsCount })}
+                    {t("generator.generateAllSlots", { count: totalSlots })}
                   </Button>
+                </HintTooltip>
+                
+                {hasAnyDialogs && (
+                  <HintTooltip hint={t("hints.generator.sendToAutomation")}>
+                    <Button
+                      variant="outline"
+                      onClick={onSendToAutomation}
+                      disabled={sendToAutomationMutation.isPending || readyDialogsCount === 0}
+                      data-testid="button-send-automation"
+                    >
+                      {sendToAutomationMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="mr-2 h-4 w-4" />
+                      )}
+                      {t("generator.sendToAutomation", { count: readyDialogsCount })}
+                    </Button>
+                  </HintTooltip>
                 )}
               </div>
 
@@ -518,19 +523,21 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                   {t("generator.dailyPrompt")}
                 </CardTitle>
                 {isDailyPromptDirty && (
-                  <Button
-                    size="sm"
-                    onClick={() => saveDailyPromptMutation.mutate(dailyPromptValue)}
-                    disabled={saveDailyPromptMutation.isPending}
-                    data-testid="button-save-daily-prompt"
-                  >
-                    {saveDailyPromptMutation.isPending ? (
-                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                    ) : (
-                      <Save className="mr-2 h-3 w-3" />
-                    )}
-                    {t("common.save")}
-                  </Button>
+                  <HintTooltip hint={t("hints.generator.saveDailyPrompt")}>
+                    <Button
+                      size="sm"
+                      onClick={() => saveDailyPromptMutation.mutate(dailyPromptValue)}
+                      disabled={saveDailyPromptMutation.isPending}
+                      data-testid="button-save-daily-prompt"
+                    >
+                      {saveDailyPromptMutation.isPending ? (
+                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                      ) : (
+                        <Save className="mr-2 h-3 w-3" />
+                      )}
+                      {t("common.save")}
+                    </Button>
+                  </HintTooltip>
                 )}
               </div>
               <CardDescription>
@@ -947,35 +954,39 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                 {t("generator.searchWebContent")}
               </CardDescription>
               <div className="flex flex-wrap gap-1.5 pt-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => autoTopicsMutation.mutate({ prompt: dailyPromptValue || settings?.dailyPrompt || "", existingTopics: firecrawlTopics })}
-                  disabled={autoTopicsMutation.isPending}
-                  data-testid="button-auto-topics"
-                >
-                  {autoTopicsMutation.isPending ? (
-                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Wand2 className="mr-1 h-3.5 w-3.5" />
-                  )}
-                  {t("generator.suggestTopics")}
-                </Button>
-                <Button
-                  size="sm"
-                  variant={firecrawlContent ? "default" : "outline"}
-                  className={firecrawlContent ? "bg-green-600 hover:bg-green-700" : ""}
-                  onClick={() => firecrawlSearchMutation.mutate(firecrawlTopics)}
-                  disabled={firecrawlSearchMutation.isPending || firecrawlTopics.length === 0}
-                  data-testid="button-firecrawl-search"
-                >
-                  {firecrawlSearchMutation.isPending ? (
-                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Search className="mr-1 h-3.5 w-3.5" />
-                  )}
-                  {firecrawlContent ? t("common.refresh") : t("common.find")}
-                </Button>
+                <HintTooltip hint={t("hints.generator.autoTopics")}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => autoTopicsMutation.mutate({ prompt: dailyPromptValue || settings?.dailyPrompt || "", existingTopics: firecrawlTopics })}
+                    disabled={autoTopicsMutation.isPending}
+                    data-testid="button-auto-topics"
+                  >
+                    {autoTopicsMutation.isPending ? (
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Wand2 className="mr-1 h-3.5 w-3.5" />
+                    )}
+                    {t("generator.suggestTopics")}
+                  </Button>
+                </HintTooltip>
+                <HintTooltip hint={t("hints.generator.searchWeb")}>
+                  <Button
+                    size="sm"
+                    variant={firecrawlContent ? "default" : "outline"}
+                    className={firecrawlContent ? "bg-green-600 hover:bg-green-700" : ""}
+                    onClick={() => firecrawlSearchMutation.mutate(firecrawlTopics)}
+                    disabled={firecrawlSearchMutation.isPending || firecrawlTopics.length === 0}
+                    data-testid="button-firecrawl-search"
+                  >
+                    {firecrawlSearchMutation.isPending ? (
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Search className="mr-1 h-3.5 w-3.5" />
+                    )}
+                    {firecrawlContent ? t("common.refresh") : t("common.find")}
+                  </Button>
+                </HintTooltip>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">

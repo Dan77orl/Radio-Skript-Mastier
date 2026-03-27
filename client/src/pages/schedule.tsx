@@ -21,6 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { VoiceInput } from "@/components/voice-input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { HintTooltip } from "@/components/hint-tooltip";
 import type { Dialog, Settings, ScheduleTemplate } from "@shared/schema";
 
 interface Holiday {
@@ -216,16 +217,22 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
           </div>
         )}
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => navigateWeek(-1)} data-testid="button-prev-week">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" onClick={goToToday} data-testid="button-today">
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {t("common.today")}
-          </Button>
-          <Button variant="outline" size="icon" onClick={() => navigateWeek(1)} data-testid="button-next-week">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <HintTooltip hint={t("hints.schedule.prevWeek")}>
+            <Button variant="outline" size="icon" onClick={() => navigateWeek(-1)} data-testid="button-prev-week">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          </HintTooltip>
+          <HintTooltip hint={t("hints.schedule.today")}>
+            <Button variant="outline" onClick={goToToday} data-testid="button-today">
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {t("common.today")}
+            </Button>
+          </HintTooltip>
+          <HintTooltip hint={t("hints.schedule.nextWeek")}>
+            <Button variant="outline" size="icon" onClick={() => navigateWeek(1)} data-testid="button-next-week">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </HintTooltip>
         </div>
       </div>
 
