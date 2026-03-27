@@ -770,20 +770,22 @@ export default function Generator({ embedded }: { embedded?: boolean }) {
                                             className="min-h-[60px] text-xs"
                                             data-testid={`textarea-regen-${slotNumber}`}
                                           />
-                                          <Button
-                                            size="sm"
-                                            variant="secondary"
-                                            onClick={() => saveEdit(dialog)}
-                                            disabled={regenerateSlotMutation.isPending}
-                                            data-testid={`button-regen-${slotNumber}`}
-                                          >
-                                            {regenerateSlotMutation.isPending ? (
-                                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                            ) : (
-                                              <RefreshCw className="mr-1 h-3 w-3" />
-                                            )}
-                                            {t("generator.regenerate")}
-                                          </Button>
+                                          <HintTooltip hint={t("hints.generator.regenerateSlot")}>
+                                            <Button
+                                              size="sm"
+                                              variant="secondary"
+                                              onClick={() => saveEdit(dialog)}
+                                              disabled={regenerateSlotMutation.isPending}
+                                              data-testid={`button-regen-${slotNumber}`}
+                                            >
+                                              {regenerateSlotMutation.isPending ? (
+                                                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                              ) : (
+                                                <RefreshCw className="mr-1 h-3 w-3" />
+                                              )}
+                                              {t("generator.regenerate")}
+                                            </Button>
+                                          </HintTooltip>
                                         </div>
                                       </CollapsibleContent>
                                     </Collapsible>

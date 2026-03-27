@@ -668,24 +668,26 @@ export default function VoicesPage() {
                   )}
                   <div className="flex items-center gap-2 flex-wrap">
                     {voice.previewUrl && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => playPreview(voice.previewUrl!, voice.id)}
-                        data-testid={`button-play-${voice.id}`}
-                      >
-                        {playingVoiceId === voice.id ? (
-                          <>
-                            <Pause className="mr-2 h-4 w-4" />
-                            {t("common.pause")}
-                          </>
-                        ) : (
-                          <>
-                            <Play className="mr-2 h-4 w-4" />
-                            {t("generator.listen")}
-                          </>
-                        )}
-                      </Button>
+                      <HintTooltip hint={t("hints.voices.previewVoice")}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => playPreview(voice.previewUrl!, voice.id)}
+                          data-testid={`button-play-${voice.id}`}
+                        >
+                          {playingVoiceId === voice.id ? (
+                            <>
+                              <Pause className="mr-2 h-4 w-4" />
+                              {t("common.pause")}
+                            </>
+                          ) : (
+                            <>
+                              <Play className="mr-2 h-4 w-4" />
+                              {t("generator.listen")}
+                            </>
+                          )}
+                        </Button>
+                      </HintTooltip>
                     )}
                     <HintTooltip hint={t("hints.voices.editVoice")}>
                       <Button

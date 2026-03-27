@@ -1075,21 +1075,23 @@ export default function ShowsPage() {
                           </Button>
                         </HintTooltip>
                         {selectedPrograms.size > 0 && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => {
-                              const toVoice = filteredPrograms
-                                .filter(p => selectedPrograms.has(p.id) && p.scriptText && (p.status === "script_ready" || p.audioUrl))
-                                .map(p => p.id);
-                              toVoice.forEach(id => enqueueAudio(id));
-                              setSelectedPrograms(new Set());
-                            }}
-                            data-testid="button-bulk-voice"
-                          >
-                            <Volume2 className="mr-1.5 h-4 w-4" />
-                            {t("shows.voiceSelected", { count: selectedPrograms.size })}
-                          </Button>
+                          <HintTooltip hint={t("hints.shows.bulkVoice")}>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                const toVoice = filteredPrograms
+                                  .filter(p => selectedPrograms.has(p.id) && p.scriptText && (p.status === "script_ready" || p.audioUrl))
+                                  .map(p => p.id);
+                                toVoice.forEach(id => enqueueAudio(id));
+                                setSelectedPrograms(new Set());
+                              }}
+                              data-testid="button-bulk-voice"
+                            >
+                              <Volume2 className="mr-1.5 h-4 w-4" />
+                              {t("shows.voiceSelected", { count: selectedPrograms.size })}
+                            </Button>
+                          </HintTooltip>
                         )}
                       </div>
                     </div>
@@ -1110,22 +1112,23 @@ export default function ShowsPage() {
                           {type.autoIsolate && ` · ${t("shows.denoise")}`}
                           {type.autoUpload !== false && ` · ${t("shows.upload")}`}
                         </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 shrink-0 border-green-300 dark:border-green-700 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900"
-                          onClick={() => pipelineMutation.mutate({ typeId: type.id, count: Math.ceil((type.weeklyCount || 7) / 7) })}
-                          disabled={pipelineTypeIds.has(type.id)}
-                          data-testid="button-run-pipeline"
-                          title={t("hints.shows.runPipeline")}
-                        >
-                          {pipelineTypeIds.has(type.id) ? (
-                            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Zap className="mr-1 h-3.5 w-3.5" />
-                          )}
-                          {t("shows.run")}
-                        </Button>
+                        <HintTooltip hint={t("hints.shows.runPipeline")}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 shrink-0 border-green-300 dark:border-green-700 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900"
+                            onClick={() => pipelineMutation.mutate({ typeId: type.id, count: Math.ceil((type.weeklyCount || 7) / 7) })}
+                            disabled={pipelineTypeIds.has(type.id)}
+                            data-testid="button-run-pipeline"
+                          >
+                            {pipelineTypeIds.has(type.id) ? (
+                              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Zap className="mr-1 h-3.5 w-3.5" />
+                            )}
+                            {t("shows.run")}
+                          </Button>
+                        </HintTooltip>
                       </div>
                     )}
                   </div>
@@ -1490,34 +1493,36 @@ export default function ShowsPage() {
               <VoiceInput onTranscript={(text) => setEditingType(prev => prev ? { ...prev, defaultPrompt: prev.defaultPrompt + " " + text } : null)} />
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isAnalyzing || !editingType?.defaultPrompt?.trim()}
-                onClick={async () => {
-                  if (!editingType?.defaultPrompt?.trim()) return;
-                  setIsAnalyzing(true);
-                  setPromptAnalysis(null);
-                  try {
-                    const res = await apiRequest("POST", "/api/analyze-prompt", {
-                      promptText: editingType.defaultPrompt,
-                    });
-                    const data = await res.json();
-                    setPromptAnalysis(data);
-                  } catch (err: any) {
-                    toast({ title: t("shows.analysisError"), description: err.message, variant: "destructive" });
-                  } finally {
-                    setIsAnalyzing(false);
-                  }
-                }}
-                data-testid="button-analyze-prompt"
-              >
-                {isAnalyzing ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t("shows.analyzing")}</>
-                ) : (
-                  <><Eye className="mr-2 h-4 w-4" />{t("shows.analyzePrompt")}</>
-                )}
-              </Button>
+              <HintTooltip hint={t("hints.shows.analyzePrompt")}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isAnalyzing || !editingType?.defaultPrompt?.trim()}
+                  onClick={async () => {
+                    if (!editingType?.defaultPrompt?.trim()) return;
+                    setIsAnalyzing(true);
+                    setPromptAnalysis(null);
+                    try {
+                      const res = await apiRequest("POST", "/api/analyze-prompt", {
+                        promptText: editingType.defaultPrompt,
+                      });
+                      const data = await res.json();
+                      setPromptAnalysis(data);
+                    } catch (err: any) {
+                      toast({ title: t("shows.analysisError"), description: err.message, variant: "destructive" });
+                    } finally {
+                      setIsAnalyzing(false);
+                    }
+                  }}
+                  data-testid="button-analyze-prompt"
+                >
+                  {isAnalyzing ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t("shows.analyzing")}</>
+                  ) : (
+                    <><Eye className="mr-2 h-4 w-4" />{t("shows.analyzePrompt")}</>
+                  )}
+                </Button>
+              </HintTooltip>
             </div>
 
             {promptAnalysis && (

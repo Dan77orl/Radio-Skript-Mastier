@@ -465,24 +465,28 @@ export default function ScheduleSettings({ embedded }: { embedded?: boolean }) {
                         </Badge>
                       </div>
                       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => openHolidayDialog(h)}
-                          data-testid={`button-edit-holiday-${h.id}`}
-                        >
-                          <Edit3 className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => deleteHolidayMutation.mutate(h.id)}
-                          data-testid={`button-delete-holiday-${h.id}`}
-                        >
-                          <Trash2 className="h-3 w-3 text-destructive" />
-                        </Button>
+                        <HintTooltip hint={t("hints.scheduleSettings.editHoliday")}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => openHolidayDialog(h)}
+                            data-testid={`button-edit-holiday-${h.id}`}
+                          >
+                            <Edit3 className="h-3 w-3" />
+                          </Button>
+                        </HintTooltip>
+                        <HintTooltip hint={t("hints.scheduleSettings.deleteHoliday")}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => deleteHolidayMutation.mutate(h.id)}
+                            data-testid={`button-delete-holiday-${h.id}`}
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        </HintTooltip>
                       </div>
                     </div>
                   ))}
@@ -929,12 +933,16 @@ function TemplateCard({
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onEdit(); }} data-testid={`button-edit-${template.id}`}>
-                <Edit3 className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onDelete(); }} data-testid={`button-delete-${template.id}`}>
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
+              <HintTooltip hint={t("hints.scheduleSettings.editTemplate")}>
+                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onEdit(); }} data-testid={`button-edit-${template.id}`}>
+                  <Edit3 className="h-4 w-4" />
+                </Button>
+              </HintTooltip>
+              <HintTooltip hint={t("hints.scheduleSettings.deleteTemplate")}>
+                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onDelete(); }} data-testid={`button-delete-${template.id}`}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </HintTooltip>
               {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
             </div>
           </div>
@@ -947,10 +955,12 @@ function TemplateCard({
                 <Users className="h-4 w-4" />
                 {t("scheduleSettings.hostShifts")}
               </h4>
-              <Button variant="outline" size="sm" onClick={onAddShift} data-testid={`button-add-shift-${template.id}`}>
-                <Plus className="mr-1 h-3 w-3" />
-                {t("scheduleSettings.addShift")}
-              </Button>
+              <HintTooltip hint={t("hints.scheduleSettings.addShift")}>
+                <Button variant="outline" size="sm" onClick={onAddShift} data-testid={`button-add-shift-${template.id}`}>
+                  <Plus className="mr-1 h-3 w-3" />
+                  {t("scheduleSettings.addShift")}
+                </Button>
+              </HintTooltip>
             </div>
 
             {!shifts?.length ? (

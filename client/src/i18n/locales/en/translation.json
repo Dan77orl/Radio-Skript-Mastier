@@ -1223,7 +1223,10 @@
     "settings": {
       "saveSettings": "Save all your current settings",
       "checkApi": "Test connection to this service to make sure it's working",
+      "saveApiKey": "Save this API key immediately",
+      "toggleApiVisibility": "Show or hide this API key",
       "uploadLogo": "Upload your radio station's logo image",
+      "removeLogo": "Remove the current station logo",
       "uploadAttachment": "Upload documents to use as knowledge base for AI content generation"
     },
     "dashboard": {

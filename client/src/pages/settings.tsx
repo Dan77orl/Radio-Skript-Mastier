@@ -383,41 +383,47 @@ export default function SettingsPage() {
                               className="flex-1"
                             />
                           </FormControl>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setShowApiKey(!showApiKey)}
-                          >
-                            {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => saveFieldMutation.mutate({ elevenLabsApiKey: field.value })}
-                            disabled={saveFieldMutation.isPending || !field.value}
-                            data-testid="button-save-elevenlabs"
-                          >
-                            {saveFieldMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Save className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => testElevenLabsMutation.mutate()}
-                            disabled={testElevenLabsMutation.isPending || !field.value}
-                            data-testid="button-test-elevenlabs"
-                          >
-                            {testElevenLabsMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              t("common.check")
-                            )}
-                          </Button>
+                          <HintTooltip hint={t("hints.settings.toggleApiVisibility")}>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setShowApiKey(!showApiKey)}
+                            >
+                              {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                          </HintTooltip>
+                          <HintTooltip hint={t("hints.settings.saveApiKey")}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => saveFieldMutation.mutate({ elevenLabsApiKey: field.value })}
+                              disabled={saveFieldMutation.isPending || !field.value}
+                              data-testid="button-save-elevenlabs"
+                            >
+                              {saveFieldMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Save className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </HintTooltip>
+                          <HintTooltip hint={t("hints.settings.checkApi")}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => testElevenLabsMutation.mutate()}
+                              disabled={testElevenLabsMutation.isPending || !field.value}
+                              data-testid="button-test-elevenlabs"
+                            >
+                              {testElevenLabsMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                t("common.check")
+                              )}
+                            </Button>
+                          </HintTooltip>
                         </div>
                         <FormDescription>
                           {t("settings.elevenLabsDescription")}{" "}
@@ -448,41 +454,47 @@ export default function SettingsPage() {
                               className="flex-1"
                             />
                           </FormControl>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setShowAnthropicKey(!showAnthropicKey)}
-                          >
-                            {showAnthropicKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => saveFieldMutation.mutate({ anthropicApiKey: field.value })}
-                            disabled={saveFieldMutation.isPending || !field.value}
-                            data-testid="button-save-anthropic"
-                          >
-                            {saveFieldMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Save className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => testAnthropicMutation.mutate()}
-                            disabled={testAnthropicMutation.isPending || !field.value}
-                            data-testid="button-test-anthropic"
-                          >
-                            {testAnthropicMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              t("common.check")
-                            )}
-                          </Button>
+                          <HintTooltip hint={t("hints.settings.toggleApiVisibility")}>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setShowAnthropicKey(!showAnthropicKey)}
+                            >
+                              {showAnthropicKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                          </HintTooltip>
+                          <HintTooltip hint={t("hints.settings.saveApiKey")}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => saveFieldMutation.mutate({ anthropicApiKey: field.value })}
+                              disabled={saveFieldMutation.isPending || !field.value}
+                              data-testid="button-save-anthropic"
+                            >
+                              {saveFieldMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Save className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </HintTooltip>
+                          <HintTooltip hint={t("hints.settings.checkApi")}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => testAnthropicMutation.mutate()}
+                              disabled={testAnthropicMutation.isPending || !field.value}
+                              data-testid="button-test-anthropic"
+                            >
+                              {testAnthropicMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                t("common.check")
+                              )}
+                            </Button>
+                          </HintTooltip>
                         </div>
                         <FormDescription>
                           {t("settings.anthropicDescription")}{" "}
@@ -516,41 +528,47 @@ export default function SettingsPage() {
                               className="flex-1"
                             />
                           </FormControl>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setShowYandexToken(!showYandexToken)}
-                          >
-                            {showYandexToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => saveFieldMutation.mutate({ yandexDiskToken: field.value })}
-                            disabled={saveFieldMutation.isPending || !field.value}
-                            data-testid="button-save-yandex"
-                          >
-                            {saveFieldMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Save className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => testYandexMutation.mutate()}
-                            disabled={testYandexMutation.isPending || !field.value}
-                            data-testid="button-test-yandex"
-                          >
-                            {testYandexMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              t("common.check")
-                            )}
-                          </Button>
+                          <HintTooltip hint={t("hints.settings.toggleApiVisibility")}>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setShowYandexToken(!showYandexToken)}
+                            >
+                              {showYandexToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                          </HintTooltip>
+                          <HintTooltip hint={t("hints.settings.saveApiKey")}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => saveFieldMutation.mutate({ yandexDiskToken: field.value })}
+                              disabled={saveFieldMutation.isPending || !field.value}
+                              data-testid="button-save-yandex"
+                            >
+                              {saveFieldMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Save className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </HintTooltip>
+                          <HintTooltip hint={t("hints.settings.checkApi")}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => testYandexMutation.mutate()}
+                              disabled={testYandexMutation.isPending || !field.value}
+                              data-testid="button-test-yandex"
+                            >
+                              {testYandexMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                t("common.check")
+                              )}
+                            </Button>
+                          </HintTooltip>
                         </div>
                         <FormDescription>
                           {t("settings.yandexDescription")}
@@ -581,28 +599,32 @@ export default function SettingsPage() {
                               className="flex-1"
                             />
                           </FormControl>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setShowFreesoundKey(!showFreesoundKey)}
-                          >
-                            {showFreesoundKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => saveFieldMutation.mutate({ freesoundApiKey: field.value })}
-                            disabled={saveFieldMutation.isPending || !field.value}
-                            data-testid="button-save-freesound"
-                          >
-                            {saveFieldMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Save className="h-4 w-4" />
-                            )}
-                          </Button>
+                          <HintTooltip hint={t("hints.settings.toggleApiVisibility")}>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setShowFreesoundKey(!showFreesoundKey)}
+                            >
+                              {showFreesoundKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                          </HintTooltip>
+                          <HintTooltip hint={t("hints.settings.saveApiKey")}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => saveFieldMutation.mutate({ freesoundApiKey: field.value })}
+                              disabled={saveFieldMutation.isPending || !field.value}
+                              data-testid="button-save-freesound"
+                            >
+                              {saveFieldMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Save className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </HintTooltip>
                         </div>
                         <FormDescription>
                           {t("settings.freesoundDescription")}
@@ -687,15 +709,17 @@ export default function SettingsPage() {
                                 alt={t("settings.stationLogo")} 
                                 className="h-16 w-16 rounded-md object-cover border"
                               />
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant="destructive"
-                                className="absolute -top-2 -right-2 h-6 w-6"
-                                onClick={() => form.setValue("stationLogo", "")}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
+                              <HintTooltip hint={t("hints.settings.removeLogo")}>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="destructive"
+                                  className="absolute -top-2 -right-2 h-6 w-6"
+                                  onClick={() => form.setValue("stationLogo", "")}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </HintTooltip>
                             </div>
                           ) : (
                             <div className="h-16 w-16 rounded-md border-2 border-dashed flex items-center justify-center text-muted-foreground">
@@ -710,20 +734,22 @@ export default function SettingsPage() {
                               onChange={handleLogoUpload}
                               className="hidden"
                             />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => logoInputRef.current?.click()}
-                              disabled={uploadingLogo}
-                              data-testid="button-upload-logo"
-                            >
-                              {uploadingLogo ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <Upload className="mr-2 h-4 w-4" />
-                              )}
-                              {t("settings.uploadLogo")}
-                            </Button>
+                            <HintTooltip hint={t("hints.settings.uploadLogo")}>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => logoInputRef.current?.click()}
+                                disabled={uploadingLogo}
+                                data-testid="button-upload-logo"
+                              >
+                                {uploadingLogo ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Upload className="mr-2 h-4 w-4" />
+                                )}
+                                {t("settings.uploadLogo")}
+                              </Button>
+                            </HintTooltip>
                           </div>
                         </div>
                         <FormDescription>

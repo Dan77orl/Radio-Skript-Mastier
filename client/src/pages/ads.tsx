@@ -933,40 +933,44 @@ export default function AdsPage() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button
-                      onClick={() => {
-                        regenerateVariantMutation.mutate({
-                          adId: currentAd.id,
-                          baseText: currentAd.variants?.[selectedVariantForEdit] || "",
-                          instructions: editInstructions,
-                        });
-                        setEditInstructions("");
-                        setSelectedVariantForEdit(null);
-                      }}
-                      disabled={regenerateVariantMutation.isPending}
-                      data-testid="button-regenerate"
-                    >
-                      {regenerateVariantMutation.isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                      )}
-                      {t("ads.refine5New")}
-                    </Button>
-                    <Button
-                      variant="default"
-                      onClick={() => {
-                        selectVariantMutation.mutate({ 
-                          adId: currentAd.id, 
-                          variantIndex: selectedVariantForEdit 
-                        });
-                      }}
-                      disabled={selectVariantMutation.isPending}
-                      data-testid="button-use-variant"
-                    >
-                      <Check className="mr-2 h-4 w-4" />
-                      {t("ads.useThis")}
-                    </Button>
+                    <HintTooltip hint={t("hints.ads.regenerate")}>
+                      <Button
+                        onClick={() => {
+                          regenerateVariantMutation.mutate({
+                            adId: currentAd.id,
+                            baseText: currentAd.variants?.[selectedVariantForEdit] || "",
+                            instructions: editInstructions,
+                          });
+                          setEditInstructions("");
+                          setSelectedVariantForEdit(null);
+                        }}
+                        disabled={regenerateVariantMutation.isPending}
+                        data-testid="button-regenerate"
+                      >
+                        {regenerateVariantMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                        )}
+                        {t("ads.refine5New")}
+                      </Button>
+                    </HintTooltip>
+                    <HintTooltip hint={t("hints.ads.useVariant")}>
+                      <Button
+                        variant="default"
+                        onClick={() => {
+                          selectVariantMutation.mutate({ 
+                            adId: currentAd.id, 
+                            variantIndex: selectedVariantForEdit 
+                          });
+                        }}
+                        disabled={selectVariantMutation.isPending}
+                        data-testid="button-use-variant"
+                      >
+                        <Check className="mr-2 h-4 w-4" />
+                        {t("ads.useThis")}
+                      </Button>
+                    </HintTooltip>
                   </div>
                 </div>
               )}
@@ -2327,12 +2331,14 @@ export default function AdsPage() {
               <p className="text-muted-foreground text-sm">{t("ads.presetsSubtitle")}</p>
             </div>
             <Dialog open={isPresetDialogOpen} onOpenChange={setIsPresetDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={openNewPresetDialog} data-testid="button-new-preset">
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t("ads.newPreset")}
-                </Button>
-              </DialogTrigger>
+              <HintTooltip hint={t("hints.ads.newPreset")}>
+                <DialogTrigger asChild>
+                  <Button onClick={openNewPresetDialog} data-testid="button-new-preset">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t("ads.newPreset")}
+                  </Button>
+                </DialogTrigger>
+              </HintTooltip>
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{editingPreset ? t("ads.editPreset") : t("ads.createPreset")}</DialogTitle>

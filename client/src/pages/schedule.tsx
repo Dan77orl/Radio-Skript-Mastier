@@ -310,31 +310,35 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
                       )}
                     </div>
                     <div className="flex gap-1 mt-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="flex-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setViewingDate(day.toISOString().split("T")[0]);
-                        }}
-                        data-testid={`button-view-${day.toISOString().split("T")[0]}`}
-                      >
-                        <FileText className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="flex-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAutoGenerate(day);
-                        }}
-                        disabled={autoGenerateMutation.isPending}
-                        data-testid={`button-autogen-${day.toISOString().split("T")[0]}`}
-                      >
-                        <Sparkles className="h-3 w-3" />
-                      </Button>
+                      <HintTooltip hint={t("hints.schedule.viewDay")}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingDate(day.toISOString().split("T")[0]);
+                          }}
+                          data-testid={`button-view-${day.toISOString().split("T")[0]}`}
+                        >
+                          <FileText className="h-3 w-3" />
+                        </Button>
+                      </HintTooltip>
+                      <HintTooltip hint={t("hints.schedule.autoGenerate")}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAutoGenerate(day);
+                          }}
+                          disabled={autoGenerateMutation.isPending}
+                          data-testid={`button-autogen-${day.toISOString().split("T")[0]}`}
+                        >
+                          <Sparkles className="h-3 w-3" />
+                        </Button>
+                      </HintTooltip>
                     </div>
                   </div>
                 );
@@ -414,18 +418,20 @@ export default function Schedule({ embedded }: { embedded?: boolean }) {
                       </p>
                     </div>
                     {slotDialog?.audioUrl && (
-                      <Button 
-                        size="icon" 
-                        variant="ghost"
-                        onClick={() => playAudio(slotDialog.audioUrl!, slotDialog.id)}
-                        data-testid={`button-play-dialog-${slotDialog.id}`}
-                      >
-                        {playingDialogId === slotDialog.id ? (
-                          <PauseCircle className="h-4 w-4" />
-                        ) : (
-                          <PlayCircle className="h-4 w-4" />
-                        )}
-                      </Button>
+                      <HintTooltip hint={t("hints.schedule.playAudio")}>
+                        <Button 
+                          size="icon" 
+                          variant="ghost"
+                          onClick={() => playAudio(slotDialog.audioUrl!, slotDialog.id)}
+                          data-testid={`button-play-dialog-${slotDialog.id}`}
+                        >
+                          {playingDialogId === slotDialog.id ? (
+                            <PauseCircle className="h-4 w-4" />
+                          ) : (
+                            <PlayCircle className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </HintTooltip>
                     )}
                   </div>
                 );
