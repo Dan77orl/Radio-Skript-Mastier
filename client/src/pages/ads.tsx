@@ -434,8 +434,8 @@ export default function AdsPage() {
   });
 
   const synthesizeAudioMutation = useMutation({
-    mutationFn: async ({ adId, voiceIds, voiceName, speakerVoiceMap }: { adId: string; voiceIds: string[]; voiceName?: string; speakerVoiceMap?: Record<string, string> }) => {
-      const response = await apiRequest("POST", `/api/ads/${adId}/synthesize-audio`, { voiceIds, voiceName, speakerVoiceMap });
+    mutationFn: async ({ adId, voiceIds, voiceName, speakerVoiceMap, scriptText }: { adId: string; voiceIds: string[]; voiceName?: string; speakerVoiceMap?: Record<string, string>; scriptText?: string }) => {
+      const response = await apiRequest("POST", `/api/ads/${adId}/synthesize-audio`, { voiceIds, voiceName, speakerVoiceMap, scriptText });
       return response.json();
     },
     onSuccess: () => {
@@ -1270,12 +1270,14 @@ export default function AdsPage() {
                         adId: currentAd.id,
                         voiceIds: Object.values(adSpeakerVoiceMap),
                         speakerVoiceMap: adSpeakerVoiceMap,
+                        scriptText: currentAd.selectedVariantText || undefined,
                       });
                     } else if (selectedVoiceId) {
                       synthesizeAudioMutation.mutate({
                         adId: currentAd.id,
                         voiceIds: [selectedVoiceId],
                         voiceName: selectedVoiceName || undefined,
+                        scriptText: currentAd.selectedVariantText || undefined,
                       });
                     }
                   }}
@@ -1618,6 +1620,7 @@ export default function AdsPage() {
                         adId: currentAd.id,
                         voiceIds: [selectedVoiceId],
                         voiceName: selectedVoiceName || undefined,
+                        scriptText: currentAd.selectedVariantText || undefined,
                       });
                     }
                   }}

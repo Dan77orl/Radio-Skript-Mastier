@@ -3657,14 +3657,14 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
   app.post("/api/ads/:id/synthesize-audio", async (req, res) => {
     try {
       const { id } = req.params;
-      const { voiceIds, voiceName: requestVoiceName, speakerVoiceMap: reqSpeakerVoiceMap } = req.body;
+      const { voiceIds, voiceName: requestVoiceName, speakerVoiceMap: reqSpeakerVoiceMap, scriptText: editedScriptText } = req.body;
       
       const ad = await storage.getAd(id, req.session.userId!);
       if (!ad) {
         return res.status(404).json({ error: "Ad not found" });
       }
 
-      if (!ad.selectedVariantText) {
+      if (!ad.selectedVariantText && !editedScriptText) {
         return res.status(400).json({ error: "No variant selected" });
       }
 
@@ -3673,8 +3673,12 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
         return res.status(400).json({ error: "ElevenLabs API key not configured" });
       }
 
+      if (editedScriptText && editedScriptText !== ad.selectedVariantText) {
+        await storage.updateAd(id, req.session.userId!, { selectedVariantText: editedScriptText });
+      }
+
       const defaultVoiceId = voiceIds?.[0] || settings.maleVoiceId || "onwK4e9ZLuTAKqWW03F9";
-      const scriptText = ad.selectedVariantText;
+      const scriptText = editedScriptText || ad.selectedVariantText;
       const isMultiSpeaker = isMultiSpeakerScript(scriptText);
 
       if (reqSpeakerVoiceMap) {
