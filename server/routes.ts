@@ -1014,7 +1014,7 @@ export async function registerRoutes(
           gender: v.gender === "female" ? "female" : "male",
           previewUrl: typeof v.previewUrl === "string" ? v.previewUrl : null,
           description: typeof v.description === "string" ? v.description : null,
-          assignedProgramTypeIds: Array.isArray(v.assignedProgramTypeIds) ? v.assignedProgramTypeIds : null,
+          assignedProgramTypeIds: Array.isArray(v.assignedProgramTypeIds) ? v.assignedProgramTypeIds : Array.isArray(v.assignedProgramTypes) ? v.assignedProgramTypes : null,
         });
         created.push(v.name);
       }
