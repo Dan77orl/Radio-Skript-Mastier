@@ -36,7 +36,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Play, Pause, Plus, Trash2, Volume2, User, Users, Mic, Edit2, Search, Loader2, Globe } from "lucide-react";
+import { Play, Pause, Plus, Trash2, Volume2, User, Users, Mic, Edit2, Search, Loader2, Globe, SlidersHorizontal } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VoiceInput } from "@/components/voice-input";
 import { HintTooltip } from "@/components/hint-tooltip";
@@ -64,8 +64,14 @@ export default function VoicesPage() {
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
   const [voiceSearch, setVoiceSearch] = useState("");
   const [voiceSearchQuery, setVoiceSearchQuery] = useState("");
+  const [myVoicesFilter, setMyVoicesFilter] = useState("");
   const [voiceTab, setVoiceTab] = useState<"my" | "search">("my");
   const [searchGender, setSearchGender] = useState("all");
+  const [searchLanguage, setSearchLanguage] = useState("all");
+  const [searchAccent, setSearchAccent] = useState("all");
+  const [searchAge, setSearchAge] = useState("all");
+  const [searchUseCase, setSearchUseCase] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -82,18 +88,32 @@ export default function VoicesPage() {
     retry: false,
   });
 
+  const activeFilterCount = [searchGender, searchLanguage, searchAccent, searchAge, searchUseCase].filter(v => v !== "all").length;
+
   const { data: searchData, isLoading: isSearching, isError: isSearchError } = useQuery<{ voices: ElevenLabsVoice[]; has_more: boolean; total_count: number }>({
-    queryKey: ["/api/elevenlabs/voices/search", voiceSearchQuery, searchGender],
+    queryKey: ["/api/elevenlabs/voices/search", voiceSearchQuery, searchGender, searchLanguage, searchAccent, searchAge, searchUseCase],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (voiceSearchQuery) params.append("q", voiceSearchQuery);
       if (searchGender !== "all") params.append("gender", searchGender);
+      if (searchLanguage !== "all") params.append("language", searchLanguage);
+      if (searchAccent !== "all") params.append("accent", searchAccent);
+      if (searchAge !== "all") params.append("age", searchAge);
+      if (searchUseCase !== "all") params.append("use_case", searchUseCase);
       const res = await fetch(`/api/elevenlabs/voices/search?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
     enabled: voiceTab === "search",
     retry: false,
+  });
+
+  const filteredMyVoices = elevenLabsData?.voices?.filter(v => {
+    if (!myVoicesFilter) return true;
+    const q = myVoicesFilter.toLowerCase();
+    return v.name.toLowerCase().includes(q) ||
+      v.labels?.accent?.toLowerCase().includes(q) ||
+      v.category?.toLowerCase().includes(q);
   });
 
   const selectVoice = (voice: ElevenLabsVoice) => {
@@ -342,7 +362,7 @@ export default function VoicesPage() {
             <Users className="mr-1 h-3 w-3" />
             {voicesCount} {t("voices.personas")}
           </Badge>
-          <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (open) { setVoiceTab("my"); setVoiceSearch(""); setVoiceSearchQuery(""); setSearchGender("all"); } setIsAddDialogOpen(open); }}>
+          <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (open) { setVoiceTab("my"); setVoiceSearch(""); setVoiceSearchQuery(""); setMyVoicesFilter(""); setSearchGender("all"); setSearchLanguage("all"); setSearchAccent("all"); setSearchAge("all"); setSearchUseCase("all"); setShowFilters(false); } setIsAddDialogOpen(open); }}>
             <HintTooltip hint={t("hints.voices.addPersona")}>
               <DialogTrigger asChild>
                 <Button data-testid="button-add-voice">
@@ -443,7 +463,17 @@ export default function VoicesPage() {
                         </TabsTrigger>
                       </HintTooltip>
                     </TabsList>
-                    <TabsContent value="my" className="mt-2">
+                    <TabsContent value="my" className="mt-2 space-y-2">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder={t("voices.searchMyVoices")}
+                          value={myVoicesFilter}
+                          onChange={(e) => setMyVoicesFilter(e.target.value)}
+                          className="pl-9"
+                          data-testid="input-my-voices-search"
+                        />
+                      </div>
                       {isLoadingElevenLabs ? (
                         <div className="space-y-2">
                           {Array.from({ length: 3 }, (_, i) => (
@@ -456,9 +486,9 @@ export default function VoicesPage() {
                           <p className="text-sm text-destructive mb-1">{t("voices.loadError")}</p>
                           <p className="text-xs text-muted-foreground">{t("voices.checkApiKey")}</p>
                         </div>
-                      ) : elevenLabsData?.voices && elevenLabsData.voices.length > 0 ? (
+                      ) : filteredMyVoices && filteredMyVoices.length > 0 ? (
                         <div className="grid gap-2 max-h-[300px] overflow-y-auto">
-                          {elevenLabsData.voices.map((voice) => (
+                          {filteredMyVoices.map((voice) => (
                             <div
                               key={voice.voice_id}
                               className={`flex items-center justify-between gap-3 p-3 rounded-lg border cursor-pointer hover-elevate ${
@@ -509,6 +539,11 @@ export default function VoicesPage() {
                             </div>
                           ))}
                         </div>
+                      ) : myVoicesFilter ? (
+                        <div className="text-center py-6 text-muted-foreground">
+                          <Search className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">{t("voices.notFound")}</p>
+                        </div>
                       ) : (
                         <div className="text-center py-6 text-muted-foreground">
                           <Volume2 className="h-10 w-10 mx-auto mb-2 opacity-50" />
@@ -530,19 +565,111 @@ export default function VoicesPage() {
                             />
                           </div>
                         </HintTooltip>
-                        <Select value={searchGender} onValueChange={setSearchGender}>
-                          <HintTooltip hint={t("hints.voices.genderFilter")}>
-                            <SelectTrigger className="w-32" data-testid="select-search-gender">
+                        <Button
+                          variant={showFilters ? "default" : "outline"}
+                          size="icon"
+                          onClick={() => setShowFilters(!showFilters)}
+                          className="relative shrink-0"
+                          data-testid="button-toggle-filters"
+                        >
+                          <SlidersHorizontal className="h-4 w-4" />
+                          {activeFilterCount > 0 && (
+                            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
+                              {activeFilterCount}
+                            </span>
+                          )}
+                        </Button>
+                      </div>
+                      {showFilters && (
+                        <div className="flex flex-wrap gap-2">
+                          <Select value={searchLanguage} onValueChange={setSearchLanguage}>
+                            <SelectTrigger className="w-auto h-8 text-xs gap-1" data-testid="select-search-language">
+                              <span className="text-muted-foreground">{t("voices.filterLanguage")}:</span>
                               <SelectValue />
                             </SelectTrigger>
-                          </HintTooltip>
-                          <SelectContent>
-                            <SelectItem value="all">{t("common.all")}</SelectItem>
-                            <SelectItem value="male">{t("common.male")}</SelectItem>
-                            <SelectItem value="female">{t("common.female")}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                            <SelectContent>
+                              <SelectItem value="all">{t("common.all")}</SelectItem>
+                              <SelectItem value="russian">Russian</SelectItem>
+                              <SelectItem value="english">English</SelectItem>
+                              <SelectItem value="turkish">Turkish</SelectItem>
+                              <SelectItem value="kazakh">Kazakh</SelectItem>
+                              <SelectItem value="spanish">Spanish</SelectItem>
+                              <SelectItem value="french">French</SelectItem>
+                              <SelectItem value="german">German</SelectItem>
+                              <SelectItem value="italian">Italian</SelectItem>
+                              <SelectItem value="portuguese">Portuguese</SelectItem>
+                              <SelectItem value="chinese">Chinese</SelectItem>
+                              <SelectItem value="japanese">Japanese</SelectItem>
+                              <SelectItem value="korean">Korean</SelectItem>
+                              <SelectItem value="arabic">Arabic</SelectItem>
+                              <SelectItem value="hindi">Hindi</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select value={searchGender} onValueChange={setSearchGender}>
+                            <SelectTrigger className="w-auto h-8 text-xs gap-1" data-testid="select-search-gender">
+                              <span className="text-muted-foreground">{t("voices.filterGender")}:</span>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">{t("common.all")}</SelectItem>
+                              <SelectItem value="male">{t("common.male")}</SelectItem>
+                              <SelectItem value="female">{t("common.female")}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select value={searchAccent} onValueChange={setSearchAccent}>
+                            <SelectTrigger className="w-auto h-8 text-xs gap-1" data-testid="select-search-accent">
+                              <span className="text-muted-foreground">{t("voices.filterAccent")}:</span>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">{t("common.all")}</SelectItem>
+                              <SelectItem value="american">American</SelectItem>
+                              <SelectItem value="british">British</SelectItem>
+                              <SelectItem value="australian">Australian</SelectItem>
+                              <SelectItem value="indian">Indian</SelectItem>
+                              <SelectItem value="russian">Russian</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select value={searchAge} onValueChange={setSearchAge}>
+                            <SelectTrigger className="w-auto h-8 text-xs gap-1" data-testid="select-search-age">
+                              <span className="text-muted-foreground">{t("voices.filterAge")}:</span>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">{t("common.all")}</SelectItem>
+                              <SelectItem value="young">Young</SelectItem>
+                              <SelectItem value="middle_aged">Middle Aged</SelectItem>
+                              <SelectItem value="old">Old</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select value={searchUseCase} onValueChange={setSearchUseCase}>
+                            <SelectTrigger className="w-auto h-8 text-xs gap-1" data-testid="select-search-usecase">
+                              <span className="text-muted-foreground">{t("voices.filterCategory")}:</span>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">{t("common.all")}</SelectItem>
+                              <SelectItem value="narration">Narration</SelectItem>
+                              <SelectItem value="conversational">Conversational</SelectItem>
+                              <SelectItem value="news">News</SelectItem>
+                              <SelectItem value="characters">Characters</SelectItem>
+                              <SelectItem value="meditation">Meditation</SelectItem>
+                              <SelectItem value="social_media">Social Media</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {activeFilterCount > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={() => { setSearchGender("all"); setSearchLanguage("all"); setSearchAccent("all"); setSearchAge("all"); setSearchUseCase("all"); }}
+                              data-testid="button-clear-filters"
+                            >
+                              {t("voices.clearFilters")}
+                            </Button>
+                          )}
+                        </div>
+                      )}
                       {isSearching ? (
                         <div className="flex items-center justify-center py-8">
                           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -579,9 +706,10 @@ export default function VoicesPage() {
                                     {voice.category}
                                   </Badge>
                                 </div>
-                                <div className="flex gap-2 text-xs text-muted-foreground mt-1">
-                                  {voice.labels?.accent && <span>{t("voices.accent")}: {voice.labels.accent}</span>}
-                                  {voice.labels?.language && <span>• {voice.labels.language}</span>}
+                                <div className="flex gap-2 text-xs text-muted-foreground mt-1 flex-wrap">
+                                  {voice.labels?.language && <span>{voice.labels.language}</span>}
+                                  {voice.labels?.accent && <span>• {t("voices.accent")}: {voice.labels.accent}</span>}
+                                  {voice.labels?.age && <span>• {voice.labels.age}</span>}
                                   {voice.labels?.use_case && <span>• {voice.labels.use_case}</span>}
                                 </div>
                               </div>

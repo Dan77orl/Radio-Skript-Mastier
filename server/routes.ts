@@ -4275,6 +4275,9 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
       const query = (req.query.q as string) || "";
       const gender = req.query.gender as string | undefined;
       const language = req.query.language as string | undefined;
+      const accent = req.query.accent as string | undefined;
+      const age = req.query.age as string | undefined;
+      const useCase = req.query.use_case as string | undefined;
       const page = parseInt(req.query.page as string) || 0;
       const pageSize = 100;
 
@@ -4285,6 +4288,9 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
       if (query) params.append("search", query);
       if (gender && gender !== "all") params.append("gender", gender);
       if (language && language !== "all") params.append("language", language);
+      if (accent && accent !== "all") params.append("accent", accent);
+      if (age && age !== "all") params.append("age", age);
+      if (useCase && useCase !== "all") params.append("use_case", useCase);
 
       const response = await fetch(`https://api.elevenlabs.io/v1/shared-voices?${params.toString()}`, {
         headers: {
