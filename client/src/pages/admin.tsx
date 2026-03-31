@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Activity, Shield, ShieldOff, Trash2, UserCheck, UserX, BarChart3, Clock, MessageSquare, ChevronDown, ChevronRight, Key } from "lucide-react";
+import { Users, Activity, Shield, ShieldOff, Trash2, UserCheck, UserX, BarChart3, Clock, MessageSquare, ChevronDown, ChevronRight, Key, Download, Upload, Database } from "lucide-react";
 
 interface UserWithStats {
   id: string;
@@ -188,6 +188,10 @@ export default function AdminPage() {
           <TabsTrigger value="apikeys" data-testid="tab-apikeys">
             <Key className="h-4 w-4 mr-1" />
             API Keys
+          </TabsTrigger>
+          <TabsTrigger value="data-sync" data-testid="tab-data-sync">
+            <Database className="h-4 w-4 mr-1" />
+            Data Sync
           </TabsTrigger>
         </TabsList>
 
@@ -484,6 +488,10 @@ export default function AdminPage() {
         <TabsContent value="apikeys" className="space-y-4">
           <ApiKeysTab settings={settingsData as Record<string, string> | undefined} />
         </TabsContent>
+
+        <TabsContent value="data-sync" className="space-y-4">
+          <DataSyncTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -692,5 +700,173 @@ function SupportSessionCard({ session }: { session: SupportSession }) {
         </CardContent>
       )}
     </Card>
+  );
+}
+
+function DataSyncTab() {
+  const { toast } = useToast();
+  const [importResult, setImportResult] = useState<Record<string, { created: number; skipped: number }> | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const res = await apiRequest("GET", "/api/admin/export-data");
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `radioflow-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Экспорт завершён", description: "Файл с данными скачан" });
+    } catch (err: any) {
+      toast({ title: "Ошибка экспорта", description: err.message, variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsImporting(true);
+    setImportResult(null);
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data.exportVersion) {
+        toast({ title: "Ошибка", description: "Неверный формат файла экспорта", variant: "destructive" });
+        return;
+      }
+      const res = await apiRequest("POST", "/api/admin/import-data", data);
+      const result = await res.json();
+      setImportResult(result.results);
+      toast({ title: "Импорт завершён", description: "Данные успешно импортированы" });
+      queryClient.invalidateQueries();
+    } catch (err: any) {
+      toast({ title: "Ошибка импорта", description: err.message, variant: "destructive" });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const LABEL_MAP: Record<string, string> = {
+    settings: "Настройки",
+    voices: "Голоса",
+    programTypes: "Типы передач",
+    programs: "Передачи",
+    dialogs: "Подводки",
+    ads: "Реклама",
+    adPresets: "Шаблоны рекламы",
+    newsSources: "Источники новостей",
+    scheduleTemplates: "Шаблоны расписания",
+    hostShifts: "Смены ведущих",
+    automations: "Автоматизации",
+    customHolidays: "Праздники",
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Экспорт / Импорт данных</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Перенос данных между dev и production окружениями. Экспортируйте все данные (голоса, передачи, подводки, настройки и т.д.) в JSON-файл, затем импортируйте его в другом окружении.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="border-dashed">
+              <CardContent className="pt-6 text-center space-y-3">
+                <Download className="h-10 w-10 mx-auto text-blue-500" />
+                <h3 className="font-medium">Экспорт данных</h3>
+                <p className="text-xs text-muted-foreground">
+                  Скачать все ваши данные в JSON-файл
+                </p>
+                <Button
+                  onClick={handleExport}
+                  disabled={isExporting}
+                  className="w-full"
+                  data-testid="button-export-data"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {isExporting ? "Экспортирую..." : "Скачать экспорт"}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-dashed">
+              <CardContent className="pt-6 text-center space-y-3">
+                <Upload className="h-10 w-10 mx-auto text-green-500" />
+                <h3 className="font-medium">Импорт данных</h3>
+                <p className="text-xs text-muted-foreground">
+                  Загрузить JSON-файл экспорта. Дубликаты пропускаются.
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleImport}
+                  className="hidden"
+                  data-testid="input-import-file"
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isImporting}
+                  variant="outline"
+                  className="w-full"
+                  data-testid="button-import-data"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {isImporting ? "Импортирую..." : "Загрузить файл"}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {importResult && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Результаты импорта</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Категория</TableHead>
+                      <TableHead>Создано</TableHead>
+                      <TableHead>Пропущено</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Object.entries(importResult).map(([key, val]) => (
+                      <TableRow key={key}>
+                        <TableCell className="font-medium">{LABEL_MAP[key] || key}</TableCell>
+                        <TableCell>
+                          <Badge variant={val.created > 0 ? "default" : "secondary"} data-testid={`badge-import-created-${key}`}>
+                            {val.created}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" data-testid={`badge-import-skipped-${key}`}>
+                            {val.skipped}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

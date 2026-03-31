@@ -1119,6 +1119,357 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/export-data", requireAdmin, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const [
+        settings,
+        voices,
+        programTypes,
+        programs,
+        dialogs,
+        ads,
+        adPresets,
+        newsSources,
+        scheduleTemplates,
+        automations,
+        customHolidays,
+      ] = await Promise.all([
+        storage.getSettings(userId),
+        storage.getVoices(userId),
+        storage.getProgramTypes(userId),
+        storage.getPrograms(userId),
+        storage.getDialogs(userId),
+        storage.getAds(userId),
+        storage.getAdPresets(userId),
+        storage.getNewsSources(userId),
+        storage.getScheduleTemplates(userId),
+        storage.getAutomations(userId),
+        storage.getCustomHolidays(userId),
+      ]);
+
+      const hostShifts: any[] = [];
+      for (const tpl of scheduleTemplates) {
+        const shifts = await storage.getHostShifts(tpl.id);
+        hostShifts.push(...shifts);
+      }
+
+      const exportData = {
+        exportVersion: 1,
+        exportedAt: new Date().toISOString(),
+        sourceUser: { email: user.email, username: user.username },
+        settings: settings || null,
+        voices,
+        programTypes,
+        programs,
+        dialogs,
+        ads,
+        adPresets,
+        newsSources,
+        scheduleTemplates,
+        hostShifts,
+        automations,
+        customHolidays,
+      };
+
+      res.setHeader("Content-Disposition", `attachment; filename="radioflow-export-${Date.now()}.json"`);
+      res.json(exportData);
+    } catch (error) {
+      console.error("Export data error:", error);
+      res.status(500).json({ error: "Failed to export data" });
+    }
+  });
+
+  app.post("/api/admin/import-data", requireAdmin, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const data = req.body;
+
+      if (!data || !data.exportVersion) {
+        return res.status(400).json({ error: "Invalid export data format" });
+      }
+
+      const results: Record<string, { created: number; skipped: number }> = {};
+      const idMapping: Record<string, string> = {};
+
+      if (data.settings) {
+        try {
+          const { id, userId: oldUserId, ...settingsData } = data.settings;
+          await storage.saveSettings({ ...settingsData, userId }, userId);
+          results.settings = { created: 1, skipped: 0 };
+        } catch (e: any) {
+          console.warn("Settings import error:", e.message);
+          results.settings = { created: 0, skipped: 1 };
+        }
+      }
+
+      if (data.voices?.length) {
+        const existingVoices = await storage.getVoices(userId);
+        const existingByElevenLabsId = new Map(existingVoices.map(v => [v.elevenLabsVoiceId, v]));
+        results.voices = { created: 0, skipped: 0 };
+        for (const v of data.voices) {
+          const oldId = v.id;
+          if (v.elevenLabsVoiceId && existingByElevenLabsId.has(v.elevenLabsVoiceId)) {
+            idMapping[oldId] = existingByElevenLabsId.get(v.elevenLabsVoiceId)!.id;
+            results.voices.skipped++;
+            continue;
+          }
+          try {
+            const { id, userId: oldUserId, createdAt, ...voiceData } = v;
+            const created = await storage.createVoice({ ...voiceData, userId });
+            idMapping[oldId] = created.id;
+            results.voices.created++;
+          } catch (e: any) {
+            console.warn(`Voice import error (${v.name}):`, e.message);
+            results.voices.skipped++;
+          }
+        }
+      }
+
+      if (data.programTypes?.length) {
+        const existingTypes = await storage.getProgramTypes(userId);
+        const existingBySlug = new Map(existingTypes.map(pt => [pt.slug, pt]));
+        results.programTypes = { created: 0, skipped: 0 };
+        for (const pt of data.programTypes) {
+          const oldId = pt.id;
+          if (existingBySlug.has(pt.slug)) {
+            idMapping[oldId] = existingBySlug.get(pt.slug)!.id;
+            results.programTypes.skipped++;
+            continue;
+          }
+          try {
+            const { id, userId: oldUserId, createdAt, ...ptData } = pt;
+            const remappedVoiceIds = ptData.voiceIds?.map((vid: string) => idMapping[vid] || vid) || null;
+            const created = await storage.createProgramType({ ...ptData, voiceIds: remappedVoiceIds, userId });
+            idMapping[oldId] = created.id;
+            results.programTypes.created++;
+          } catch (e: any) {
+            console.warn(`ProgramType import error (${pt.name}):`, e.message);
+            results.programTypes.skipped++;
+          }
+        }
+      }
+
+      if (data.programs?.length) {
+        const existingPrograms = await storage.getPrograms(userId);
+        const existingByTitle = new Set(existingPrograms.map(p => `${p.programTypeId}:${p.title}`));
+        results.programs = { created: 0, skipped: 0 };
+        for (const prog of data.programs) {
+          const oldId = prog.id;
+          const newTypeId = idMapping[prog.programTypeId] || prog.programTypeId;
+          const key = `${newTypeId}:${prog.title}`;
+          if (existingByTitle.has(key)) {
+            results.programs.skipped++;
+            continue;
+          }
+          try {
+            const { id, userId: oldUserId, createdAt, programTypeId, voiceAssignments, ...progData } = prog;
+            const remappedVoiceAssignments = voiceAssignments
+              ? Object.fromEntries(
+                  Object.entries(voiceAssignments).map(([speaker, voiceId]) => [speaker, idMapping[voiceId as string] || voiceId])
+                )
+              : null;
+            const created = await storage.createProgram({
+              ...progData,
+              programTypeId: newTypeId,
+              voiceAssignments: remappedVoiceAssignments,
+              userId,
+            });
+            idMapping[oldId] = created.id;
+            results.programs.created++;
+          } catch (e: any) {
+            console.warn(`Program import error (${prog.title}):`, e.message);
+            results.programs.skipped++;
+          }
+        }
+      }
+
+      if (data.dialogs?.length) {
+        const existingDialogs = await storage.getDialogs(userId);
+        const existingByTitle = new Set(existingDialogs.map(d => d.title));
+        results.dialogs = { created: 0, skipped: 0 };
+        for (const d of data.dialogs) {
+          if (existingByTitle.has(d.title)) {
+            results.dialogs.skipped++;
+            continue;
+          }
+          try {
+            const { id, userId: oldUserId, createdAt, ...dialogData } = d;
+            await storage.createDialog({ ...dialogData, userId });
+            results.dialogs.created++;
+          } catch (e: any) {
+            console.warn(`Dialog import error (${d.title}):`, e.message);
+            results.dialogs.skipped++;
+          }
+        }
+      }
+
+      if (data.ads?.length) {
+        const existingAds = await storage.getAds(userId);
+        const existingByTitle = new Set(existingAds.map(a => a.title));
+        results.ads = { created: 0, skipped: 0 };
+        for (const ad of data.ads) {
+          if (existingByTitle.has(ad.title)) {
+            results.ads.skipped++;
+            continue;
+          }
+          try {
+            const { id, userId: oldUserId, createdAt, voiceId, voiceAssignments, ...adData } = ad;
+            const remappedVoiceId = voiceId ? (idMapping[voiceId] || voiceId) : null;
+            const remappedVoiceAssignments = voiceAssignments
+              ? Object.fromEntries(
+                  Object.entries(voiceAssignments).map(([speaker, vid]) => [speaker, idMapping[vid as string] || vid])
+                )
+              : null;
+            await storage.createAd({
+              ...adData,
+              voiceId: remappedVoiceId,
+              voiceAssignments: remappedVoiceAssignments,
+              userId,
+            });
+            results.ads.created++;
+          } catch (e: any) {
+            console.warn(`Ad import error (${ad.title}):`, e.message);
+            results.ads.skipped++;
+          }
+        }
+      }
+
+      if (data.adPresets?.length) {
+        const existingPresets = await storage.getAdPresets(userId);
+        const existingByName = new Set(existingPresets.map(p => p.name));
+        results.adPresets = { created: 0, skipped: 0 };
+        for (const preset of data.adPresets) {
+          if (existingByName.has(preset.name)) {
+            results.adPresets.skipped++;
+            continue;
+          }
+          try {
+            const { id, userId: oldUserId, createdAt, defaultVoiceId, ...presetData } = preset;
+            const remappedVoiceId = defaultVoiceId ? (idMapping[defaultVoiceId] || defaultVoiceId) : null;
+            await storage.createAdPreset({ ...presetData, defaultVoiceId: remappedVoiceId, userId });
+            results.adPresets.created++;
+          } catch (e: any) {
+            console.warn(`AdPreset import error (${preset.name}):`, e.message);
+            results.adPresets.skipped++;
+          }
+        }
+      }
+
+      if (data.newsSources?.length) {
+        const existingSources = await storage.getNewsSources(userId);
+        const existingByUrl = new Set(existingSources.map(s => s.url));
+        results.newsSources = { created: 0, skipped: 0 };
+        for (const src of data.newsSources) {
+          if (existingByUrl.has(src.url)) {
+            results.newsSources.skipped++;
+            continue;
+          }
+          try {
+            const { id, userId: oldUserId, createdAt, ...srcData } = src;
+            await storage.createNewsSource({ ...srcData, userId });
+            results.newsSources.created++;
+          } catch (e: any) {
+            console.warn(`NewsSource import error (${src.name}):`, e.message);
+            results.newsSources.skipped++;
+          }
+        }
+      }
+
+      if (data.scheduleTemplates?.length) {
+        const existingTemplates = await storage.getScheduleTemplates(userId);
+        const existingByName = new Map(existingTemplates.map(t => [t.name, t]));
+        results.scheduleTemplates = { created: 0, skipped: 0 };
+        for (const tpl of data.scheduleTemplates) {
+          const oldId = tpl.id;
+          if (existingByName.has(tpl.name)) {
+            idMapping[oldId] = existingByName.get(tpl.name)!.id;
+            results.scheduleTemplates.skipped++;
+            continue;
+          }
+          try {
+            const { id, userId: oldUserId, createdAt, ...tplData } = tpl;
+            const created = await storage.createScheduleTemplate({ ...tplData, userId });
+            idMapping[oldId] = created.id;
+            results.scheduleTemplates.created++;
+          } catch (e: any) {
+            console.warn(`ScheduleTemplate import error (${tpl.name}):`, e.message);
+            results.scheduleTemplates.skipped++;
+          }
+        }
+      }
+
+      if (data.hostShifts?.length) {
+        results.hostShifts = { created: 0, skipped: 0 };
+        for (const shift of data.hostShifts) {
+          try {
+            const { id, ...shiftData } = shift;
+            const newTemplateId = idMapping[shiftData.templateId] || shiftData.templateId;
+            const remappedVoiceIds = shiftData.voiceIds?.map((vid: string) => idMapping[vid] || vid) || [];
+            await storage.createHostShift({ ...shiftData, templateId: newTemplateId, voiceIds: remappedVoiceIds });
+            results.hostShifts.created++;
+          } catch (e: any) {
+            console.warn(`HostShift import error:`, e.message);
+            results.hostShifts.skipped++;
+          }
+        }
+      }
+
+      if (data.automations?.length) {
+        const existingAutomations = await storage.getAutomations(userId);
+        const existingByName = new Set(existingAutomations.map(a => a.name));
+        results.automations = { created: 0, skipped: 0 };
+        for (const auto of data.automations) {
+          if (existingByName.has(auto.name)) {
+            results.automations.skipped++;
+            continue;
+          }
+          try {
+            const { id, userId: oldUserId, createdAt, programTypeId, ...autoData } = auto;
+            const newProgramTypeId = programTypeId ? (idMapping[programTypeId] || programTypeId) : null;
+            await storage.createAutomation({ ...autoData, programTypeId: newProgramTypeId, userId });
+            results.automations.created++;
+          } catch (e: any) {
+            console.warn(`Automation import error (${auto.name}):`, e.message);
+            results.automations.skipped++;
+          }
+        }
+      }
+
+      if (data.customHolidays?.length) {
+        const existingHolidays = await storage.getCustomHolidays(userId);
+        const existingByDate = new Set(existingHolidays.map(h => h.date));
+        results.customHolidays = { created: 0, skipped: 0 };
+        for (const holiday of data.customHolidays) {
+          if (existingByDate.has(holiday.date)) {
+            results.customHolidays.skipped++;
+            continue;
+          }
+          try {
+            const { id, userId: oldUserId, ...holidayData } = holiday;
+            await storage.createCustomHoliday({ ...holidayData, userId });
+            results.customHolidays.created++;
+          } catch (e: any) {
+            console.warn(`CustomHoliday import error:`, e.message);
+            results.customHolidays.skipped++;
+          }
+        }
+      }
+
+      res.json({
+        message: "Import completed",
+        results,
+        idMapping,
+      });
+    } catch (error) {
+      console.error("Import data error:", error);
+      res.status(500).json({ error: "Failed to import data" });
+    }
+  });
+
   app.get("/api/settings", async (req, res) => {
     try {
       const settings = await storage.getSettings(req.session.userId);
