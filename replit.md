@@ -41,7 +41,8 @@ Preferred communication style: Simple, everyday language.
 
 ### Core Features
 - **AI-Powered Script Generation**: Generates dialogs, program scripts, and ads using Claude (primary) or OpenAI (fallback).
-- **Multi-Speaker Scripts**: Supports scripts with multiple speakers for both shows AND ads, including emotion tags for enhanced TTS and visual rendering. Ads with `speakersCount > 1` generate multi-speaker variants with `[Speaker Name]:` format and emotion tags. Voice assignment UI maps speakers to individual voices. Audio synthesis segments by speaker, synthesizes each with the assigned voice, and concatenates via ffmpeg.
+- **Multi-Speaker Scripts**: Supports scripts with multiple speakers for both shows AND ads, including emotion tags for enhanced TTS and visual rendering. Ads with `speakersCount > 1` generate multi-speaker variants with `[Speaker Name]:` format and emotion tags. Voice assignment UI maps speakers to individual voices. Audio synthesis segments by speaker, synthesizes each with the assigned voice, and concatenates via ffmpeg with silence gaps between segments (450ms between different speakers, 200ms for same speaker) for natural-sounding audio.
+- **TTS Voice Settings**: Configurable `ttsStability` (default 0.75) and `ttsSimilarityBoost` (default 0.75) in Settings UI, applied to all ElevenLabs TTS calls.
 - **Schedule System**: Flexible templates for broadcast scheduling, host rotation, and integration with holiday calendars (static and custom).
 - **Language-Aware Generation**: AI prompts are localized to ensure scripts are generated in the user's preferred language.
 - **Automatic Weekly Pipeline**: Automates script generation, audio synthesis, and cloud storage upload for programs based on configurable settings.

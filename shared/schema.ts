@@ -71,6 +71,8 @@ Must include: greeting to listeners, an interesting fact or useful tip.`),
   dialogStyle: text("dialog_style").default("lively"),
   dialogReplicas: integer("dialog_replicas").default(4),
   showHints: boolean("show_hints").default(true),
+  ttsStability: real("tts_stability").default(0.75),
+  ttsSimilarityBoost: real("tts_similarity_boost").default(0.75),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).omit({

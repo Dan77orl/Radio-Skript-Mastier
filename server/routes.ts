@@ -612,13 +612,53 @@ function isMultiSpeakerScript(scriptText: string): boolean {
   return !!matches && matches.length >= 2;
 }
 
-async function concatMp3WithFfmpeg(segmentFiles: string[], outputFile: string, tmpDir: string, timestamp: number): Promise<void> {
+async function generateSilence(durationMs: number, outputPath: string): Promise<void> {
+  const { execFile } = await import("child_process");
+  const { promisify } = await import("util");
+  const execFileAsync = promisify(execFile);
+  const durationSec = durationMs / 1000;
+  await execFileAsync("ffmpeg", [
+    "-y", "-f", "lavfi", "-i", `anullsrc=r=44100:cl=mono`,
+    "-t", String(durationSec),
+    "-c:a", "libmp3lame", "-b:a", "192k",
+    outputPath,
+  ], { timeout: 10000 });
+}
+
+async function concatMp3WithFfmpeg(
+  segmentFiles: string[],
+  outputFile: string,
+  tmpDir: string,
+  timestamp: number,
+  speakerPerSegment?: string[],
+): Promise<void> {
   const { execFile } = await import("child_process");
   const { promisify } = await import("util");
   const execFileAsync = promisify(execFile);
 
+  const silenceFiles: string[] = [];
+  const filesWithGaps: string[] = [];
+
+  for (let i = 0; i < segmentFiles.length; i++) {
+    filesWithGaps.push(segmentFiles[i]);
+    if (i < segmentFiles.length - 1) {
+      const sameSpeaker = speakerPerSegment &&
+        speakerPerSegment[i] && speakerPerSegment[i + 1] &&
+        speakerPerSegment[i].toLowerCase() === speakerPerSegment[i + 1].toLowerCase();
+      const gapMs = sameSpeaker ? 200 : 450;
+      const silFile = path.join(tmpDir, `_silence_${timestamp}_${i}.mp3`);
+      try {
+        await generateSilence(gapMs, silFile);
+        filesWithGaps.push(silFile);
+        silenceFiles.push(silFile);
+      } catch (err: any) {
+        console.warn(`Failed to generate silence gap ${i}:`, err.message);
+      }
+    }
+  }
+
   const listFile = path.join(tmpDir, `_concat_${timestamp}.txt`);
-  const listContent = segmentFiles.map(f => `file '${f}'`).join("\n");
+  const listContent = filesWithGaps.map(f => `file '${f}'`).join("\n");
   await fs.writeFile(listFile, listContent);
 
   try {
@@ -632,7 +672,7 @@ async function concatMp3WithFfmpeg(segmentFiles: string[], outputFile: string, t
       "-write_xing", "1",
       outputFile,
     ], { timeout: 120000 });
-    console.log(`ffmpeg concat: ${segmentFiles.length} segments -> ${path.basename(outputFile)}`);
+    console.log(`ffmpeg concat: ${segmentFiles.length} segments (${filesWithGaps.length} with gaps) -> ${path.basename(outputFile)}`);
   } catch (err: any) {
     console.warn("ffmpeg concat failed, falling back to Buffer.concat:", err.message);
     const buffers: Buffer[] = [];
@@ -642,6 +682,9 @@ async function concatMp3WithFfmpeg(segmentFiles: string[], outputFile: string, t
     await fs.writeFile(outputFile, Buffer.concat(buffers));
   } finally {
     await fs.unlink(listFile).catch(() => {});
+    for (const sf of silenceFiles) {
+      await fs.unlink(sf).catch(() => {});
+    }
   }
 }
 
@@ -1540,6 +1583,9 @@ ${ps.minReplicas(dialogReplicas)}`;
         });
       }
 
+      const ttsStability = settings.ttsStability ?? 0.75;
+      const ttsSimilarityBoost = settings.ttsSimilarityBoost ?? 0.75;
+
       const generateVoice = async (text: string, voiceId: string): Promise<Buffer> => {
         const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
           method: "POST",
@@ -1552,8 +1598,8 @@ ${ps.minReplicas(dialogReplicas)}`;
             model_id: "eleven_v3",
             output_format: "mp3_44100_192",
             voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.75,
+              stability: ttsStability,
+              similarity_boost: ttsSimilarityBoost,
             },
           }),
         });
@@ -2065,6 +2111,9 @@ IMPORTANT: Response in JSON format:
 
       res.json({ queued: dialogsForDate.length });
 
+      const ttsStability2 = settings.ttsStability ?? 0.75;
+      const ttsSimilarityBoost2 = settings.ttsSimilarityBoost ?? 0.75;
+
       const generateVoiceAudio = async (text: string, voiceId: string): Promise<Buffer> => {
         const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
           method: "POST",
@@ -2077,8 +2126,8 @@ IMPORTANT: Response in JSON format:
             model_id: "eleven_v3",
             output_format: "mp3_44100_192",
             voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.75,
+              stability: ttsStability2,
+              similarity_boost: ttsSimilarityBoost2,
             },
           }),
         });
@@ -3244,6 +3293,9 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
           await fs.mkdir(audioDir, { recursive: true });
           const timestamp = Date.now();
 
+          const adTtsStability = settings.ttsStability ?? 0.75;
+          const adTtsSimilarityBoost = settings.ttsSimilarityBoost ?? 0.75;
+
           let finalAudioFile: string;
           let voiceNameForVersion: string;
 
@@ -3258,6 +3310,7 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
             }
 
             const segmentFiles: string[] = [];
+            const segmentSpeakers: string[] = [];
             const usedVoiceNames: string[] = [];
 
             for (let i = 0; i < segments.length; i++) {
@@ -3291,7 +3344,7 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
                   text: cleanText,
                   model_id: "eleven_v3",
                   output_format: "mp3_44100_192",
-                  voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+                  voice_settings: { stability: adTtsStability, similarity_boost: adTtsSimilarityBoost },
                 }),
               });
 
@@ -3304,13 +3357,14 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
               const segFile = path.join(audioDir, `_ad_seg_${timestamp}_${i}.mp3`);
               await fs.writeFile(segFile, segBuffer);
               segmentFiles.push(segFile);
+              segmentSpeakers.push(seg.speaker);
 
               const vName = voiceNameMap.get(segVoiceId) || segVoiceId;
               if (!usedVoiceNames.includes(vName)) usedVoiceNames.push(vName);
             }
 
             finalAudioFile = path.join(audioDir, `ad_${id}_${timestamp}.mp3`);
-            await concatMp3WithFfmpeg(segmentFiles, finalAudioFile, audioDir, timestamp);
+            await concatMp3WithFfmpeg(segmentFiles, finalAudioFile, audioDir, timestamp, segmentSpeakers);
 
             for (const sf of segmentFiles) {
               await fs.unlink(sf).catch(() => {});
@@ -3328,7 +3382,7 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
                 text: scriptText,
                 model_id: "eleven_v3",
                 output_format: "mp3_44100_192",
-                voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+                voice_settings: { stability: adTtsStability, similarity_boost: adTtsSimilarityBoost },
               }),
             });
 
@@ -5058,6 +5112,9 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
       const voicesList = await storage.getVoices(req.session.userId!);
       const programType = await storage.getProgramType(program.programTypeId, req.session.userId!);
 
+      const progTtsStability = settings.ttsStability ?? 0.75;
+      const progTtsSimilarityBoost = settings.ttsSimilarityBoost ?? 0.75;
+
       const generateVoiceSegment = async (text: string, voiceId: string): Promise<Buffer> => {
         const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
           method: "POST",
@@ -5070,8 +5127,8 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
             model_id: "eleven_v3",
             output_format: "mp3_44100_192",
             voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.75,
+              stability: progTtsStability,
+              similarity_boost: progTtsSimilarityBoost,
             },
           }),
         });
@@ -5104,6 +5161,7 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
         }
 
         const segmentFiles: string[] = [];
+        const segmentSpeakers: string[] = [];
         let segmentErrors: string[] = [];
 
         for (let i = 0; i < segments.length; i++) {
@@ -5134,6 +5192,7 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
             const segFile = path.join(audioDir, `_seg_${timestamp}_${i}.mp3`);
             await fs.writeFile(segFile, buffer);
             segmentFiles.push(segFile);
+            segmentSpeakers.push(segment.speaker);
           } catch (err) {
             console.error(`Segment ${i + 1} synthesis error:`, err);
             segmentErrors.push(`Сегмент ${i + 1} (${segment.speaker}): ошибка синтеза`);
@@ -5147,7 +5206,7 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
         const filename = resolveFileName(programType?.fileNameTemplate, programType, program, timestamp);
         const outputFile = path.join(audioDir, filename);
 
-        const combined = await concatMp3WithFfmpeg(segmentFiles, outputFile, audioDir, timestamp);
+        const combined = await concatMp3WithFfmpeg(segmentFiles, outputFile, audioDir, timestamp, segmentSpeakers);
 
         for (const f of segmentFiles) {
           await fs.unlink(f).catch(() => {});

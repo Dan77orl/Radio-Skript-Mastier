@@ -37,6 +37,8 @@ const settingsFormSchema = z.object({
   stationWebsite: z.string().optional(),
   stationLocation: z.string().optional(),
   stationAttachments: z.array(z.string()).optional(),
+  ttsStability: z.coerce.number().min(0).max(1).optional(),
+  ttsSimilarityBoost: z.coerce.number().min(0).max(1).optional(),
 });
 
 type SettingsFormValues = z.infer<typeof settingsFormSchema>;
@@ -87,6 +89,8 @@ export default function SettingsPage() {
       stationWebsite: "",
       stationLocation: "",
       stationAttachments: [],
+      ttsStability: 0.75,
+      ttsSimilarityBoost: 0.75,
     },
   });
 
@@ -107,6 +111,8 @@ export default function SettingsPage() {
         stationWebsite: settings.stationWebsite || "",
         stationLocation: settings.stationLocation || "",
         stationAttachments: settings.stationAttachments || [],
+        ttsStability: settings.ttsStability ?? 0.75,
+        ttsSimilarityBoost: settings.ttsSimilarityBoost ?? 0.75,
       });
     }
   }, [settings, form]);
@@ -441,6 +447,72 @@ export default function SettingsPage() {
                       </FormItem>
                     )}
                   />
+
+                  <div className="rounded-lg border p-4 space-y-4 bg-muted/30">
+                    <h4 className="text-sm font-medium">{t("settings.ttsSettings")}</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="ttsStability"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("settings.ttsStability")}</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={1}
+                                step={0.05}
+                                {...field}
+                                data-testid="input-tts-stability"
+                              />
+                            </FormControl>
+                            <FormDescription>{t("settings.ttsStabilityDesc")}</FormDescription>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="ttsSimilarityBoost"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("settings.ttsSimilarityBoost")}</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={1}
+                                step={0.05}
+                                {...field}
+                                data-testid="input-tts-similarity"
+                              />
+                            </FormControl>
+                            <FormDescription>{t("settings.ttsSimilarityBoostDesc")}</FormDescription>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <HintTooltip hint={t("hints.settings.saveTtsSettings")}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => saveFieldMutation.mutate({
+                          ttsStability: Number(form.getValues("ttsStability")),
+                          ttsSimilarityBoost: Number(form.getValues("ttsSimilarityBoost")),
+                        })}
+                        disabled={saveFieldMutation.isPending}
+                        data-testid="button-save-tts-settings"
+                      >
+                        {saveFieldMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {t("common.save")}
+                      </Button>
+                    </HintTooltip>
+                  </div>
 
                   <Separator />
 
