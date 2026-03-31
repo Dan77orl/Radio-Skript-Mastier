@@ -1046,9 +1046,14 @@ export default function AdsPage() {
             <CardContent className="space-y-4">
               <div className="rounded-lg bg-muted p-4 mb-4">
                 <p className="text-sm font-medium mb-2">{t("ads.selectedText")}:</p>
-                <div className="text-sm">
-                  {isMultiSpeakerAd ? renderMultiSpeakerScript(scriptForVoices) : scriptForVoices}
-                </div>
+                <textarea
+                  className="w-full min-h-[80px] text-sm bg-transparent border border-border rounded-md p-2 resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+                  value={scriptForVoices}
+                  onChange={(e) => {
+                    setCurrentAd(prev => prev ? { ...prev, selectedVariantText: e.target.value } : prev);
+                  }}
+                  data-testid="textarea-edit-ad-script"
+                />
               </div>
 
               {isMultiSpeakerAd && (
