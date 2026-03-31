@@ -642,58 +642,74 @@ async function concatMp3WithFfmpeg(
   timestamp: number,
   speakerPerSegment?: string[],
 ): Promise<void> {
+  if (segmentFiles.length === 0) return;
+  if (segmentFiles.length === 1) {
+    await fs.copyFile(segmentFiles[0], outputFile);
+    return;
+  }
+
   const { execFile } = await import("child_process");
   const { promisify } = await import("util");
   const execFileAsync = promisify(execFile);
 
   const silenceFiles: string[] = [];
-  const fadedFiles: string[] = [];
   const CROSSFADE_SEC = 0.08;
 
-  try {
-    for (let i = 0; i < segmentFiles.length; i++) {
-      const fadedFile = path.join(tmpDir, `_faded_${timestamp}_${i}.mp3`);
-      const fadeArgs: string[] = ["-y", "-i", segmentFiles[i]];
-      const filters: string[] = [];
-      if (i > 0) filters.push(`afade=t=in:st=0:d=${CROSSFADE_SEC}`);
-      if (i < segmentFiles.length - 1) filters.push(`afade=t=out:d=${CROSSFADE_SEC}:curve=exp`);
+  const allFiles: string[] = [];
+  const allSpeakers: string[] = [];
 
-      if (filters.length > 0) {
-        fadeArgs.push("-af", filters.join(","));
-      }
-      fadeArgs.push("-c:a", "libmp3lame", "-b:a", "192k", fadedFile);
+  for (let i = 0; i < segmentFiles.length; i++) {
+    allFiles.push(segmentFiles[i]);
+    allSpeakers.push(speakerPerSegment?.[i] || "");
 
+    if (i < segmentFiles.length - 1) {
+      const sameSpeaker = speakerPerSegment &&
+        speakerPerSegment[i] && speakerPerSegment[i + 1] &&
+        speakerPerSegment[i].toLowerCase() === speakerPerSegment[i + 1].toLowerCase();
+      const gapMs = sameSpeaker ? 200 : 450;
+      const silFile = path.join(tmpDir, `_silence_${timestamp}_${i}.mp3`);
       try {
-        await execFileAsync("ffmpeg", fadeArgs, { timeout: 15000 });
-        fadedFiles.push(fadedFile);
-      } catch {
-        fadedFiles.push(segmentFiles[i]);
+        await generateSilence(gapMs, silFile);
+        allFiles.push(silFile);
+        allSpeakers.push("__silence__");
+        silenceFiles.push(silFile);
+      } catch (err: any) {
+        console.warn(`Failed to generate silence gap ${i}:`, err.message);
       }
     }
+  }
 
-    const filesWithGaps: string[] = [];
-    for (let i = 0; i < fadedFiles.length; i++) {
-      filesWithGaps.push(fadedFiles[i]);
-      if (i < fadedFiles.length - 1) {
-        const sameSpeaker = speakerPerSegment &&
-          speakerPerSegment[i] && speakerPerSegment[i + 1] &&
-          speakerPerSegment[i].toLowerCase() === speakerPerSegment[i + 1].toLowerCase();
-        const gapMs = sameSpeaker ? 200 : 450;
-        const silFile = path.join(tmpDir, `_silence_${timestamp}_${i}.mp3`);
-        try {
-          await generateSilence(gapMs, silFile);
-          filesWithGaps.push(silFile);
-          silenceFiles.push(silFile);
-        } catch (err: any) {
-          console.warn(`Failed to generate silence gap ${i}:`, err.message);
-        }
-      }
+  try {
+    const inputArgs: string[] = [];
+    for (const f of allFiles) {
+      inputArgs.push("-i", f);
     }
 
+    const filterParts: string[] = [];
+    let prevLabel = "[0]";
+    for (let i = 1; i < allFiles.length; i++) {
+      const outLabel = i < allFiles.length - 1 ? `[a${i}]` : "";
+      filterParts.push(`${prevLabel}[${i}]acrossfade=d=${CROSSFADE_SEC}:c1=tri:c2=tri${outLabel}`);
+      prevLabel = `[a${i}]`;
+    }
+
+    const filterComplex = filterParts.join(";");
+
+    await execFileAsync("ffmpeg", [
+      "-y",
+      ...inputArgs,
+      "-filter_complex", filterComplex,
+      "-c:a", "libmp3lame",
+      "-b:a", "192k",
+      "-write_xing", "1",
+      outputFile,
+    ], { timeout: 120000 });
+    console.log(`ffmpeg acrossfade: ${segmentFiles.length} segments -> ${path.basename(outputFile)}`);
+  } catch (err: any) {
+    console.warn("ffmpeg acrossfade failed, falling back to simple concat:", err.message);
     const listFile = path.join(tmpDir, `_concat_${timestamp}.txt`);
-    const listContent = filesWithGaps.map(f => `file '${f}'`).join("\n");
+    const listContent = allFiles.map(f => `file '${f}'`).join("\n");
     await fs.writeFile(listFile, listContent);
-
     try {
       await execFileAsync("ffmpeg", [
         "-y",
@@ -705,9 +721,8 @@ async function concatMp3WithFfmpeg(
         "-write_xing", "1",
         outputFile,
       ], { timeout: 120000 });
-      console.log(`ffmpeg concat: ${segmentFiles.length} segments (${filesWithGaps.length} with gaps+fades) -> ${path.basename(outputFile)}`);
-    } catch (err: any) {
-      console.warn("ffmpeg concat failed, falling back to Buffer.concat:", err.message);
+    } catch (err2: any) {
+      console.warn("ffmpeg simple concat also failed, Buffer.concat:", err2.message);
       const buffers: Buffer[] = [];
       for (const f of segmentFiles) {
         buffers.push(await fs.readFile(f));
@@ -719,11 +734,6 @@ async function concatMp3WithFfmpeg(
   } finally {
     for (const sf of silenceFiles) {
       await fs.unlink(sf).catch(() => {});
-    }
-    for (const ff of fadedFiles) {
-      if (ff !== segmentFiles[fadedFiles.indexOf(ff)]) {
-        await fs.unlink(ff).catch(() => {});
-      }
     }
   }
 }
