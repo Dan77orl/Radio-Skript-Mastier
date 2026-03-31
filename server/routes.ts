@@ -982,6 +982,50 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/sync-voices", requireAdmin, async (req, res) => {
+    try {
+      const { voices: voicesToSync } = req.body;
+      if (!Array.isArray(voicesToSync) || voicesToSync.length === 0) {
+        return res.status(400).json({ error: "voices array is required" });
+      }
+
+      const userId = req.session.userId!;
+      const existingVoices = await storage.getVoices(userId);
+      const existingVoiceIds = new Set(existingVoices.map(v => v.elevenLabsVoiceId));
+
+      const created: string[] = [];
+      const skipped: string[] = [];
+      const invalid: string[] = [];
+
+      for (const v of voicesToSync) {
+        if (!v || typeof v.name !== "string" || !v.name.trim() || typeof v.elevenLabsVoiceId !== "string" || !v.elevenLabsVoiceId.trim()) {
+          invalid.push(v?.name || "unknown");
+          continue;
+        }
+        if (existingVoiceIds.has(v.elevenLabsVoiceId)) {
+          skipped.push(v.name);
+          continue;
+        }
+        existingVoiceIds.add(v.elevenLabsVoiceId);
+        await storage.createVoice({
+          userId,
+          name: v.name.trim(),
+          elevenLabsVoiceId: v.elevenLabsVoiceId.trim(),
+          gender: v.gender === "female" ? "female" : "male",
+          previewUrl: typeof v.previewUrl === "string" ? v.previewUrl : null,
+          description: typeof v.description === "string" ? v.description : null,
+          assignedProgramTypeIds: Array.isArray(v.assignedProgramTypeIds) ? v.assignedProgramTypeIds : null,
+        });
+        created.push(v.name);
+      }
+
+      res.json({ created, skipped, invalid, message: `Created ${created.length} voices, skipped ${skipped.length}, invalid ${invalid.length}` });
+    } catch (error) {
+      console.error("Admin sync voices error:", error);
+      res.status(500).json({ error: "Failed to sync voices" });
+    }
+  });
+
   app.get("/api/settings", async (req, res) => {
     try {
       const settings = await storage.getSettings(req.session.userId);
@@ -3737,14 +3781,25 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: name,
+          new_name: name,
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error("ElevenLabs add shared voice error:", errorText);
-        return res.status(response.status).json({ error: "Failed to add shared voice to account" });
+        let detail = "Failed to add shared voice to account";
+        try {
+          const parsed = JSON.parse(errorText);
+          if (parsed.detail) {
+            if (typeof parsed.detail === "string") {
+              detail = parsed.detail;
+            } else if (Array.isArray(parsed.detail)) {
+              detail = parsed.detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ");
+            }
+          }
+        } catch {}
+        return res.status(response.status).json({ error: detail });
       }
 
       const data = await response.json();

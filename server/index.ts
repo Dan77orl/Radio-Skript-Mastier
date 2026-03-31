@@ -151,6 +151,25 @@ app.use((req, res, next) => {
       log(`serving on port ${port}`);
       setTimeout(() => seedDemoIfNeeded(), 5000);
       setTimeout(() => ensureAdminExists().catch(e => console.error("[admin-bootstrap]", e)), 3000);
+      setTimeout(async () => {
+        try {
+          const { pool: checkPool } = await import("./db");
+          const adminEmails = (process.env.ADMIN_EMAILS || "test@test.com").split(",").map(e => e.trim()).filter(Boolean);
+          for (const email of adminEmails) {
+            const adminResult = await checkPool.query("SELECT id FROM users WHERE email = $1 LIMIT 1", [email]);
+            if (adminResult.rows.length > 0) {
+              const adminId = adminResult.rows[0].id;
+              const voiceResult = await checkPool.query("SELECT COUNT(*) as cnt FROM voices WHERE user_id = $1", [adminId]);
+              const voiceCount = parseInt(voiceResult.rows[0]?.cnt || "0");
+              if (voiceCount < 4) {
+                console.log(`[voice-check] Admin ${email} has only ${voiceCount} voices. Use POST /api/admin/sync-voices to add missing voices.`);
+              }
+            }
+          }
+        } catch (e) {
+          console.error("[voice-check] Error checking voices:", e);
+        }
+      }, 8000);
     },
   );
 })();
