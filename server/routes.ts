@@ -183,7 +183,7 @@ interface ScriptSegment {
 }
 
 function parseMultiSpeakerScript(scriptText: string): ScriptSegment[] {
-  const segments: ScriptSegment[] = [];
+  const rawSegments: ScriptSegment[] = [];
   const lines = scriptText.split("\n");
   let currentSpeaker = "";
   let currentText = "";
@@ -192,7 +192,7 @@ function parseMultiSpeakerScript(scriptText: string): ScriptSegment[] {
     const speakerMatch = line.match(/^\s*\[([^\]]+)\]:\s*(.*)/);
     if (speakerMatch) {
       if (currentSpeaker && currentText.trim()) {
-        segments.push({ speaker: currentSpeaker, text: currentText.trim() });
+        rawSegments.push({ speaker: currentSpeaker, text: currentText.trim() });
       }
       currentSpeaker = speakerMatch[1];
       currentText = speakerMatch[2];
@@ -202,10 +202,20 @@ function parseMultiSpeakerScript(scriptText: string): ScriptSegment[] {
   }
   
   if (currentSpeaker && currentText.trim()) {
-    segments.push({ speaker: currentSpeaker, text: currentText.trim() });
+    rawSegments.push({ speaker: currentSpeaker, text: currentText.trim() });
+  }
+
+  const merged: ScriptSegment[] = [];
+  for (const seg of rawSegments) {
+    const last = merged[merged.length - 1];
+    if (last && last.speaker.toLowerCase() === seg.speaker.toLowerCase()) {
+      last.text = last.text + " " + seg.text;
+    } else {
+      merged.push({ speaker: seg.speaker, text: seg.text });
+    }
   }
   
-  return segments;
+  return merged;
 }
 
 function resolveAssignedVoices(voicesList: any[], programType: any): any[] {
@@ -637,53 +647,83 @@ async function concatMp3WithFfmpeg(
   const execFileAsync = promisify(execFile);
 
   const silenceFiles: string[] = [];
-  const filesWithGaps: string[] = [];
-
-  for (let i = 0; i < segmentFiles.length; i++) {
-    filesWithGaps.push(segmentFiles[i]);
-    if (i < segmentFiles.length - 1) {
-      const sameSpeaker = speakerPerSegment &&
-        speakerPerSegment[i] && speakerPerSegment[i + 1] &&
-        speakerPerSegment[i].toLowerCase() === speakerPerSegment[i + 1].toLowerCase();
-      const gapMs = sameSpeaker ? 200 : 450;
-      const silFile = path.join(tmpDir, `_silence_${timestamp}_${i}.mp3`);
-      try {
-        await generateSilence(gapMs, silFile);
-        filesWithGaps.push(silFile);
-        silenceFiles.push(silFile);
-      } catch (err: any) {
-        console.warn(`Failed to generate silence gap ${i}:`, err.message);
-      }
-    }
-  }
-
-  const listFile = path.join(tmpDir, `_concat_${timestamp}.txt`);
-  const listContent = filesWithGaps.map(f => `file '${f}'`).join("\n");
-  await fs.writeFile(listFile, listContent);
+  const fadedFiles: string[] = [];
+  const CROSSFADE_SEC = 0.08;
 
   try {
-    await execFileAsync("ffmpeg", [
-      "-y",
-      "-f", "concat",
-      "-safe", "0",
-      "-i", listFile,
-      "-c:a", "libmp3lame",
-      "-b:a", "192k",
-      "-write_xing", "1",
-      outputFile,
-    ], { timeout: 120000 });
-    console.log(`ffmpeg concat: ${segmentFiles.length} segments (${filesWithGaps.length} with gaps) -> ${path.basename(outputFile)}`);
-  } catch (err: any) {
-    console.warn("ffmpeg concat failed, falling back to Buffer.concat:", err.message);
-    const buffers: Buffer[] = [];
-    for (const f of segmentFiles) {
-      buffers.push(await fs.readFile(f));
+    for (let i = 0; i < segmentFiles.length; i++) {
+      const fadedFile = path.join(tmpDir, `_faded_${timestamp}_${i}.mp3`);
+      const fadeArgs: string[] = ["-y", "-i", segmentFiles[i]];
+      const filters: string[] = [];
+      if (i > 0) filters.push(`afade=t=in:st=0:d=${CROSSFADE_SEC}`);
+      if (i < segmentFiles.length - 1) filters.push(`afade=t=out:d=${CROSSFADE_SEC}:curve=exp`);
+
+      if (filters.length > 0) {
+        fadeArgs.push("-af", filters.join(","));
+      }
+      fadeArgs.push("-c:a", "libmp3lame", "-b:a", "192k", fadedFile);
+
+      try {
+        await execFileAsync("ffmpeg", fadeArgs, { timeout: 15000 });
+        fadedFiles.push(fadedFile);
+      } catch {
+        fadedFiles.push(segmentFiles[i]);
+      }
     }
-    await fs.writeFile(outputFile, Buffer.concat(buffers));
+
+    const filesWithGaps: string[] = [];
+    for (let i = 0; i < fadedFiles.length; i++) {
+      filesWithGaps.push(fadedFiles[i]);
+      if (i < fadedFiles.length - 1) {
+        const sameSpeaker = speakerPerSegment &&
+          speakerPerSegment[i] && speakerPerSegment[i + 1] &&
+          speakerPerSegment[i].toLowerCase() === speakerPerSegment[i + 1].toLowerCase();
+        const gapMs = sameSpeaker ? 200 : 450;
+        const silFile = path.join(tmpDir, `_silence_${timestamp}_${i}.mp3`);
+        try {
+          await generateSilence(gapMs, silFile);
+          filesWithGaps.push(silFile);
+          silenceFiles.push(silFile);
+        } catch (err: any) {
+          console.warn(`Failed to generate silence gap ${i}:`, err.message);
+        }
+      }
+    }
+
+    const listFile = path.join(tmpDir, `_concat_${timestamp}.txt`);
+    const listContent = filesWithGaps.map(f => `file '${f}'`).join("\n");
+    await fs.writeFile(listFile, listContent);
+
+    try {
+      await execFileAsync("ffmpeg", [
+        "-y",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", listFile,
+        "-c:a", "libmp3lame",
+        "-b:a", "192k",
+        "-write_xing", "1",
+        outputFile,
+      ], { timeout: 120000 });
+      console.log(`ffmpeg concat: ${segmentFiles.length} segments (${filesWithGaps.length} with gaps+fades) -> ${path.basename(outputFile)}`);
+    } catch (err: any) {
+      console.warn("ffmpeg concat failed, falling back to Buffer.concat:", err.message);
+      const buffers: Buffer[] = [];
+      for (const f of segmentFiles) {
+        buffers.push(await fs.readFile(f));
+      }
+      await fs.writeFile(outputFile, Buffer.concat(buffers));
+    } finally {
+      await fs.unlink(listFile).catch(() => {});
+    }
   } finally {
-    await fs.unlink(listFile).catch(() => {});
     for (const sf of silenceFiles) {
       await fs.unlink(sf).catch(() => {});
+    }
+    for (const ff of fadedFiles) {
+      if (ff !== segmentFiles[fadedFiles.indexOf(ff)]) {
+        await fs.unlink(ff).catch(() => {});
+      }
     }
   }
 }
