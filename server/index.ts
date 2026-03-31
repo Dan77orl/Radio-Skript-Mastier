@@ -161,7 +161,7 @@ app.use((req, res, next) => {
               const adminId = adminResult.rows[0].id;
               const voiceResult = await checkPool.query("SELECT COUNT(*) as cnt FROM voices WHERE user_id = $1", [adminId]);
               const voiceCount = parseInt(voiceResult.rows[0]?.cnt || "0");
-              if (voiceCount < 4) {
+              if (voiceCount < 6) {
                 console.log(`[voice-check] Admin ${email} has only ${voiceCount} voices. Use POST /api/admin/sync-voices to add missing voices.`);
               }
             }

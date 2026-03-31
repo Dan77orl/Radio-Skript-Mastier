@@ -242,10 +242,19 @@ export default function VoicesPage() {
         });
         const data = await res.json();
         voiceId = data.voice_id;
-      } catch (err) {
+      } catch (err: any) {
+        let errorDetail = t("voices.libraryAddError");
+        try {
+          const msg = err.message || "";
+          const jsonPart = msg.substring(msg.indexOf("{"));
+          if (jsonPart) {
+            const errData = JSON.parse(jsonPart);
+            if (errData.error) errorDetail = errData.error;
+          }
+        } catch {}
         toast({
           title: t("common.error"),
-          description: t("voices.libraryAddError"),
+          description: errorDetail,
           variant: "destructive",
         });
         return;
