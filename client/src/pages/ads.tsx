@@ -107,6 +107,7 @@ export default function AdsPage() {
   const [smartImage, setSmartImage] = useState<File | null>(null);
   const [smartImagePreview, setSmartImagePreview] = useState<string | null>(null);
   const [showVoiceLibrary, setShowVoiceLibrary] = useState(false);
+  const [adVoiceTab, setAdVoiceTab] = useState<"saved" | "elevenlabs" | "library">("saved");
   const [voiceSearchQuery, setVoiceSearchQuery] = useState("");
   const [voiceSearchGender, setVoiceSearchGender] = useState("all");
   const [voiceSearchLanguage, setVoiceSearchLanguage] = useState("all");
@@ -224,7 +225,7 @@ export default function AdsPage() {
     queryKey: ["/api/voices"],
   });
 
-  const { data: elevenLabsVoices } = useQuery<{ voices: Array<{ voice_id: string; name: string; labels?: { gender?: string } }> }>({
+  const { data: elevenLabsVoices } = useQuery<{ voices: Array<{ voice_id: string; name: string; category?: string; labels?: { gender?: string; language?: string; accent?: string; age?: string; use_case?: string }; preview_url?: string; description?: string }> }>({
     queryKey: ["/api/elevenlabs/voices"],
   });
 
@@ -246,7 +247,7 @@ export default function AdsPage() {
     has_more: boolean;
   }>({
     queryKey: [voiceSearchUrl],
-    enabled: showVoiceLibrary,
+    enabled: showVoiceLibrary || adVoiceTab === "library",
   });
 
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
@@ -1027,9 +1028,10 @@ export default function AdsPage() {
         const scriptForVoices = currentAd.selectedVariantText || "";
         const isMultiSpeakerAd = hasFormattedSpeakers(scriptForVoices);
         const adSpeakers = isMultiSpeakerAd ? extractSpeakers(scriptForVoices) : [];
+        const savedVoiceIds = new Set(voices?.filter(v => v.isActive).map(v => v.elevenLabsVoiceId) || []);
         const allVoiceOptions = [
-          ...(voices?.filter(v => v.isActive).map(v => ({ id: v.elevenLabsVoiceId, name: getCleanVoiceName(v), gender: v.gender })) || []),
-          ...(!voices?.length && elevenLabsVoices?.voices ? elevenLabsVoices.voices.slice(0, 8).map(v => ({ id: v.voice_id, name: v.name, gender: v.labels?.gender })) : []),
+          ...(voices?.filter(v => v.isActive).map(v => ({ id: v.elevenLabsVoiceId, name: getCleanVoiceName(v), gender: v.gender, source: "saved" as const })) || []),
+          ...(elevenLabsVoices?.voices?.filter(v => !savedVoiceIds.has(v.voice_id)).map(v => ({ id: v.voice_id, name: v.name, gender: v.labels?.gender, source: "elevenlabs" as const })) || []),
         ];
         const canSynthesize = isMultiSpeakerAd
           ? adSpeakers.every(s => adSpeakerVoiceMap[s])
@@ -1077,7 +1079,16 @@ export default function AdsPage() {
                             </SelectTrigger>
                           </HintTooltip>
                           <SelectContent>
-                            {allVoiceOptions.map(v => (
+                            {allVoiceOptions.filter(v => v.source === "saved").length > 0 && (
+                              <div className="px-2 py-1 text-xs text-muted-foreground font-medium">{t("ads.savedVoices")}</div>
+                            )}
+                            {allVoiceOptions.filter(v => v.source === "saved").map(v => (
+                              <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                            ))}
+                            {allVoiceOptions.filter(v => v.source === "elevenlabs").length > 0 && (
+                              <div className="px-2 py-1 text-xs text-muted-foreground font-medium mt-1 border-t pt-1">ElevenLabs</div>
+                            )}
+                            {allVoiceOptions.filter(v => v.source === "elevenlabs").map(v => (
                               <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                             ))}
                           </SelectContent>
@@ -1089,130 +1100,67 @@ export default function AdsPage() {
               )}
 
               {!isMultiSpeakerAd && (
-                <>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium">{t("ads.myVoices")}</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowVoiceLibrary(!showVoiceLibrary)}
-                      data-testid="button-add-persona"
-                    >
-                      {showVoiceLibrary ? <X className="mr-1 h-4 w-4" /> : <Plus className="mr-1 h-4 w-4" />}
-                      {showVoiceLibrary ? t("common.close") : t("ads.addPersona")}
-                    </Button>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {voices?.filter(v => v.isActive).map((voice) => (
-                      <div
-                        key={voice.id}
-                        className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors hover-elevate ${
-                          selectedVoiceId === voice.elevenLabsVoiceId ? "border-primary bg-primary/5" : ""
-                        }`}
-                        onClick={() => { setSelectedVoiceId(voice.elevenLabsVoiceId); setSelectedVoiceName(getCleanVoiceName(voice)); }}
-                        data-testid={`voice-${voice.id}`}
-                      >
-                        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                          voice.gender === "male" ? "bg-blue-500/20" : "bg-pink-500/20"
-                        }`}>
-                          <Volume2 className={`h-5 w-5 ${
-                            voice.gender === "male" ? "text-blue-500" : "text-pink-500"
-                          }`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{getCleanVoiceName(voice)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {voice.gender === "male" ? t("ads.male") : t("ads.female")}
-                          </p>
-                        </div>
-                        {selectedVoiceId === voice.elevenLabsVoiceId && (
-                          <Check className="h-5 w-5 text-primary" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+                <Tabs value={adVoiceTab} onValueChange={(v) => setAdVoiceTab(v as "saved" | "elevenlabs" | "library")} className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="saved" data-testid="tab-saved-voices">
+                      {t("ads.savedVoices")}
+                      {voices?.filter(v => v.isActive).length ? ` (${voices.filter(v => v.isActive).length})` : ""}
+                    </TabsTrigger>
+                    <TabsTrigger value="elevenlabs" data-testid="tab-elevenlabs-voices">
+                      ElevenLabs
+                      {elevenLabsVoices?.voices?.length ? ` (${elevenLabsVoices.voices.length})` : ""}
+                    </TabsTrigger>
+                    <TabsTrigger value="library" data-testid="tab-voice-library">
+                      {t("ads.voiceLibrary")}
+                    </TabsTrigger>
+                  </TabsList>
 
-              {showVoiceLibrary && (
-                <div className="border rounded-lg p-4 space-y-3">
-                  <p className="text-sm font-medium">{t("ads.voiceLibrary")}</p>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder={t("ads.searchVoicePlaceholder")}
-                      value={voiceSearchQuery}
-                      onChange={(e) => setVoiceSearchQuery(e.target.value)}
-                      className="flex-1"
-                      data-testid="input-voice-search"
-                    />
-                    <Select value={voiceSearchLanguage} onValueChange={setVoiceSearchLanguage}>
-                      <SelectTrigger className="w-36" data-testid="select-voice-language">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t("ads.allLanguages")}</SelectItem>
-                        <SelectItem value="arabic">العربية</SelectItem>
-                        <SelectItem value="bulgarian">Български</SelectItem>
-                        <SelectItem value="chinese">中文</SelectItem>
-                        <SelectItem value="croatian">Hrvatski</SelectItem>
-                        <SelectItem value="czech">Čeština</SelectItem>
-                        <SelectItem value="danish">Dansk</SelectItem>
-                        <SelectItem value="dutch">Nederlands</SelectItem>
-                        <SelectItem value="english">English</SelectItem>
-                        <SelectItem value="filipino">Filipino</SelectItem>
-                        <SelectItem value="finnish">Suomi</SelectItem>
-                        <SelectItem value="french">Français</SelectItem>
-                        <SelectItem value="german">Deutsch</SelectItem>
-                        <SelectItem value="greek">Ελληνικά</SelectItem>
-                        <SelectItem value="hebrew">עברית</SelectItem>
-                        <SelectItem value="hindi">हिन्दी</SelectItem>
-                        <SelectItem value="hungarian">Magyar</SelectItem>
-                        <SelectItem value="indonesian">Bahasa Indonesia</SelectItem>
-                        <SelectItem value="italian">Italiano</SelectItem>
-                        <SelectItem value="japanese">日本語</SelectItem>
-                        <SelectItem value="korean">한국어</SelectItem>
-                        <SelectItem value="malay">Bahasa Melayu</SelectItem>
-                        <SelectItem value="norwegian">Norsk</SelectItem>
-                        <SelectItem value="polish">Polski</SelectItem>
-                        <SelectItem value="portuguese">Português</SelectItem>
-                        <SelectItem value="romanian">Română</SelectItem>
-                        <SelectItem value="russian">Русский</SelectItem>
-                        <SelectItem value="slovak">Slovenčina</SelectItem>
-                        <SelectItem value="spanish">Español</SelectItem>
-                        <SelectItem value="swedish">Svenska</SelectItem>
-                        <SelectItem value="tamil">தமிழ்</SelectItem>
-                        <SelectItem value="turkish">Türkçe</SelectItem>
-                        <SelectItem value="ukrainian">Українська</SelectItem>
-                        <SelectItem value="vietnamese">Tiếng Việt</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select value={voiceSearchGender} onValueChange={setVoiceSearchGender}>
-                      <SelectTrigger className="w-28" data-testid="select-voice-gender">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t("ads.allGenders")}</SelectItem>
-                        <SelectItem value="male">{t("ads.male")}</SelectItem>
-                        <SelectItem value="female">{t("ads.female")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {isSearchingVoices ? (
-                    <div className="flex justify-center py-4">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <TabsContent value="saved" className="mt-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {voices?.filter(v => v.isActive).map((voice) => (
+                        <div
+                          key={voice.id}
+                          className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors hover-elevate ${
+                            selectedVoiceId === voice.elevenLabsVoiceId ? "border-primary bg-primary/5" : ""
+                          }`}
+                          onClick={() => { setSelectedVoiceId(voice.elevenLabsVoiceId); setSelectedVoiceName(getCleanVoiceName(voice)); }}
+                          data-testid={`voice-${voice.id}`}
+                        >
+                          <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                            voice.gender === "male" ? "bg-blue-500/20" : "bg-pink-500/20"
+                          }`}>
+                            <Volume2 className={`h-5 w-5 ${
+                              voice.gender === "male" ? "text-blue-500" : "text-pink-500"
+                            }`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{getCleanVoiceName(voice)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {voice.gender === "male" ? t("ads.male") : t("ads.female")}
+                            </p>
+                          </div>
+                          {selectedVoiceId === voice.elevenLabsVoiceId && (
+                            <Check className="h-5 w-5 text-primary" />
+                          )}
+                        </div>
+                      ))}
+                      {(!voices || voices.filter(v => v.isActive).length === 0) && (
+                        <p className="text-sm text-muted-foreground col-span-2 text-center py-4">{t("ads.noSavedVoices")}</p>
+                      )}
                     </div>
-                  ) : (
-                    <ScrollArea className="h-[250px]">
+                  </TabsContent>
+
+                  <TabsContent value="elevenlabs" className="mt-3">
+                    <ScrollArea className="h-[300px]">
                       <div className="grid gap-2">
-                        {sharedVoicesData?.voices?.map((voice) => (
+                        {elevenLabsVoices?.voices?.map((voice) => (
                           <div
                             key={voice.voice_id}
                             className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors hover-elevate ${
                               selectedVoiceId === voice.voice_id ? "border-primary bg-primary/5" : ""
                             }`}
                             onClick={() => { setSelectedVoiceId(voice.voice_id); setSelectedVoiceName(voice.name); }}
-                            data-testid={`shared-voice-${voice.voice_id}`}
+                            data-testid={`el-voice-${voice.voice_id}`}
                           >
                             <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
                               voice.labels?.gender === "male" ? "bg-blue-500/20" : "bg-pink-500/20"
@@ -1229,25 +1177,23 @@ export default function AdsPage() {
                             </div>
                             <div className="flex items-center gap-1">
                               {voice.preview_url && (
-                                <HintTooltip hint={t("hints.ads.previewVoiceLibrary")}>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      previewVoice(voice.preview_url!);
-                                    }}
-                                    data-testid={`preview-voice-${voice.voice_id}`}
-                                  >
-                                    {previewingVoiceUrl === voice.preview_url ? (
-                                      <PauseCircle className="h-4 w-4" />
-                                    ) : (
-                                      <PlayCircle className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </HintTooltip>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    previewVoice(voice.preview_url!);
+                                  }}
+                                  data-testid={`preview-el-voice-${voice.voice_id}`}
+                                >
+                                  {previewingVoiceUrl === voice.preview_url ? (
+                                    <PauseCircle className="h-4 w-4" />
+                                  ) : (
+                                    <PlayCircle className="h-4 w-4" />
+                                  )}
+                                </Button>
                               )}
                               {selectedVoiceId === voice.voice_id && (
                                 <Check className="h-4 w-4 text-primary" />
@@ -1255,10 +1201,139 @@ export default function AdsPage() {
                             </div>
                           </div>
                         ))}
+                        {(!elevenLabsVoices?.voices || elevenLabsVoices.voices.length === 0) && (
+                          <p className="text-sm text-muted-foreground text-center py-4">{t("ads.noElevenLabsVoices")}</p>
+                        )}
                       </div>
                     </ScrollArea>
-                  )}
-                </div>
+                  </TabsContent>
+
+                  <TabsContent value="library" className="mt-3">
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder={t("ads.searchVoicePlaceholder")}
+                          value={voiceSearchQuery}
+                          onChange={(e) => setVoiceSearchQuery(e.target.value)}
+                          className="flex-1"
+                          data-testid="input-voice-search"
+                        />
+                        <Select value={voiceSearchLanguage} onValueChange={setVoiceSearchLanguage}>
+                          <SelectTrigger className="w-36" data-testid="select-voice-language">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">{t("ads.allLanguages")}</SelectItem>
+                            <SelectItem value="arabic">العربية</SelectItem>
+                            <SelectItem value="bulgarian">Български</SelectItem>
+                            <SelectItem value="chinese">中文</SelectItem>
+                            <SelectItem value="croatian">Hrvatski</SelectItem>
+                            <SelectItem value="czech">Čeština</SelectItem>
+                            <SelectItem value="danish">Dansk</SelectItem>
+                            <SelectItem value="dutch">Nederlands</SelectItem>
+                            <SelectItem value="english">English</SelectItem>
+                            <SelectItem value="filipino">Filipino</SelectItem>
+                            <SelectItem value="finnish">Suomi</SelectItem>
+                            <SelectItem value="french">Français</SelectItem>
+                            <SelectItem value="german">Deutsch</SelectItem>
+                            <SelectItem value="greek">Ελληνικά</SelectItem>
+                            <SelectItem value="hebrew">עברית</SelectItem>
+                            <SelectItem value="hindi">हिन्दी</SelectItem>
+                            <SelectItem value="hungarian">Magyar</SelectItem>
+                            <SelectItem value="indonesian">Bahasa Indonesia</SelectItem>
+                            <SelectItem value="italian">Italiano</SelectItem>
+                            <SelectItem value="japanese">日本語</SelectItem>
+                            <SelectItem value="korean">한국어</SelectItem>
+                            <SelectItem value="malay">Bahasa Melayu</SelectItem>
+                            <SelectItem value="norwegian">Norsk</SelectItem>
+                            <SelectItem value="polish">Polski</SelectItem>
+                            <SelectItem value="portuguese">Português</SelectItem>
+                            <SelectItem value="romanian">Română</SelectItem>
+                            <SelectItem value="russian">Русский</SelectItem>
+                            <SelectItem value="slovak">Slovenčina</SelectItem>
+                            <SelectItem value="spanish">Español</SelectItem>
+                            <SelectItem value="swedish">Svenska</SelectItem>
+                            <SelectItem value="tamil">தமிழ்</SelectItem>
+                            <SelectItem value="turkish">Türkçe</SelectItem>
+                            <SelectItem value="ukrainian">Українська</SelectItem>
+                            <SelectItem value="vietnamese">Tiếng Việt</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select value={voiceSearchGender} onValueChange={setVoiceSearchGender}>
+                          <SelectTrigger className="w-28" data-testid="select-voice-gender">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">{t("ads.allGenders")}</SelectItem>
+                            <SelectItem value="male">{t("ads.male")}</SelectItem>
+                            <SelectItem value="female">{t("ads.female")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {isSearchingVoices ? (
+                        <div className="flex justify-center py-4">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : (
+                        <ScrollArea className="h-[250px]">
+                          <div className="grid gap-2">
+                            {sharedVoicesData?.voices?.map((voice) => (
+                              <div
+                                key={voice.voice_id}
+                                className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors hover-elevate ${
+                                  selectedVoiceId === voice.voice_id ? "border-primary bg-primary/5" : ""
+                                }`}
+                                onClick={() => { setSelectedVoiceId(voice.voice_id); setSelectedVoiceName(voice.name); }}
+                                data-testid={`shared-voice-${voice.voice_id}`}
+                              >
+                                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                                  voice.labels?.gender === "male" ? "bg-blue-500/20" : "bg-pink-500/20"
+                                }`}>
+                                  <User className={`h-5 w-5 ${
+                                    voice.labels?.gender === "male" ? "text-blue-500" : "text-pink-500"
+                                  }`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium truncate text-sm">{voice.name}</p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {[voice.labels?.language, voice.labels?.gender, voice.labels?.accent, voice.labels?.age].filter(Boolean).join(" · ")}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {voice.preview_url && (
+                                    <HintTooltip hint={t("hints.ads.previewVoiceLibrary")}>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          previewVoice(voice.preview_url!);
+                                        }}
+                                        data-testid={`preview-voice-${voice.voice_id}`}
+                                      >
+                                        {previewingVoiceUrl === voice.preview_url ? (
+                                          <PauseCircle className="h-4 w-4" />
+                                        ) : (
+                                          <PlayCircle className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </HintTooltip>
+                                  )}
+                                  {selectedVoiceId === voice.voice_id && (
+                                    <Check className="h-4 w-4 text-primary" />
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
               )}
 
               <HintTooltip hint={t("hints.ads.synthesize")}>
@@ -1465,153 +1540,212 @@ export default function AdsPage() {
               </div>
 
               <div className="border rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">{t("ads.reRenderVoice")}</p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowVoiceLibrary(!showVoiceLibrary)}
-                    data-testid="toggle-voice-library-audio"
-                  >
-                    {showVoiceLibrary ? t("ads.myVoices") : t("ads.voiceLibrary")}
-                  </Button>
-                </div>
+                <p className="text-sm font-medium">{t("ads.reRenderVoice")}</p>
 
-                {!showVoiceLibrary ? (
-                  <div className="flex gap-2 flex-wrap">
-                    {voices?.filter(v => v.isActive).map((voice) => (
-                      <Button
-                        key={voice.id}
-                        variant={selectedVoiceId === voice.elevenLabsVoiceId ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => { setSelectedVoiceId(voice.elevenLabsVoiceId); setSelectedVoiceName(getCleanVoiceName(voice)); }}
-                        data-testid={`rerender-voice-${voice.id}`}
-                      >
-                        <Volume2 className="mr-1 h-3 w-3" />
-                        {getCleanVoiceName(voice)}
-                      </Button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder={t("ads.searchVoicePlaceholder")}
-                        value={voiceSearchQuery}
-                        onChange={(e) => setVoiceSearchQuery(e.target.value)}
-                        className="flex-1"
-                        data-testid="input-voice-search-audio"
-                      />
-                      <Select value={voiceSearchLanguage} onValueChange={setVoiceSearchLanguage}>
-                        <SelectTrigger className="w-32" data-testid="select-voice-language-audio">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">{t("ads.allLanguages")}</SelectItem>
-                          <SelectItem value="arabic">العربية</SelectItem>
-                          <SelectItem value="bulgarian">Български</SelectItem>
-                          <SelectItem value="chinese">中文</SelectItem>
-                          <SelectItem value="croatian">Hrvatski</SelectItem>
-                          <SelectItem value="czech">Čeština</SelectItem>
-                          <SelectItem value="danish">Dansk</SelectItem>
-                          <SelectItem value="dutch">Nederlands</SelectItem>
-                          <SelectItem value="english">English</SelectItem>
-                          <SelectItem value="filipino">Filipino</SelectItem>
-                          <SelectItem value="finnish">Suomi</SelectItem>
-                          <SelectItem value="french">Français</SelectItem>
-                          <SelectItem value="german">Deutsch</SelectItem>
-                          <SelectItem value="greek">Ελληνικά</SelectItem>
-                          <SelectItem value="hebrew">עברית</SelectItem>
-                          <SelectItem value="hindi">हिन्दी</SelectItem>
-                          <SelectItem value="hungarian">Magyar</SelectItem>
-                          <SelectItem value="indonesian">Bahasa Indonesia</SelectItem>
-                          <SelectItem value="italian">Italiano</SelectItem>
-                          <SelectItem value="japanese">日本語</SelectItem>
-                          <SelectItem value="korean">한국어</SelectItem>
-                          <SelectItem value="malay">Bahasa Melayu</SelectItem>
-                          <SelectItem value="norwegian">Norsk</SelectItem>
-                          <SelectItem value="polish">Polski</SelectItem>
-                          <SelectItem value="portuguese">Português</SelectItem>
-                          <SelectItem value="romanian">Română</SelectItem>
-                          <SelectItem value="russian">Русский</SelectItem>
-                          <SelectItem value="slovak">Slovenčina</SelectItem>
-                          <SelectItem value="spanish">Español</SelectItem>
-                          <SelectItem value="swedish">Svenska</SelectItem>
-                          <SelectItem value="tamil">தமிழ்</SelectItem>
-                          <SelectItem value="turkish">Türkçe</SelectItem>
-                          <SelectItem value="ukrainian">Українська</SelectItem>
-                          <SelectItem value="vietnamese">Tiếng Việt</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select value={voiceSearchGender} onValueChange={setVoiceSearchGender}>
-                        <SelectTrigger className="w-24" data-testid="select-voice-gender-audio">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">{t("ads.allGenders")}</SelectItem>
-                          <SelectItem value="male">{t("ads.male")}</SelectItem>
-                          <SelectItem value="female">{t("ads.female")}</SelectItem>
-                        </SelectContent>
-                      </Select>
+                <Tabs defaultValue="saved" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 h-8">
+                    <TabsTrigger value="saved" className="text-xs" data-testid="tab-rerender-saved">
+                      {t("ads.savedVoices")}
+                    </TabsTrigger>
+                    <TabsTrigger value="elevenlabs" className="text-xs" data-testid="tab-rerender-elevenlabs">
+                      ElevenLabs
+                    </TabsTrigger>
+                    <TabsTrigger value="library" className="text-xs" data-testid="tab-rerender-library" onClick={() => { if (!showVoiceLibrary) setShowVoiceLibrary(true); }}>
+                      {t("ads.voiceLibrary")}
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="saved" className="mt-2">
+                    <div className="flex gap-2 flex-wrap">
+                      {voices?.filter(v => v.isActive).map((voice) => (
+                        <Button
+                          key={voice.id}
+                          variant={selectedVoiceId === voice.elevenLabsVoiceId ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => { setSelectedVoiceId(voice.elevenLabsVoiceId); setSelectedVoiceName(getCleanVoiceName(voice)); }}
+                          data-testid={`rerender-voice-${voice.id}`}
+                        >
+                          <Volume2 className="mr-1 h-3 w-3" />
+                          {getCleanVoiceName(voice)}
+                        </Button>
+                      ))}
                     </div>
-                    {isSearchingVoices ? (
-                      <div className="flex justify-center py-3">
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : (
-                      <ScrollArea className="h-[200px]">
-                        <div className="grid gap-1.5">
-                          {sharedVoicesData?.voices?.map((voice) => (
-                            <div
-                              key={voice.voice_id}
-                              className={`flex items-center gap-2 rounded-lg border p-2 cursor-pointer transition-colors hover:bg-muted/50 ${
-                                selectedVoiceId === voice.voice_id ? "border-primary bg-primary/5" : ""
-                              }`}
-                              onClick={() => { setSelectedVoiceId(voice.voice_id); setSelectedVoiceName(voice.name); }}
-                              data-testid={`audio-shared-voice-${voice.voice_id}`}
-                            >
-                              <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
-                                voice.labels?.gender === "male" ? "bg-blue-500/20" : "bg-pink-500/20"
-                              }`}>
-                                <User className={`h-4 w-4 ${
-                                  voice.labels?.gender === "male" ? "text-blue-500" : "text-pink-500"
-                                }`} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{voice.name}</p>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {[voice.labels?.language, voice.labels?.gender, voice.labels?.accent].filter(Boolean).join(" · ")}
-                                </p>
-                              </div>
-                              {voice.preview_url && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 shrink-0"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    previewVoice(voice.preview_url!);
-                                  }}
-                                  data-testid={`audio-preview-voice-${voice.voice_id}`}
-                                >
-                                  {previewingVoiceUrl === voice.preview_url ? (
-                                    <PauseCircle className="h-4 w-4" />
-                                  ) : (
-                                    <PlayCircle className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              )}
-                              {selectedVoiceId === voice.voice_id && (
-                                <Check className="h-4 w-4 text-primary shrink-0" />
-                              )}
+                  </TabsContent>
+
+                  <TabsContent value="elevenlabs" className="mt-2">
+                    <ScrollArea className="h-[180px]">
+                      <div className="grid gap-1.5">
+                        {elevenLabsVoices?.voices?.map((voice) => (
+                          <div
+                            key={voice.voice_id}
+                            className={`flex items-center gap-2 rounded-lg border p-2 cursor-pointer transition-colors hover:bg-muted/50 ${
+                              selectedVoiceId === voice.voice_id ? "border-primary bg-primary/5" : ""
+                            }`}
+                            onClick={() => { setSelectedVoiceId(voice.voice_id); setSelectedVoiceName(voice.name); }}
+                            data-testid={`rerender-el-voice-${voice.voice_id}`}
+                          >
+                            <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
+                              voice.labels?.gender === "male" ? "bg-blue-500/20" : "bg-pink-500/20"
+                            }`}>
+                              <User className={`h-4 w-4 ${
+                                voice.labels?.gender === "male" ? "text-blue-500" : "text-pink-500"
+                              }`} />
                             </div>
-                          ))}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{voice.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {[voice.labels?.language, voice.labels?.gender, voice.labels?.accent].filter(Boolean).join(" · ")}
+                              </p>
+                            </div>
+                            {voice.preview_url && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 shrink-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  previewVoice(voice.preview_url!);
+                                }}
+                                data-testid={`rerender-preview-el-${voice.voice_id}`}
+                              >
+                                {previewingVoiceUrl === voice.preview_url ? (
+                                  <PauseCircle className="h-4 w-4" />
+                                ) : (
+                                  <PlayCircle className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
+                            {selectedVoiceId === voice.voice_id && (
+                              <Check className="h-4 w-4 text-primary shrink-0" />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </TabsContent>
+
+                  <TabsContent value="library" className="mt-2">
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder={t("ads.searchVoicePlaceholder")}
+                          value={voiceSearchQuery}
+                          onChange={(e) => setVoiceSearchQuery(e.target.value)}
+                          className="flex-1"
+                          data-testid="input-voice-search-audio"
+                        />
+                        <Select value={voiceSearchLanguage} onValueChange={setVoiceSearchLanguage}>
+                          <SelectTrigger className="w-32" data-testid="select-voice-language-audio">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">{t("ads.allLanguages")}</SelectItem>
+                            <SelectItem value="arabic">العربية</SelectItem>
+                            <SelectItem value="bulgarian">Български</SelectItem>
+                            <SelectItem value="chinese">中文</SelectItem>
+                            <SelectItem value="croatian">Hrvatski</SelectItem>
+                            <SelectItem value="czech">Čeština</SelectItem>
+                            <SelectItem value="danish">Dansk</SelectItem>
+                            <SelectItem value="dutch">Nederlands</SelectItem>
+                            <SelectItem value="english">English</SelectItem>
+                            <SelectItem value="filipino">Filipino</SelectItem>
+                            <SelectItem value="finnish">Suomi</SelectItem>
+                            <SelectItem value="french">Français</SelectItem>
+                            <SelectItem value="german">Deutsch</SelectItem>
+                            <SelectItem value="greek">Ελληνικά</SelectItem>
+                            <SelectItem value="hebrew">עברית</SelectItem>
+                            <SelectItem value="hindi">हिन्दी</SelectItem>
+                            <SelectItem value="hungarian">Magyar</SelectItem>
+                            <SelectItem value="indonesian">Bahasa Indonesia</SelectItem>
+                            <SelectItem value="italian">Italiano</SelectItem>
+                            <SelectItem value="japanese">日本語</SelectItem>
+                            <SelectItem value="korean">한국어</SelectItem>
+                            <SelectItem value="malay">Bahasa Melayu</SelectItem>
+                            <SelectItem value="norwegian">Norsk</SelectItem>
+                            <SelectItem value="polish">Polski</SelectItem>
+                            <SelectItem value="portuguese">Português</SelectItem>
+                            <SelectItem value="romanian">Română</SelectItem>
+                            <SelectItem value="russian">Русский</SelectItem>
+                            <SelectItem value="slovak">Slovenčina</SelectItem>
+                            <SelectItem value="spanish">Español</SelectItem>
+                            <SelectItem value="swedish">Svenska</SelectItem>
+                            <SelectItem value="tamil">தமிழ்</SelectItem>
+                            <SelectItem value="turkish">Türkçe</SelectItem>
+                            <SelectItem value="ukrainian">Українська</SelectItem>
+                            <SelectItem value="vietnamese">Tiếng Việt</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select value={voiceSearchGender} onValueChange={setVoiceSearchGender}>
+                          <SelectTrigger className="w-24" data-testid="select-voice-gender-audio">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">{t("ads.allGenders")}</SelectItem>
+                            <SelectItem value="male">{t("ads.male")}</SelectItem>
+                            <SelectItem value="female">{t("ads.female")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {isSearchingVoices ? (
+                        <div className="flex justify-center py-3">
+                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                         </div>
-                      </ScrollArea>
-                    )}
-                  </div>
-                )}
+                      ) : (
+                        <ScrollArea className="h-[200px]">
+                          <div className="grid gap-1.5">
+                            {sharedVoicesData?.voices?.map((voice) => (
+                              <div
+                                key={voice.voice_id}
+                                className={`flex items-center gap-2 rounded-lg border p-2 cursor-pointer transition-colors hover:bg-muted/50 ${
+                                  selectedVoiceId === voice.voice_id ? "border-primary bg-primary/5" : ""
+                                }`}
+                                onClick={() => { setSelectedVoiceId(voice.voice_id); setSelectedVoiceName(voice.name); }}
+                                data-testid={`audio-shared-voice-${voice.voice_id}`}
+                              >
+                                <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
+                                  voice.labels?.gender === "male" ? "bg-blue-500/20" : "bg-pink-500/20"
+                                }`}>
+                                  <User className={`h-4 w-4 ${
+                                    voice.labels?.gender === "male" ? "text-blue-500" : "text-pink-500"
+                                  }`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{voice.name}</p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {[voice.labels?.language, voice.labels?.gender, voice.labels?.accent].filter(Boolean).join(" · ")}
+                                  </p>
+                                </div>
+                                {voice.preview_url && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 shrink-0"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      previewVoice(voice.preview_url!);
+                                    }}
+                                    data-testid={`audio-preview-voice-${voice.voice_id}`}
+                                  >
+                                    {previewingVoiceUrl === voice.preview_url ? (
+                                      <PauseCircle className="h-4 w-4" />
+                                    ) : (
+                                      <PlayCircle className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                )}
+                                {selectedVoiceId === voice.voice_id && (
+                                  <Check className="h-4 w-4 text-primary shrink-0" />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
 
                 <Button
                   onClick={() => {
