@@ -46,7 +46,14 @@ const geminiAI = new GoogleGenAI({
   },
 });
 
-const CLAUDE_MODEL = "claude-sonnet-4-20250514";
+const CLAUDE_MODEL_DIRECT = "claude-sonnet-4-20250514";
+const CLAUDE_MODEL_REPLIT = "claude-sonnet-4-5";
+function getClaudeModel(): string {
+  return (process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY && process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL)
+    ? CLAUDE_MODEL_REPLIT
+    : CLAUDE_MODEL_DIRECT;
+}
+const CLAUDE_MODEL = getClaudeModel();
 
 interface ParsedNewsItem {
   title: string;
