@@ -106,7 +106,7 @@ function getEffectiveElevenLabsKey(settings: any): string | null {
 }
 
 function getEffectiveAnthropicKey(settings: any): string | null {
-  return process.env.ANTHROPIC_API_KEY || settings?.anthropicApiKey || null;
+  return process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || settings?.anthropicApiKey || null;
 }
 
 function withEffectiveKeys(settings: any): any {
@@ -119,6 +119,12 @@ function withEffectiveKeys(settings: any): any {
 }
 
 async function getAnthropicClient(userId?: string): Promise<Anthropic | null> {
+  if (process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY && process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL) {
+    return new Anthropic({
+      apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
+      baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
+    });
+  }
   const settings = await storage.getSettings(userId);
   const apiKey = getEffectiveAnthropicKey(settings);
   if (!apiKey) {
@@ -1630,8 +1636,8 @@ export async function registerRoutes(
       const settingsData = await storage.getSettings(req.session?.userId);
       let respText: string;
 
-      if (settingsData?.anthropicApiKey) {
-        const anthropic = new Anthropic({ apiKey: settingsData.anthropicApiKey });
+      const anthropic = await getAnthropicClient(req.session?.userId);
+      if (anthropic) {
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
           max_tokens: 4000,
@@ -3995,11 +4001,9 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
         const pdfBuffer = await fs.readFile(filePath);
         const base64Pdf = pdfBuffer.toString("base64");
 
-        const settings = await storage.getSettings(req.session.userId);
-        const anthropicApiKey = settings?.anthropicApiKey;
+        const anthropic = await getAnthropicClient(req.session.userId);
 
-        if (anthropicApiKey) {
-          const anthropic = new Anthropic({ apiKey: anthropicApiKey });
+        if (anthropic) {
           const response = await anthropic.messages.create({
             model: CLAUDE_MODEL,
             max_tokens: 3000,
@@ -4603,9 +4607,9 @@ ${contextParts.join("\n\n")}
       const settingsData = await storage.getSettings(userId);
       let respText = "";
 
-      if (settingsData?.anthropicApiKey) {
-        const anthropic = new Anthropic({ apiKey: settingsData.anthropicApiKey });
-        const response = await anthropic.messages.create({
+      const anthropicSearch = await getAnthropicClient(userId);
+      if (anthropicSearch) {
+        const response = await anthropicSearch.messages.create({
           model: CLAUDE_MODEL,
           max_tokens: 300,
           system: "Ты генерируешь поисковые запросы для веб-поиска. Отвечай ТОЛЬКО JSON.",
@@ -4698,9 +4702,9 @@ ${existingList}
       const settingsData = await storage.getSettings(req.session?.userId);
       let respText: string;
 
-      if (settingsData?.anthropicApiKey) {
-        const anthropic = new Anthropic({ apiKey: settingsData.anthropicApiKey });
-        const response = await anthropic.messages.create({
+      const anthropicTopics = await getAnthropicClient(req.session?.userId);
+      if (anthropicTopics) {
+        const response = await anthropicTopics.messages.create({
           model: CLAUDE_MODEL,
           max_tokens: 500,
           system: systemPrompt,

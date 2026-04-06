@@ -262,12 +262,22 @@ export async function handleSupportChat(req: Request, res: Response) {
 
     let assistantReply = "";
 
-    const anthropicKey = req.session?.userId
-      ? (await storage.getSettings(req.session.userId))?.anthropicApiKey
-      : null;
+    let anthropic: Anthropic | null = null;
+    if (process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY && process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL) {
+      anthropic = new Anthropic({
+        apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
+      });
+    } else {
+      const anthropicKey = req.session?.userId
+        ? (await storage.getSettings(req.session.userId))?.anthropicApiKey
+        : null;
+      if (anthropicKey) {
+        anthropic = new Anthropic({ apiKey: anthropicKey });
+      }
+    }
 
-    if (anthropicKey) {
-      const anthropic = new Anthropic({ apiKey: anthropicKey });
+    if (anthropic) {
       const response = await anthropic.messages.create({
         model: CLAUDE_MODEL,
         max_tokens: 1024,
