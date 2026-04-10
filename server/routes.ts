@@ -5582,6 +5582,14 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
           speakerVoiceMap.set(speakerName.toLowerCase(), voice.elevenLabsVoiceId);
         }
 
+        const allVoiceMap = new Map<string, string>();
+        for (const voice of voicesList) {
+          if (voice.elevenLabsVoiceId) {
+            const speakerName = getCleanVoiceName(voice);
+            allVoiceMap.set(speakerName.toLowerCase(), voice.elevenLabsVoiceId);
+          }
+        }
+
         const segmentFiles: string[] = [];
         const segmentSpeakers: string[] = [];
         let segmentErrors: string[] = [];
@@ -5601,7 +5609,18 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
             }
           }
           if (!voiceId) {
-            voiceId = assignedVoices[0]?.elevenLabsVoiceId;
+            voiceId = allVoiceMap.get(segment.speaker.toLowerCase());
+          }
+          if (!voiceId) {
+            for (const [name, vid] of allVoiceMap.entries()) {
+              if (segment.speaker.toLowerCase().includes(name) || name.includes(segment.speaker.toLowerCase())) {
+                voiceId = vid;
+                break;
+              }
+            }
+          }
+          if (!voiceId) {
+            voiceId = assignedVoices[0]?.elevenLabsVoiceId || voicesList[0]?.elevenLabsVoiceId;
           }
           if (!voiceId) {
             segmentErrors.push(`Сегмент ${i + 1}: голос не найден для "${segment.speaker}"`);
@@ -5652,7 +5671,20 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
         res.json({ ...updated, segmentCount: segmentFiles.length, totalSegments: totalExpected, errors: segmentErrors });
       } else {
         const resolved = resolveAssignedVoices(voicesList, programType);
-        const activeVoice = resolved.length > 0 ? resolved[0] : voicesList.find(v => v.isActive);
+        let activeVoice = resolved.length > 0 ? resolved[0] : null;
+        if (!activeVoice) {
+          const speakerFromScript = extractSpeakerFromPrompt(program.scriptText || "");
+          if (speakerFromScript) {
+            const spkLower = speakerFromScript.toLowerCase();
+            activeVoice = voicesList.find(v => {
+              const vn = getCleanVoiceName(v).toLowerCase();
+              return vn === spkLower || spkLower.includes(vn) || vn.includes(spkLower);
+            }) || null;
+          }
+        }
+        if (!activeVoice) {
+          activeVoice = voicesList.find(v => v.isActive) || null;
+        }
 
         if (!activeVoice) {
           return res.status(400).json({ error: "No active voice configured" });
