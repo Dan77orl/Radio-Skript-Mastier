@@ -71,8 +71,87 @@ import {
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import type { ProgramType, Program, Settings as AppSettings, Voice } from "@shared/schema";
 import { HintTooltip } from "@/components/hint-tooltip";
+
+function ScheduleScriptPopover({
+  type,
+  disabled,
+  onGenerate,
+}: {
+  type: ProgramType;
+  disabled: boolean;
+  onGenerate: (scheduledDate: string, forecastDays?: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const todayStr = new Date().toISOString().split("T")[0];
+  const maxDate = new Date(Date.now() + 6 * 86400000).toISOString().split("T")[0];
+  const [date, setDate] = useState(todayStr);
+  const [days, setDays] = useState<number>(type.defaultForecastDays || 3);
+  const isWeather = !!type.isWeatherForecast;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={disabled}
+          className="px-2"
+          data-testid={`button-schedule-script-${type.id}`}
+          title={t("shows.scheduleScript")}
+        >
+          <Calendar className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 space-y-3" align="end">
+        <div className="space-y-1">
+          <Label className="text-xs">{t("shows.releaseDate")}</Label>
+          <Input
+            type="date"
+            value={date}
+            min={todayStr}
+            max={maxDate}
+            onChange={(e) => setDate(e.target.value)}
+            data-testid="input-schedule-date"
+          />
+        </div>
+        {isWeather && (
+          <div className="space-y-1">
+            <Label className="text-xs">{t("shows.forecastDays")}</Label>
+            <Select value={String(days)} onValueChange={(v) => setDays(Number(v))}>
+              <SelectTrigger data-testid="select-forecast-days">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {t("shows.daysCount", { count: n })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <Button
+          size="sm"
+          className="w-full"
+          onClick={() => {
+            onGenerate(date, isWeather ? days : undefined);
+            setOpen(false);
+          }}
+          data-testid="button-generate-with-options"
+        >
+          <Zap className="mr-1.5 h-4 w-4" />
+          {t("common.create")}
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const getDefaultProgramTypes = (stationName: string, t: (key: string) => string) => [
   {
@@ -311,9 +390,12 @@ export default function ShowsPage() {
   });
 
   const autoCreateMutation = useMutation({
-    mutationFn: async (typeId: string) => {
+    mutationFn: async ({ typeId, scheduledDate, forecastDays }: { typeId: string; scheduledDate?: string; forecastDays?: number }) => {
       setGeneratingTypeIds(prev => new Set(prev).add(typeId));
-      const response = await apiRequest("POST", `/api/programs/auto-create/${typeId}`);
+      const body: Record<string, any> = {};
+      if (scheduledDate) body.scheduledDate = scheduledDate;
+      if (forecastDays) body.forecastDays = forecastDays;
+      const response = await apiRequest("POST", `/api/programs/auto-create/${typeId}`, body);
       return { data: await response.json(), typeId };
     },
     onSuccess: ({ data, typeId }) => {
@@ -321,7 +403,7 @@ export default function ShowsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/programs", typeId] });
       toast({ title: t("shows.programCreated"), description: data.title });
     },
-    onError: (error: Error, typeId) => {
+    onError: (error: Error, { typeId }) => {
       setGeneratingTypeIds(prev => { const next = new Set(prev); next.delete(typeId); return next; });
       toast({ title: t("shows.error"), description: error.message, variant: "destructive" });
     },
@@ -772,6 +854,8 @@ export default function ShowsPage() {
         scriptTemplate: settingsType.scriptTemplate || "",
         useFirecrawl: settingsType.useFirecrawl || false,
         firecrawlTopics: settingsType.firecrawlTopics || [],
+        isWeatherForecast: settingsType.isWeatherForecast || false,
+        defaultForecastDays: settingsType.defaultForecastDays || 1,
       },
     });
   };
@@ -1076,7 +1160,7 @@ export default function ShowsPage() {
                         <HintTooltip hint={t("hints.shows.autoCreate")}>
                           <Button
                             size="sm"
-                            onClick={() => autoCreateMutation.mutate(type.id)}
+                            onClick={() => autoCreateMutation.mutate({ typeId: type.id })}
                             disabled={generatingTypeIds.has(type.id)}
                             data-testid="button-auto-create"
                           >
@@ -1088,6 +1172,13 @@ export default function ShowsPage() {
                             {t("shows.script")}
                           </Button>
                         </HintTooltip>
+                        <ScheduleScriptPopover
+                          type={type}
+                          disabled={generatingTypeIds.has(type.id)}
+                          onGenerate={(scheduledDate, forecastDays) =>
+                            autoCreateMutation.mutate({ typeId: type.id, scheduledDate, forecastDays })
+                          }
+                        />
                         <HintTooltip hint={t("hints.shows.batchCreate")}>
                           <Button
                             variant="outline"
@@ -1989,6 +2080,47 @@ export default function ShowsPage() {
                         {firecrawlTestResult}
                       </pre>
                     )}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3 border rounded-lg p-3 sm:p-4 bg-muted/20 min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <Label className="text-base font-semibold flex items-center gap-2">
+                      <CloudSun className="h-4 w-4" />
+                      {t("shows.weatherTitle")}
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">{t("shows.weatherDesc")}</p>
+                  </div>
+                  <Switch
+                    checked={!!settingsType.isWeatherForecast}
+                    onCheckedChange={(checked) =>
+                      setSettingsType((prev) => prev ? { ...prev, isWeatherForecast: checked } : null)
+                    }
+                    data-testid="switch-weather-forecast"
+                  />
+                </div>
+                {settingsType.isWeatherForecast && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{t("shows.defaultForecastDays")}</Label>
+                    <Select
+                      value={String(settingsType.defaultForecastDays || 1)}
+                      onValueChange={(v) =>
+                        setSettingsType((prev) => prev ? { ...prev, defaultForecastDays: Number(v) } : null)
+                      }
+                    >
+                      <SelectTrigger data-testid="select-default-forecast-days">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            {t("shows.daysCount", { count: n })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
               </div>

@@ -782,9 +782,11 @@ interface WeatherData {
   weathercode: number;
   time: string;
   daily?: {
+    time: string[];
     temperature_max: number[];
     temperature_min: number[];
     precipitation_sum: number[];
+    weathercode: number[];
     sunrise: string[];
     sunset: string[];
   };
@@ -796,7 +798,7 @@ async function fetchWeather(lat?: number, lon?: number): Promise<WeatherData | n
   try {
     const useLat = lat ?? DEFAULT_COORDS.lat;
     const useLon = lon ?? DEFAULT_COORDS.lon;
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${useLat}&longitude=${useLon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,sunrise,sunset&timezone=auto`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${useLat}&longitude=${useLon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode,sunrise,sunset&timezone=auto&forecast_days=7`;
     const response = await fetch(url);
     if (!response.ok) return null;
     const data = await response.json();
@@ -807,9 +809,11 @@ async function fetchWeather(lat?: number, lon?: number): Promise<WeatherData | n
       weathercode: data.current_weather?.weathercode,
       time: data.current_weather?.time,
       daily: data.daily ? {
+        time: data.daily.time,
         temperature_max: data.daily.temperature_2m_max,
         temperature_min: data.daily.temperature_2m_min,
         precipitation_sum: data.daily.precipitation_sum,
+        weathercode: data.daily.weathercode,
         sunrise: data.daily.sunrise,
         sunset: data.daily.sunset,
       } : undefined,
@@ -820,31 +824,29 @@ async function fetchWeather(lat?: number, lon?: number): Promise<WeatherData | n
   }
 }
 
-function getWeatherDescription(code: number): string {
-  const descriptions: Record<number, string> = {
-    0: "ясно",
-    1: "преимущественно ясно",
-    2: "переменная облачность",
-    3: "пасмурно",
-    45: "туман",
-    48: "изморозь",
-    51: "легкая морось",
-    53: "морось",
-    55: "сильная морось",
-    61: "небольшой дождь",
-    63: "дождь",
-    65: "сильный дождь",
-    71: "небольшой снег",
-    73: "снег",
-    75: "сильный снег",
-    80: "ливень",
-    81: "умеренный ливень",
-    82: "сильный ливень",
-    95: "гроза",
-    96: "гроза с градом",
-    99: "сильная гроза с градом",
-  };
-  return descriptions[code] || "неизвестно";
+const WEATHER_DESCRIPTIONS_RU: Record<number, string> = {
+  0: "ясно", 1: "преимущественно ясно", 2: "переменная облачность", 3: "пасмурно",
+  45: "туман", 48: "изморозь",
+  51: "легкая морось", 53: "морось", 55: "сильная морось",
+  61: "небольшой дождь", 63: "дождь", 65: "сильный дождь",
+  71: "небольшой снег", 73: "снег", 75: "сильный снег",
+  80: "ливень", 81: "умеренный ливень", 82: "сильный ливень",
+  95: "гроза", 96: "гроза с градом", 99: "сильная гроза с градом",
+};
+
+const WEATHER_DESCRIPTIONS_EN: Record<number, string> = {
+  0: "clear sky", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
+  45: "fog", 48: "depositing rime fog",
+  51: "light drizzle", 53: "moderate drizzle", 55: "dense drizzle",
+  61: "slight rain", 63: "moderate rain", 65: "heavy rain",
+  71: "slight snow", 73: "moderate snow", 75: "heavy snow",
+  80: "rain showers", 81: "moderate rain showers", 82: "violent rain showers",
+  95: "thunderstorm", 96: "thunderstorm with hail", 99: "severe thunderstorm with hail",
+};
+
+function getWeatherDescription(code: number, lang: string = "ru"): string {
+  const dict = lang === "ru" ? WEATHER_DESCRIPTIONS_RU : WEATHER_DESCRIPTIONS_EN;
+  return dict[code] || (lang === "ru" ? "неизвестно" : "unknown");
 }
 
 async function logUsage(userId: string, action: string, details?: string, tokensUsed?: number) {
@@ -4849,7 +4851,17 @@ ${existingList}
       const ps = getPromptStrings(userLang);
 
       const today = new Date();
-      const dateStr = today.toISOString().split("T")[0];
+      const todayStr = today.toISOString().split("T")[0];
+
+      const reqScheduledDate = typeof req.body?.scheduledDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.body.scheduledDate)
+        ? req.body.scheduledDate
+        : null;
+      const dateStr = reqScheduledDate || todayStr;
+
+      const reqForecastDays = Number.isFinite(Number(req.body?.forecastDays))
+        ? Math.min(7, Math.max(1, Math.round(Number(req.body.forecastDays))))
+        : (programType.defaultForecastDays || 1);
+      const forecastDays = programType.isWeatherForecast ? reqForecastDays : 1;
 
       const existingPrograms = await storage.getProgramsByType(programType.id, req.session.userId!);
       const todayPrograms = existingPrograms.filter(p => p.scheduledDate === dateStr);
@@ -4914,7 +4926,47 @@ ${existingList}
       const durationStr = durationRemSec > 0 ? `${durationMin}:${String(durationRemSec).padStart(2, "0")}` : `${durationMin}:00`;
       prompt += `\n\n${ps.dateSlot(dateStr, nextSlot, programType.dailyCount || 1)}`;
 
-      const month = today.getMonth();
+      if (programType.isWeatherForecast) {
+        try {
+          const weather = await fetchWeather();
+          if (weather?.daily?.time?.length) {
+            const dailyTimes = weather.daily.time;
+            const startIdx = dailyTimes.findIndex(d => d === dateStr);
+            const baseIdx = startIdx >= 0 ? startIdx : 0;
+            const lines: string[] = [];
+            const isRu = userLang === "ru";
+            const weekdayLocale = isRu ? "ru-RU" : "en-US";
+            for (let i = 0; i < forecastDays && (baseIdx + i) < dailyTimes.length; i++) {
+              const idx = baseIdx + i;
+              const dStr = dailyTimes[idx];
+              const dObj = new Date(dStr + "T12:00:00");
+              const weekday = dObj.toLocaleDateString(weekdayLocale, { weekday: "long", day: "numeric", month: "long" });
+              const tMax = Math.round(weather.daily.temperature_max[idx]);
+              const tMin = Math.round(weather.daily.temperature_min[idx]);
+              const prec = weather.daily.precipitation_sum[idx] || 0;
+              const code = weather.daily.weathercode?.[idx] ?? 0;
+              const desc = getWeatherDescription(code, userLang);
+              if (isRu) {
+                lines.push(`- ${weekday} (${dStr}): днём ${tMax}°C, ночью ${tMin}°C, ${desc}${prec > 0 ? `, осадки ${prec} мм` : ""}`);
+              } else {
+                lines.push(`- ${weekday} (${dStr}): high ${tMax}°C, low ${tMin}°C, ${desc}${prec > 0 ? `, precipitation ${prec} mm` : ""}`);
+              }
+            }
+            if (lines.length) {
+              if (isRu) {
+                prompt += `\n\nРЕАЛЬНЫЕ ДАННЫЕ ПРОГНОЗА ПОГОДЫ В АЛАНЬЕ (используй ТОЛЬКО эти данные, не выдумывай свои значения):\n${lines.join("\n")}\n\nЗАДАЧА: Создай связный текст-прогноз погоды на ${forecastDays} ${forecastDays === 1 ? "день" : forecastDays < 5 ? "дня" : "дней"} вперёд. Упомяни КАЖДЫЙ день из данных выше, передай атмосферу, дай практические советы (что надеть, брать ли зонт). Пиши живо, как радиоведущий.`;
+              } else {
+                prompt += `\n\nREAL WEATHER FORECAST DATA FOR ALANYA (use ONLY these values, do not invent your own):\n${lines.join("\n")}\n\nTASK: Create a coherent ${forecastDays}-day weather forecast script. Mention EVERY day from the data above, convey the atmosphere, give practical advice (what to wear, whether to bring an umbrella). Write lively, like a radio host.`;
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Weather injection failed:", e);
+        }
+      }
+
+      const seasonRefDate = new Date(dateStr + "T12:00:00");
+      const month = seasonRefDate.getMonth();
       const season = month <= 1 || month === 11 ? "winter" : month <= 4 ? "spring" : month <= 7 ? "summer" : "autumn";
       prompt += `\n${ps.seasonPrefix} ${ps.seasons[season]}`;
       prompt += `\n${ps.seasonNote}`;
