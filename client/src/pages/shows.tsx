@@ -868,10 +868,16 @@ export default function ShowsPage() {
     try {
       const results: { created: number; total: number; errors: string[] } = { created: 0, total: batchCount, errors: [] };
 
+      const activeType = programTypes?.find(p => p.id === activeTab);
+      const batchBody: Record<string, any> = {};
+      if (activeType?.isWeatherForecast) {
+        batchBody.forecastDays = Math.min(7, Math.max(1, activeType.defaultForecastDays || 1));
+      }
+
       for (let i = 0; i < batchCount; i++) {
         setBatchProgress(i + 1);
         try {
-          const response = await apiRequest("POST", `/api/programs/auto-create/${activeTab}`);
+          const response = await apiRequest("POST", `/api/programs/auto-create/${activeTab}`, batchBody);
           await response.json();
           results.created++;
         } catch (err: any) {

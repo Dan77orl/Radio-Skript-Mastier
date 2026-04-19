@@ -6365,11 +6365,27 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
       const count = req.body.count || 1;
       const results: any[] = [];
 
+      const rawScheduledDate = req.body?.scheduledDate;
+      const pipelineScheduledDate = typeof rawScheduledDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawScheduledDate)
+        ? rawScheduledDate
+        : null;
+      const rawForecastDays = req.body?.forecastDays;
+      const explicitForecastDays = Number.isFinite(Number(rawForecastDays))
+        ? Math.min(7, Math.max(1, Math.round(Number(rawForecastDays))))
+        : null;
+      const pipelineForecastDays = programType.isWeatherForecast
+        ? (explicitForecastDays ?? Math.min(7, Math.max(1, programType.defaultForecastDays || 1)))
+        : null;
+
       for (let i = 0; i < count; i++) {
         try {
+          const createBody: Record<string, any> = {};
+          if (pipelineScheduledDate) createBody.scheduledDate = pipelineScheduledDate;
+          if (pipelineForecastDays) createBody.forecastDays = pipelineForecastDays;
           const createRes = await fetch(`http://localhost:${process.env.PORT || 5000}/api/programs/auto-create/${programType.id}`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", Cookie: req.headers.cookie || "" },
+            body: JSON.stringify(createBody),
           });
 
           if (!createRes.ok) {
@@ -6520,10 +6536,14 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
         console.log(`[scheduler] Auto-generating ${remaining} program(s) for "${pType.name}" (${dateStr})`);
 
         try {
+          const pipelineBody: Record<string, any> = { count: remaining, scheduledDate: dateStr };
+          if (pType.isWeatherForecast) {
+            pipelineBody.forecastDays = Math.min(7, Math.max(1, pType.defaultForecastDays || 1));
+          }
           await fetch(`http://localhost:${process.env.PORT || 5000}/api/programs/${pType.id}/auto-pipeline`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ count: remaining }),
+            body: JSON.stringify(pipelineBody),
           });
         } catch (err: any) {
           console.error(`[scheduler] Error for "${pType.name}":`, err.message);
