@@ -4853,14 +4853,26 @@ ${existingList}
       const today = new Date();
       const todayStr = today.toISOString().split("T")[0];
 
-      const reqScheduledDate = typeof req.body?.scheduledDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.body.scheduledDate)
-        ? req.body.scheduledDate
+      const rawScheduledDate = (req.body?.scheduledDate ?? req.query?.scheduledDate);
+      const reqScheduledDate = typeof rawScheduledDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawScheduledDate)
+        ? rawScheduledDate
         : null;
+      if (reqScheduledDate) {
+        const reqDateMs = new Date(reqScheduledDate + "T12:00:00Z").getTime();
+        const todayMs = new Date(todayStr + "T12:00:00Z").getTime();
+        const dayMs = 86400000;
+        const diffDays = Math.round((reqDateMs - todayMs) / dayMs);
+        if (Number.isNaN(diffDays) || diffDays < 0 || diffDays > 7) {
+          return res.status(400).json({ error: "scheduledDate must be within today..today+7 days" });
+        }
+      }
       const dateStr = reqScheduledDate || todayStr;
 
-      const reqForecastDays = Number.isFinite(Number(req.body?.forecastDays))
-        ? Math.min(7, Math.max(1, Math.round(Number(req.body.forecastDays))))
-        : (programType.defaultForecastDays || 1);
+      const clampDays = (n: number) => Math.min(7, Math.max(1, Math.round(n)));
+      const rawForecastDays = (req.body?.forecastDays ?? req.query?.forecastDays);
+      const reqForecastDays = Number.isFinite(Number(rawForecastDays))
+        ? clampDays(Number(rawForecastDays))
+        : clampDays(programType.defaultForecastDays || 1);
       const forecastDays = programType.isWeatherForecast ? reqForecastDays : 1;
 
       const existingPrograms = await storage.getProgramsByType(programType.id, req.session.userId!);
