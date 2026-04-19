@@ -1034,6 +1034,316 @@ const WEATHER_DESCRIPTIONS_KK: Record<number, string> = {
   95: "найзағай", 96: "бұршақты найзағай", 99: "қатты бұршақты найзағай",
 };
 
+const WEATHER_DESCRIPTIONS_AZ: Record<number, string> = {
+  0: "aydın", 1: "əsasən aydın", 2: "qismən buludlu", 3: "tutqun",
+  45: "duman", 48: "qırov dumanı",
+  51: "yüngül çiskin", 53: "orta çiskin", 55: "güclü çiskin",
+  61: "yüngül yağış", 63: "orta yağış", 65: "güclü yağış",
+  71: "yüngül qar", 73: "orta qar", 75: "güclü qar",
+  80: "leysan", 81: "orta leysan", 82: "güclü leysan",
+  95: "tufan", 96: "doluyla tufan", 99: "doluyla güclü tufan",
+};
+
+const WEATHER_DESCRIPTIONS_BG: Record<number, string> = {
+  0: "ясно", 1: "предимно ясно", 2: "променлива облачност", 3: "облачно",
+  45: "мъгла", 48: "слана с мъгла",
+  51: "лек ръмеж", 53: "умерен ръмеж", 55: "силен ръмеж",
+  61: "слаб дъжд", 63: "умерен дъжд", 65: "силен дъжд",
+  71: "слаб сняг", 73: "умерен сняг", 75: "силен сняг",
+  80: "превалявания", 81: "умерени превалявания", 82: "силни превалявания",
+  95: "гръмотевична буря", 96: "буря с градушка", 99: "силна буря с градушка",
+};
+
+const WEATHER_DESCRIPTIONS_BN: Record<number, string> = {
+  0: "পরিষ্কার আকাশ", 1: "মূলত পরিষ্কার", 2: "আংশিক মেঘলা", 3: "মেঘাচ্ছন্ন",
+  45: "কুয়াশা", 48: "তুষার কুয়াশা",
+  51: "হালকা গুঁড়ি বৃষ্টি", 53: "মাঝারি গুঁড়ি বৃষ্টি", 55: "ঘন গুঁড়ি বৃষ্টি",
+  61: "হালকা বৃষ্টি", 63: "মাঝারি বৃষ্টি", 65: "ভারী বৃষ্টি",
+  71: "হালকা তুষারপাত", 73: "মাঝারি তুষারপাত", 75: "ভারী তুষারপাত",
+  80: "বর্ষণ", 81: "মাঝারি বর্ষণ", 82: "প্রবল বর্ষণ",
+  95: "বজ্রঝড়", 96: "শিলাবৃষ্টিসহ বজ্রঝড়", 99: "শিলাবৃষ্টিসহ প্রবল বজ্রঝড়",
+};
+
+const WEATHER_DESCRIPTIONS_BS: Record<number, string> = {
+  0: "vedro", 1: "uglavnom vedro", 2: "djelimično oblačno", 3: "oblačno",
+  45: "magla", 48: "ledena magla",
+  51: "slaba sitna kiša", 53: "umjerena sitna kiša", 55: "jaka sitna kiša",
+  61: "slaba kiša", 63: "umjerena kiša", 65: "jaka kiša",
+  71: "slab snijeg", 73: "umjeren snijeg", 75: "jak snijeg",
+  80: "pljuskovi", 81: "umjereni pljuskovi", 82: "jaki pljuskovi",
+  95: "grmljavina", 96: "grmljavina s gradom", 99: "jaka grmljavina s gradom",
+};
+
+const WEATHER_DESCRIPTIONS_CS: Record<number, string> = {
+  0: "jasno", 1: "převážně jasno", 2: "polojasno", 3: "zataženo",
+  45: "mlha", 48: "námrazová mlha",
+  51: "slabé mrholení", 53: "mrholení", 55: "silné mrholení",
+  61: "slabý déšť", 63: "déšť", 65: "silný déšť",
+  71: "slabé sněžení", 73: "sněžení", 75: "silné sněžení",
+  80: "přeháňky", 81: "mírné přeháňky", 82: "silné přeháňky",
+  95: "bouřka", 96: "bouřka s kroupami", 99: "silná bouřka s kroupami",
+};
+
+const WEATHER_DESCRIPTIONS_DA: Record<number, string> = {
+  0: "klart vejr", 1: "overvejende klart", 2: "delvist skyet", 3: "overskyet",
+  45: "tåge", 48: "rimtåge",
+  51: "let støvregn", 53: "støvregn", 55: "kraftig støvregn",
+  61: "let regn", 63: "regn", 65: "kraftig regn",
+  71: "let sne", 73: "sne", 75: "kraftig sne",
+  80: "byger", 81: "moderate byger", 82: "kraftige byger",
+  95: "tordenvejr", 96: "tordenvejr med hagl", 99: "kraftigt tordenvejr med hagl",
+};
+
+const WEATHER_DESCRIPTIONS_EL: Record<number, string> = {
+  0: "αίθριος", 1: "κυρίως αίθριος", 2: "μερικώς συννεφιασμένος", 3: "συννεφιασμένος",
+  45: "ομίχλη", 48: "παγωμένη ομίχλη",
+  51: "ελαφρύ ψιχάλισμα", 53: "ψιχάλισμα", 55: "πυκνό ψιχάλισμα",
+  61: "ασθενής βροχή", 63: "βροχή", 65: "ισχυρή βροχή",
+  71: "ασθενής χιονόπτωση", 73: "χιονόπτωση", 75: "ισχυρή χιονόπτωση",
+  80: "μπόρες", 81: "μέτριες μπόρες", 82: "ισχυρές μπόρες",
+  95: "καταιγίδα", 96: "καταιγίδα με χαλάζι", 99: "ισχυρή καταιγίδα με χαλάζι",
+};
+
+const WEATHER_DESCRIPTIONS_ET: Record<number, string> = {
+  0: "selge", 1: "valdavalt selge", 2: "vahelduva pilvisusega", 3: "pilves",
+  45: "udu", 48: "härmaudu",
+  51: "kerge uduvihm", 53: "uduvihm", 55: "tihe uduvihm",
+  61: "nõrk vihm", 63: "vihm", 65: "tugev vihm",
+  71: "nõrk lumesadu", 73: "lumesadu", 75: "tugev lumesadu",
+  80: "hoovihm", 81: "mõõdukas hoovihm", 82: "tugev hoovihm",
+  95: "äike", 96: "äike rahega", 99: "tugev äike rahega",
+};
+
+const WEATHER_DESCRIPTIONS_FI: Record<number, string> = {
+  0: "selkeää", 1: "enimmäkseen selkeää", 2: "puolipilvistä", 3: "pilvistä",
+  45: "sumua", 48: "huurresumua",
+  51: "kevyttä tihkusadetta", 53: "tihkusadetta", 55: "voimakasta tihkusadetta",
+  61: "heikkoa sadetta", 63: "sadetta", 65: "voimakasta sadetta",
+  71: "heikkoa lumisadetta", 73: "lumisadetta", 75: "voimakasta lumisadetta",
+  80: "sadekuuroja", 81: "kohtalaisia sadekuuroja", 82: "rajuja sadekuuroja",
+  95: "ukkosta", 96: "ukkosta ja rakeita", 99: "voimakasta ukkosta ja rakeita",
+};
+
+const WEATHER_DESCRIPTIONS_HR: Record<number, string> = {
+  0: "vedro", 1: "pretežno vedro", 2: "djelomično oblačno", 3: "oblačno",
+  45: "magla", 48: "ledena magla",
+  51: "slaba rosulja", 53: "umjerena rosulja", 55: "jaka rosulja",
+  61: "slaba kiša", 63: "umjerena kiša", 65: "jaka kiša",
+  71: "slab snijeg", 73: "umjeren snijeg", 75: "jak snijeg",
+  80: "pljuskovi", 81: "umjereni pljuskovi", 82: "jaki pljuskovi",
+  95: "grmljavinsko nevrijeme", 96: "grmljavina s tučom", 99: "jaka grmljavina s tučom",
+};
+
+const WEATHER_DESCRIPTIONS_HU: Record<number, string> = {
+  0: "derült", 1: "túlnyomóan derült", 2: "részben felhős", 3: "borult",
+  45: "köd", 48: "zúzmarás köd",
+  51: "gyenge szitálás", 53: "szitálás", 55: "erős szitálás",
+  61: "gyenge eső", 63: "eső", 65: "erős eső",
+  71: "gyenge havazás", 73: "havazás", 75: "erős havazás",
+  80: "záporok", 81: "mérsékelt záporok", 82: "heves záporok",
+  95: "zivatar", 96: "zivatar jégesővel", 99: "erős zivatar jégesővel",
+};
+
+const WEATHER_DESCRIPTIONS_HY: Record<number, string> = {
+  0: "պարզ", 1: "հիմնականում պարզ", 2: "մասամբ ամպամած", 3: "ամպամած",
+  45: "մառախուղ", 48: "սառցե մառախուղ",
+  51: "թեթև մաղում", 53: "մաղում", 55: "խիտ մաղում",
+  61: "թեթև անձրև", 63: "անձրև", 65: "տեղատարափ անձրև",
+  71: "թեթև ձյուն", 73: "ձյուն", 75: "տեղատարափ ձյուն",
+  80: "տեղատարափ", 81: "չափավոր տեղատարափ", 82: "ուժեղ տեղատարափ",
+  95: "ամպրոպ", 96: "ամպրոպ կարկտով", 99: "ուժեղ ամպրոպ կարկտով",
+};
+
+const WEATHER_DESCRIPTIONS_KA: Record<number, string> = {
+  0: "მზიანი", 1: "უმეტესად მზიანი", 2: "ნაწილობრივ მოღრუბლული", 3: "მოღრუბლული",
+  45: "ნისლი", 48: "ყინულოვანი ნისლი",
+  51: "მსუბუქი წვიმწვიმა", 53: "წვიმწვიმა", 55: "ძლიერი წვიმწვიმა",
+  61: "სუსტი წვიმა", 63: "წვიმა", 65: "ძლიერი წვიმა",
+  71: "სუსტი თოვლი", 73: "თოვლი", 75: "ძლიერი თოვლი",
+  80: "კოკისპირული წვიმა", 81: "ზომიერი კოკისპირული", 82: "ძლიერი კოკისპირული",
+  95: "ჭექა-ქუხილი", 96: "ჭექა-ქუხილი სეტყვით", 99: "ძლიერი ჭექა-ქუხილი სეტყვით",
+};
+
+const WEATHER_DESCRIPTIONS_KY: Record<number, string> = {
+  0: "ачык", 1: "негизинен ачык", 2: "айрым булуттуу", 3: "булуттуу",
+  45: "туман", 48: "кыроолуу туман",
+  51: "жеңил себелек", 53: "себелек", 55: "күчтүү себелек",
+  61: "анча-мынча жамгыр", 63: "жамгыр", 65: "катуу жамгыр",
+  71: "анча-мынча кар", 73: "кар", 75: "катуу кар",
+  80: "нөшөр", 81: "орточо нөшөр", 82: "катуу нөшөр",
+  95: "чагылган", 96: "мөндүрлүү чагылган", 99: "катуу мөндүрлүү чагылган",
+};
+
+const WEATHER_DESCRIPTIONS_LT: Record<number, string> = {
+  0: "giedra", 1: "daugiausia giedra", 2: "mažai debesuota", 3: "debesuota",
+  45: "rūkas", 48: "šerkšno rūkas",
+  51: "silpnas dulksnotas lietus", 53: "dulksnotas lietus", 55: "smarkus dulksnotas lietus",
+  61: "silpnas lietus", 63: "lietus", 65: "smarkus lietus",
+  71: "silpnas sniegas", 73: "sniegas", 75: "smarkus sniegas",
+  80: "liūtys", 81: "vidutinės liūtys", 82: "smarkios liūtys",
+  95: "perkūnija", 96: "perkūnija su kruša", 99: "stipri perkūnija su kruša",
+};
+
+const WEATHER_DESCRIPTIONS_LV: Record<number, string> = {
+  0: "skaidrs", 1: "pārsvarā skaidrs", 2: "daļēji mākoņains", 3: "apmācies",
+  45: "migla", 48: "sarmas migla",
+  51: "viegls smidzinošs lietus", 53: "smidzinošs lietus", 55: "stiprs smidzinošs lietus",
+  61: "viegls lietus", 63: "lietus", 65: "stiprs lietus",
+  71: "viegls sniegs", 73: "sniegs", 75: "stiprs sniegs",
+  80: "lietusgāzes", 81: "mērenas lietusgāzes", 82: "stipras lietusgāzes",
+  95: "pērkona negaiss", 96: "negaiss ar krusu", 99: "stiprs negaiss ar krusu",
+};
+
+const WEATHER_DESCRIPTIONS_MK: Record<number, string> = {
+  0: "ведро", 1: "претежно ведро", 2: "делумно облачно", 3: "облачно",
+  45: "магла", 48: "ледена магла",
+  51: "слаб ситен дожд", 53: "ситен дожд", 55: "силен ситен дожд",
+  61: "слаб дожд", 63: "дожд", 65: "силен дожд",
+  71: "слаб снег", 73: "снег", 75: "силен снег",
+  80: "пороен дожд", 81: "умерен пороен дожд", 82: "силен пороен дожд",
+  95: "грмежи", 96: "грмежи со град", 99: "силни грмежи со град",
+};
+
+const WEATHER_DESCRIPTIONS_MN: Record<number, string> = {
+  0: "цэлмэг", 1: "ихэвчлэн цэлмэг", 2: "багавтар үүлшинэ", 3: "бүрхэг",
+  45: "манан", 48: "хяруутай манан",
+  51: "сул шиврээ", 53: "дунд зэргийн шиврээ", 55: "хүчтэй шиврээ",
+  61: "бага зэргийн бороо", 63: "бороо", 65: "их бороо",
+  71: "бага зэргийн цас", 73: "цас", 75: "их цас",
+  80: "аадар бороо", 81: "дунд зэргийн аадар", 82: "хүчтэй аадар",
+  95: "аянга цахилгаан", 96: "мөндөртэй аянга", 99: "хүчтэй мөндөртэй аянга",
+};
+
+const WEATHER_DESCRIPTIONS_MS: Record<number, string> = {
+  0: "cerah", 1: "kebanyakannya cerah", 2: "berawan sebahagian", 3: "mendung",
+  45: "berkabus", 48: "kabus beku",
+  51: "hujan renyai-renyai ringan", 53: "hujan renyai-renyai sederhana", 55: "hujan renyai-renyai lebat",
+  61: "hujan ringan", 63: "hujan sederhana", 65: "hujan lebat",
+  71: "salji ringan", 73: "salji sederhana", 75: "salji lebat",
+  80: "hujan renyai", 81: "hujan renyai sederhana", 82: "hujan renyai lebat",
+  95: "ribut petir", 96: "ribut petir dengan hujan batu", 99: "ribut petir kuat dengan hujan batu",
+};
+
+const WEATHER_DESCRIPTIONS_NO: Record<number, string> = {
+  0: "klart vær", 1: "for det meste klart", 2: "delvis skyet", 3: "overskyet",
+  45: "tåke", 48: "rimtåke",
+  51: "lett yr", 53: "yr", 55: "tett yr",
+  61: "lett regn", 63: "regn", 65: "kraftig regn",
+  71: "lett snø", 73: "snø", 75: "kraftig snø",
+  80: "regnbyger", 81: "moderate regnbyger", 82: "kraftige regnbyger",
+  95: "tordenvær", 96: "tordenvær med hagl", 99: "kraftig tordenvær med hagl",
+};
+
+const WEATHER_DESCRIPTIONS_RO: Record<number, string> = {
+  0: "senin", 1: "predominant senin", 2: "parțial înnorat", 3: "înnorat",
+  45: "ceață", 48: "ceață cu chiciură",
+  51: "burniță ușoară", 53: "burniță moderată", 55: "burniță densă",
+  61: "ploaie ușoară", 63: "ploaie moderată", 65: "ploaie puternică",
+  71: "ninsoare ușoară", 73: "ninsoare moderată", 75: "ninsoare puternică",
+  80: "averse de ploaie", 81: "averse moderate", 82: "averse puternice",
+  95: "furtună", 96: "furtună cu grindină", 99: "furtună puternică cu grindină",
+};
+
+const WEATHER_DESCRIPTIONS_SK: Record<number, string> = {
+  0: "jasno", 1: "prevažne jasno", 2: "polojasno", 3: "zamračené",
+  45: "hmla", 48: "námrazová hmla",
+  51: "slabé mrholenie", 53: "mrholenie", 55: "silné mrholenie",
+  61: "slabý dážď", 63: "dážď", 65: "silný dážď",
+  71: "slabé sneženie", 73: "sneženie", 75: "silné sneženie",
+  80: "prehánky", 81: "mierne prehánky", 82: "silné prehánky",
+  95: "búrka", 96: "búrka s krupobitím", 99: "silná búrka s krupobitím",
+};
+
+const WEATHER_DESCRIPTIONS_SL: Record<number, string> = {
+  0: "jasno", 1: "pretežno jasno", 2: "delno oblačno", 3: "oblačno",
+  45: "megla", 48: "ivnata megla",
+  51: "rahlo pršenje", 53: "pršenje", 55: "močno pršenje",
+  61: "šibek dež", 63: "dež", 65: "močan dež",
+  71: "šibko sneženje", 73: "sneženje", 75: "močno sneženje",
+  80: "plohe", 81: "zmerne plohe", 82: "močne plohe",
+  95: "nevihta", 96: "nevihta s točo", 99: "močna nevihta s točo",
+};
+
+const WEATHER_DESCRIPTIONS_SQ: Record<number, string> = {
+  0: "kthjellët", 1: "kryesisht kthjellët", 2: "pjesërisht me re", 3: "i vranët",
+  45: "mjegull", 48: "mjegull me brymë",
+  51: "shi i lehtë i imët", 53: "shi i imët", 55: "shi i imët i dendur",
+  61: "shi i lehtë", 63: "shi i moderuar", 65: "shi i dendur",
+  71: "borë e lehtë", 73: "borë", 75: "borë e dendur",
+  80: "rrebeshe shiu", 81: "rrebeshe të moderuara", 82: "rrebeshe të forta",
+  95: "stuhi me bubullima", 96: "stuhi me breshër", 99: "stuhi e fortë me breshër",
+};
+
+const WEATHER_DESCRIPTIONS_SR: Record<number, string> = {
+  0: "ведро", 1: "претежно ведро", 2: "делимично облачно", 3: "облачно",
+  45: "магла", 48: "ледена магла",
+  51: "слаба ромињава киша", 53: "ромињава киша", 55: "јака ромињава киша",
+  61: "слаба киша", 63: "киша", 65: "јака киша",
+  71: "слаб снег", 73: "снег", 75: "јак снег",
+  80: "пљускови", 81: "умерени пљускови", 82: "јаки пљускови",
+  95: "грмљавина", 96: "грмљавина са градом", 99: "јака грмљавина са градом",
+};
+
+const WEATHER_DESCRIPTIONS_SV: Record<number, string> = {
+  0: "klart väder", 1: "mestadels klart", 2: "delvis molnigt", 3: "mulet",
+  45: "dimma", 48: "rimfrostsdimma",
+  51: "lätt duggregn", 53: "duggregn", 55: "tätt duggregn",
+  61: "lätt regn", 63: "regn", 65: "kraftigt regn",
+  71: "lätt snöfall", 73: "snöfall", 75: "kraftigt snöfall",
+  80: "regnskurar", 81: "måttliga regnskurar", 82: "kraftiga regnskurar",
+  95: "åskväder", 96: "åskväder med hagel", 99: "kraftigt åskväder med hagel",
+};
+
+const WEATHER_DESCRIPTIONS_SW: Record<number, string> = {
+  0: "anga safi", 1: "kwa kiasi kikubwa angavu", 2: "mawingu kiasi", 3: "mawingu",
+  45: "ukungu", 48: "ukungu wa barafu",
+  51: "manyunyu hafifu", 53: "manyunyu ya wastani", 55: "manyunyu mazito",
+  61: "mvua hafifu", 63: "mvua ya wastani", 65: "mvua kubwa",
+  71: "theluji hafifu", 73: "theluji ya wastani", 75: "theluji kubwa",
+  80: "mvua za ghafla", 81: "mvua za ghafla za wastani", 82: "mvua za ghafla kali",
+  95: "ngurumo za radi", 96: "ngurumo na mvua ya mawe", 99: "ngurumo kali na mvua ya mawe",
+};
+
+const WEATHER_DESCRIPTIONS_TA: Record<number, string> = {
+  0: "தெளிவான வானம்", 1: "பெரும்பாலும் தெளிவாக", 2: "ஓரளவு மேகமூட்டம்", 3: "மேகமூட்டம்",
+  45: "மூடுபனி", 48: "உறைபனி மூடுபனி",
+  51: "லேசான தூறல்", 53: "மிதமான தூறல்", 55: "அடர்ந்த தூறல்",
+  61: "லேசான மழை", 63: "மிதமான மழை", 65: "கனமழை",
+  71: "லேசான பனிப்பொழிவு", 73: "மிதமான பனிப்பொழிவு", 75: "கடுமையான பனிப்பொழிவு",
+  80: "மழைப்பொழிவு", 81: "மிதமான மழைப்பொழிவு", 82: "கடுமையான மழைப்பொழிவு",
+  95: "இடிமின்னல் புயல்", 96: "ஆலங்கட்டியுடன் இடிமின்னல்", 99: "ஆலங்கட்டியுடன் கடுமையான இடிமின்னல்",
+};
+
+const WEATHER_DESCRIPTIONS_TG: Record<number, string> = {
+  0: "соф", 1: "асосан соф", 2: "қисман абрнок", 3: "абрнок",
+  45: "туман", 48: "тумани яхбаста",
+  51: "боридани сабук", 53: "боридани миёна", 55: "боридани сахт",
+  61: "борони сабук", 63: "борон", 65: "борони сахт",
+  71: "барфи сабук", 73: "барф", 75: "барфи сахт",
+  80: "сел", 81: "сели миёна", 82: "сели сахт",
+  95: "раъду барқ", 96: "раъду барқ бо жола", 99: "раъду барқи сахт бо жола",
+};
+
+const WEATHER_DESCRIPTIONS_TH: Record<number, string> = {
+  0: "ท้องฟ้าแจ่มใส", 1: "ส่วนใหญ่แจ่มใส", 2: "มีเมฆบางส่วน", 3: "มีเมฆมาก",
+  45: "หมอก", 48: "หมอกน้ำแข็ง",
+  51: "ฝนปรอยเล็กน้อย", 53: "ฝนปรอยปานกลาง", 55: "ฝนปรอยหนัก",
+  61: "ฝนตกเล็กน้อย", 63: "ฝนตกปานกลาง", 65: "ฝนตกหนัก",
+  71: "หิมะตกเล็กน้อย", 73: "หิมะตกปานกลาง", 75: "หิมะตกหนัก",
+  80: "ฝนซู่", 81: "ฝนซู่ปานกลาง", 82: "ฝนซู่หนัก",
+  95: "พายุฝนฟ้าคะนอง", 96: "พายุฝนฟ้าคะนองกับลูกเห็บ", 99: "พายุฝนฟ้าคะนองรุนแรงกับลูกเห็บ",
+};
+
+const WEATHER_DESCRIPTIONS_UZ: Record<number, string> = {
+  0: "ochiq", 1: "asosan ochiq", 2: "qisman bulutli", 3: "bulutli",
+  45: "tuman", 48: "qirovli tuman",
+  51: "yengil shivalama", 53: "shivalama", 55: "kuchli shivalama",
+  61: "yengil yomg'ir", 63: "yomg'ir", 65: "kuchli yomg'ir",
+  71: "yengil qor", 73: "qor", 75: "kuchli qor",
+  80: "jala", 81: "o'rtacha jala", 82: "kuchli jala",
+  95: "momaqaldiroq", 96: "do'l bilan momaqaldiroq", 99: "do'l bilan kuchli momaqaldiroq",
+};
+
 const WEATHER_DESCRIPTIONS_BY_LANG: Record<string, Record<number, string>> = {
   ru: WEATHER_DESCRIPTIONS_RU,
   en: WEATHER_DESCRIPTIONS_EN,
@@ -1056,6 +1366,37 @@ const WEATHER_DESCRIPTIONS_BY_LANG: Record<string, Record<number, string>> = {
   fa: WEATHER_DESCRIPTIONS_FA,
   he: WEATHER_DESCRIPTIONS_HE,
   kk: WEATHER_DESCRIPTIONS_KK,
+  az: WEATHER_DESCRIPTIONS_AZ,
+  bg: WEATHER_DESCRIPTIONS_BG,
+  bn: WEATHER_DESCRIPTIONS_BN,
+  bs: WEATHER_DESCRIPTIONS_BS,
+  cs: WEATHER_DESCRIPTIONS_CS,
+  da: WEATHER_DESCRIPTIONS_DA,
+  el: WEATHER_DESCRIPTIONS_EL,
+  et: WEATHER_DESCRIPTIONS_ET,
+  fi: WEATHER_DESCRIPTIONS_FI,
+  hr: WEATHER_DESCRIPTIONS_HR,
+  hu: WEATHER_DESCRIPTIONS_HU,
+  hy: WEATHER_DESCRIPTIONS_HY,
+  ka: WEATHER_DESCRIPTIONS_KA,
+  ky: WEATHER_DESCRIPTIONS_KY,
+  lt: WEATHER_DESCRIPTIONS_LT,
+  lv: WEATHER_DESCRIPTIONS_LV,
+  mk: WEATHER_DESCRIPTIONS_MK,
+  mn: WEATHER_DESCRIPTIONS_MN,
+  ms: WEATHER_DESCRIPTIONS_MS,
+  no: WEATHER_DESCRIPTIONS_NO,
+  ro: WEATHER_DESCRIPTIONS_RO,
+  sk: WEATHER_DESCRIPTIONS_SK,
+  sl: WEATHER_DESCRIPTIONS_SL,
+  sq: WEATHER_DESCRIPTIONS_SQ,
+  sr: WEATHER_DESCRIPTIONS_SR,
+  sv: WEATHER_DESCRIPTIONS_SV,
+  sw: WEATHER_DESCRIPTIONS_SW,
+  ta: WEATHER_DESCRIPTIONS_TA,
+  tg: WEATHER_DESCRIPTIONS_TG,
+  th: WEATHER_DESCRIPTIONS_TH,
+  uz: WEATHER_DESCRIPTIONS_UZ,
 };
 
 const WEATHER_UNKNOWN_BY_LANG: Record<string, string> = {
@@ -1064,6 +1405,13 @@ const WEATHER_UNKNOWN_BY_LANG: Record<string, string> = {
   nl: "onbekend", ar: "غير معروف", zh: "未知", ja: "不明", ko: "알 수 없음",
   hi: "अज्ञात", id: "tidak diketahui", vi: "không xác định", fa: "نامشخص", he: "לא ידוע",
   kk: "белгісіз",
+  az: "naməlum", bg: "неизвестно", bn: "অজানা", bs: "nepoznato", cs: "neznámé",
+  da: "ukendt", el: "άγνωστο", et: "teadmata", fi: "tuntematon", hr: "nepoznato",
+  hu: "ismeretlen", hy: "անհայտ", ka: "უცნობი", ky: "белгисиз", lt: "nežinoma",
+  lv: "nezināms", mk: "непознато", mn: "тодорхойгүй", ms: "tidak diketahui", no: "ukjent",
+  ro: "necunoscut", sk: "neznáme", sl: "neznano", sq: "i panjohur", sr: "непознато",
+  sv: "okänt", sw: "haijulikani", ta: "தெரியாது", tg: "номаълум", th: "ไม่ทราบ",
+  uz: "noma'lum",
 };
 
 function getWeatherDescription(code: number, lang: string = "ru"): string {
