@@ -5537,9 +5537,9 @@ ${existingList}
             }
             if (lines.length) {
               if (isRu) {
-                prompt += `\n\nРЕАЛЬНЫЕ ДАННЫЕ ПРОГНОЗА ПОГОДЫ В АЛАНЬЕ (используй ТОЛЬКО эти данные, не выдумывай свои значения):\n${lines.join("\n")}\n\nЗАДАЧА: Создай связный текст-прогноз погоды на ${forecastDays} ${forecastDays === 1 ? "день" : forecastDays < 5 ? "дня" : "дней"} вперёд. Упомяни КАЖДЫЙ день из данных выше, передай атмосферу, дай практические советы (что надеть, брать ли зонт). Пиши живо, как радиоведущий.`;
+                prompt += `\n\nРЕАЛЬНЫЕ ДАННЫЕ ПРОГНОЗА ПОГОДЫ В АЛАНЬЕ (используй ТОЛЬКО эти числа, не выдумывай свои значения):\n${lines.join("\n")}`;
               } else {
-                prompt += `\n\nREAL WEATHER FORECAST DATA FOR ALANYA (use ONLY these values, do not invent your own):\n${lines.join("\n")}\n\nTASK: Create a coherent ${forecastDays}-day weather forecast script. Mention EVERY day from the data above, convey the atmosphere, give practical advice (what to wear, whether to bring an umbrella). Write lively, like a radio host.`;
+                prompt += `\n\nREAL WEATHER FORECAST DATA FOR ALANYA (use ONLY these numbers, do not invent your own values):\n${lines.join("\n")}`;
               }
             }
           }
@@ -5554,7 +5554,10 @@ ${existingList}
       prompt += `\n${ps.seasonPrefix} ${ps.seasons[season]}`;
       prompt += `\n${ps.seasonNote}`;
 
-      prompt += `\n\n${ps.durationStrict(durationSec, durationStr, minWords, maxWords)}`;
+      const userHasLengthConstraint = /\b(\d+\s*(?:слов|строк|предложен|фраз|секунд|минут|words?|lines?|sentences?|phrases?|seconds?|minutes?))\b|\b(?:не\s+более|не\s+менее|ровно|exactly|no\s+more\s+than|at\s+most)\s+\d+|готовый\s+сценарий|готовый\s+шаблон|ready[-\s]made\s+script|use\s+this\s+script\s+verbatim/i.test(rawPrompt);
+      if (!userHasLengthConstraint) {
+        prompt += `\n\n${ps.durationStrict(durationSec, durationStr, minWords, maxWords)}`;
+      }
 
       const hasSearchContext = fcKeywords.length > 0 || (rawPrompt && rawPrompt.length > 50);
       if (hasSearchContext) {
