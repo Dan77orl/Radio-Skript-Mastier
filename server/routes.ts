@@ -4949,6 +4949,20 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
     }
   });
 
+  app.post("/api/program-types/reorder", async (req, res) => {
+    try {
+      const { orderedIds } = req.body as { orderedIds?: unknown };
+      if (!Array.isArray(orderedIds) || !orderedIds.every((x) => typeof x === "string")) {
+        return res.status(400).json({ error: "orderedIds must be an array of strings" });
+      }
+      await storage.reorderProgramTypes(req.session.userId!, orderedIds as string[]);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error reordering program types:", error);
+      res.status(500).json({ error: "Failed to reorder program types" });
+    }
+  });
+
   app.patch("/api/program-types/:id", async (req, res) => {
     try {
       const updated = await storage.updateProgramType(req.params.id, req.session.userId!, req.body);

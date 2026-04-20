@@ -199,6 +199,7 @@ export interface IStorage {
   createProgramType(programType: InsertProgramType): Promise<ProgramType>;
   updateProgramType(id: string, userId: string, programType: Partial<InsertProgramType>): Promise<ProgramType | undefined>;
   deleteProgramType(id: string, userId: string): Promise<boolean>;
+  reorderProgramTypes(userId: string, orderedIds: string[]): Promise<void>;
   
   getPrograms(userId: string): Promise<Program[]>;
   getProgramsByType(typeId: string, userId?: string): Promise<Program[]>;
@@ -573,6 +574,17 @@ export class DatabaseStorage implements IStorage {
   async deleteProgramType(id: string, userId: string): Promise<boolean> {
     const result = await db.delete(programTypes).where(and(eq(programTypes.id, id), eq(programTypes.userId, userId))).returning();
     return result.length > 0;
+  }
+
+  async reorderProgramTypes(userId: string, orderedIds: string[]): Promise<void> {
+    if (orderedIds.length === 0) return;
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx.update(programTypes)
+          .set({ sortOrder: i })
+          .where(and(eq(programTypes.id, orderedIds[i]), eq(programTypes.userId, userId)));
+      }
+    });
   }
 
   async getPrograms(userId: string): Promise<Program[]> {

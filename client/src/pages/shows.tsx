@@ -9,6 +9,23 @@ import { VoiceInput } from "@/components/voice-input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  horizontalListSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -245,6 +262,23 @@ const iconMap: Record<string, typeof Radio> = {
   "megaphone": Megaphone,
 };
 
+function SortableProgramTypeTab({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    cursor: isDragging ? "grabbing" : "grab",
+    touchAction: "none",
+    display: "inline-flex",
+  };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} data-testid={`sortable-tab-${id}`}>
+      {children}
+    </div>
+  );
+}
+
 export default function ShowsPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -324,6 +358,38 @@ export default function ShowsPage() {
   const { data: programTypes, isLoading: isLoadingTypes } = useQuery<ProgramType[]>({
     queryKey: ["/api/program-types"],
   });
+
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const reorderProgramTypesMutation = useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      return apiRequest("POST", "/api/program-types/reorder", { orderedIds });
+    },
+    onError: () => {
+      toast({
+        description: t("shows.reorderError", { defaultValue: "Couldn't save tab order" }),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/program-types"] });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/program-types"] });
+    },
+  });
+
+  const handleProgramTypeDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const current = programTypes ?? [];
+    const oldIndex = current.findIndex((t) => t.id === active.id);
+    const newIndex = current.findIndex((t) => t.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(current, oldIndex, newIndex).map((t, i) => ({ ...t, sortOrder: i }));
+    queryClient.setQueryData<ProgramType[]>(["/api/program-types"], reordered);
+    reorderProgramTypesMutation.mutate(reordered.map((t) => t.id));
+  };
 
   const { data: programs, isLoading: isLoadingPrograms } = useQuery<Program[]>({
     queryKey: ["/api/programs", activeTab],
@@ -1071,17 +1137,30 @@ export default function ShowsPage() {
 
       <Tabs value={activeTab || ""} onValueChange={setActiveTab}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <TabsList className="flex-wrap">
-            {programTypes?.map((type) => {
-              const Icon = type.icon ? iconMap[type.icon] || Radio : Radio;
-              return (
-                <TabsTrigger key={type.id} value={type.id} className="gap-2" data-testid={`tab-${type.slug}`}>
-                  <Icon className="h-4 w-4" />
-                  {type.name}
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
+          <DndContext
+            sensors={dndSensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleProgramTypeDragEnd}
+          >
+            <SortableContext
+              items={(programTypes ?? []).map((t) => t.id)}
+              strategy={horizontalListSortingStrategy}
+            >
+              <TabsList className="flex-wrap">
+                {programTypes?.map((type) => {
+                  const Icon = type.icon ? iconMap[type.icon] || Radio : Radio;
+                  return (
+                    <SortableProgramTypeTab key={type.id} id={type.id}>
+                      <TabsTrigger value={type.id} className="gap-2" data-testid={`tab-${type.slug}`}>
+                        <Icon className="h-4 w-4" />
+                        {type.name}
+                      </TabsTrigger>
+                    </SortableProgramTypeTab>
+                  );
+                })}
+              </TabsList>
+            </SortableContext>
+          </DndContext>
           <HintTooltip hint={t("hints.shows.addType")}>
             <Button variant="outline" size="sm" onClick={() => setIsAddTypeDialogOpen(true)} data-testid="button-add-type">
               <Plus className="mr-2 h-4 w-4" />
