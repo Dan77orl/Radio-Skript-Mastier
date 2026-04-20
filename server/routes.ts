@@ -6,6 +6,7 @@ import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertAdPresetSchema, insertVoiceSchema, insertScheduleTemplateSchema, insertHostShiftSchema, insertCustomHolidaySchema } from "@shared/schema";
+import { hasLengthConstraintInPrompt } from "@shared/prompt-length";
 import { getHolidaysForDate, getHolidaysForYear, getHolidaysForMonth, getHolidayInfo, setCustomHolidays } from "./holidays";
 import { getPromptStrings, getGenderLabel, getDefaultHostName, getLanguageDirective, getLanguageName } from "./prompt-locale";
 import { handleSupportChat } from "./support-chat";
@@ -5554,7 +5555,7 @@ ${existingList}
       prompt += `\n${ps.seasonPrefix} ${ps.seasons[season]}`;
       prompt += `\n${ps.seasonNote}`;
 
-      const userHasLengthConstraint = /(?:\d+\s*[-–—]?\s*\d*\s*(?:слов|строк|предложен|фраз|секунд|минут|words?|lines?|sentences?|phrases?|seconds?|minutes?))|(?:не\s+более|не\s+менее|ровно|максимум|минимум|exactly|no\s+more\s+than|at\s+most|at\s+least)\s+\d+|готовый\s+сценарий|готовый\s+шаблон|готовый\s+текст|используй\s+(?:этот|данный)\s+(?:сценарий|текст|шаблон)|ready[-\s]made\s+script|use\s+this\s+script\s+verbatim/iu.test(rawPrompt);
+      const userHasLengthConstraint = hasLengthConstraintInPrompt(rawPrompt);
       if (!userHasLengthConstraint) {
         prompt += `\n\n${ps.durationStrict(durationSec, durationStr, minWords, maxWords)}`;
       }
