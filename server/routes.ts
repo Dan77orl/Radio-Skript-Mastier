@@ -5554,7 +5554,7 @@ ${existingList}
       prompt += `\n${ps.seasonPrefix} ${ps.seasons[season]}`;
       prompt += `\n${ps.seasonNote}`;
 
-      const userHasLengthConstraint = /\b(\d+\s*(?:слов|строк|предложен|фраз|секунд|минут|words?|lines?|sentences?|phrases?|seconds?|minutes?))\b|\b(?:не\s+более|не\s+менее|ровно|exactly|no\s+more\s+than|at\s+most)\s+\d+|готовый\s+сценарий|готовый\s+шаблон|ready[-\s]made\s+script|use\s+this\s+script\s+verbatim/i.test(rawPrompt);
+      const userHasLengthConstraint = /(?:\d+\s*[-–—]?\s*\d*\s*(?:слов|строк|предложен|фраз|секунд|минут|words?|lines?|sentences?|phrases?|seconds?|minutes?))|(?:не\s+более|не\s+менее|ровно|максимум|минимум|exactly|no\s+more\s+than|at\s+most|at\s+least)\s+\d+|готовый\s+сценарий|готовый\s+шаблон|готовый\s+текст|используй\s+(?:этот|данный)\s+(?:сценарий|текст|шаблон)|ready[-\s]made\s+script|use\s+this\s+script\s+verbatim/iu.test(rawPrompt);
       if (!userHasLengthConstraint) {
         prompt += `\n\n${ps.durationStrict(durationSec, durationStr, minWords, maxWords)}`;
       }
