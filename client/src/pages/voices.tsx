@@ -36,11 +36,49 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Play, Pause, Plus, Trash2, Volume2, User, Users, Mic, Edit2, Search, Loader2, Globe, SlidersHorizontal } from "lucide-react";
+import { Play, Pause, Plus, Trash2, Volume2, User, Users, Mic, Edit2, Search, Loader2, Globe, SlidersHorizontal, GripVertical } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VoiceInput } from "@/components/voice-input";
 import { HintTooltip } from "@/components/hint-tooltip";
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import type { DraggableAttributes, DraggableSyntheticListeners } from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { Voice, ProgramType } from "@shared/schema";
+
+interface VoiceDragHandleProps {
+  attributes: DraggableAttributes;
+  listeners: DraggableSyntheticListeners;
+  isDragging: boolean;
+}
+
+function SortableVoiceCard({ id, children }: { id: string; children: (handleProps: VoiceDragHandleProps) => React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style} data-testid={`sortable-voice-${id}`}>
+      {children({ attributes, listeners, isDragging })}
+    </div>
+  );
+}
 
 interface ElevenLabsVoice {
   voice_id: string;
@@ -193,6 +231,38 @@ export default function VoicesPage() {
       });
     },
   });
+
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const reorderVoicesMutation = useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      return apiRequest("POST", "/api/voices/reorder", { orderedIds });
+    },
+    onError: () => {
+      toast({
+        description: t("voices.reorderError", { defaultValue: "Couldn't save voice order" }),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/voices"] });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/voices"] });
+    },
+  });
+
+  const handleVoiceDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const current = voices ?? [];
+    const oldIndex = current.findIndex((v) => v.id === active.id);
+    const newIndex = current.findIndex((v) => v.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(current, oldIndex, newIndex).map((v, i) => ({ ...v, sortOrder: i }));
+    queryClient.setQueryData<Voice[]>(["/api/voices"], reordered);
+    reorderVoicesMutation.mutate(reordered.map((v) => v.id));
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -770,17 +840,33 @@ export default function VoicesPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {isLoading ? (
-          Array.from({ length: 4 }, (_, i) => (
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {Array.from({ length: 4 }, (_, i) => (
             <Skeleton key={i} className="h-40" />
-          ))
-        ) : voices && voices.length > 0 ? (
-          voices.map((voice, index) => (
-            <Card key={voice.id} data-testid={`voice-card-${voice.id}`}>
+          ))}
+        </div>
+      ) : voices && voices.length > 0 ? (
+        <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleVoiceDragEnd}>
+          <SortableContext items={voices.map((v) => v.id)} strategy={rectSortingStrategy}>
+            <div className="grid gap-4 md:grid-cols-2">
+              {voices.map((voice, index) => (
+                <SortableVoiceCard key={voice.id} id={voice.id}>
+                  {({ attributes, listeners, isDragging }) => (
+            <Card data-testid={`voice-card-${voice.id}`} className={isDragging ? "ring-2 ring-primary" : ""}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      className="flex h-8 w-6 items-center justify-center text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
+                      aria-label={t("voices.dragToReorder", { defaultValue: "Drag to reorder" })}
+                      data-testid={`button-drag-voice-${voice.id}`}
+                      {...attributes}
+                      {...listeners}
+                    >
+                      <GripVertical className="h-4 w-4" />
+                    </button>
                     <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
                       voice.gender === "female" ? "bg-pink-500/10 text-pink-600" : "bg-blue-500/10 text-blue-600"
                     }`}>
@@ -873,8 +959,14 @@ export default function VoicesPage() {
                 </div>
               </CardContent>
             </Card>
-          ))
-        ) : (
+                  )}
+                </SortableVoiceCard>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
           <Card className="col-span-full">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Users className="h-16 w-16 text-muted-foreground/50 mb-4" />
@@ -888,8 +980,8 @@ export default function VoicesPage() {
               </Button>
             </CardContent>
           </Card>
-        )}
-      </div>
+        </div>
+      )}
 
       <Dialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open && editAudioRef.current) editAudioRef.current.pause(); setIsEditDialogOpen(open); }}>
         <DialogContent className="!w-[min(38rem,calc(100vw-2rem))] !max-w-none max-h-[85vh] overflow-y-auto">

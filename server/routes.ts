@@ -4734,6 +4734,20 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
     }
   });
 
+  app.post("/api/voices/reorder", async (req, res) => {
+    try {
+      const { orderedIds } = req.body as { orderedIds?: unknown };
+      if (!Array.isArray(orderedIds) || !orderedIds.every((x) => typeof x === "string")) {
+        return res.status(400).json({ error: "orderedIds must be an array of strings" });
+      }
+      await storage.reorderVoices(req.session.userId!, orderedIds as string[]);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error reordering voices:", error);
+      res.status(500).json({ error: "Failed to reorder voices" });
+    }
+  });
+
   app.patch("/api/voices/:id", async (req, res) => {
     try {
       const allowedFields = ["name", "gender", "isActive", "sortOrder", "description", "personaName", "assignedProgramTypeIds", "elevenLabsVoiceId", "previewUrl"];

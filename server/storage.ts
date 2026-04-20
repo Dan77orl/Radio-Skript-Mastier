@@ -193,6 +193,7 @@ export interface IStorage {
   updateVoice(id: string, userId: string, voice: Partial<InsertVoice>): Promise<Voice | undefined>;
   deleteVoice(id: string, userId: string): Promise<boolean>;
   getVoicesCount(userId: string): Promise<number>;
+  reorderVoices(userId: string, orderedIds: string[]): Promise<void>;
   
   getProgramTypes(userId?: string): Promise<ProgramType[]>;
   getProgramType(id: string, userId?: string): Promise<ProgramType | undefined>;
@@ -541,6 +542,17 @@ export class DatabaseStorage implements IStorage {
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(voices)
       .where(eq(voices.userId, userId));
     return result[0]?.count || 0;
+  }
+
+  async reorderVoices(userId: string, orderedIds: string[]): Promise<void> {
+    if (orderedIds.length === 0) return;
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx.update(voices)
+          .set({ sortOrder: i })
+          .where(and(eq(voices.id, orderedIds[i]), eq(voices.userId, userId)));
+      }
+    });
   }
 
   async getProgramTypes(userId?: string): Promise<ProgramType[]> {
