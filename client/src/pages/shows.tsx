@@ -1646,6 +1646,15 @@ export default function ShowsPage() {
               />
               <VoiceInput onTranscript={(text) => setEditingType(prev => prev ? { ...prev, defaultPrompt: prev.defaultPrompt + " " + text } : null)} />
             </div>
+            {hasLengthConstraintInPrompt(editingType?.defaultPrompt || "") && (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="text-length-constraint-hint-edit-prompt"
+              >
+                <span className="font-medium">{t("shows.lengthConstraintDetected")}.</span>{" "}
+                {t("shows.lengthConstraintHint")}
+              </p>
+            )}
             <div className="flex gap-2">
               <HintTooltip hint={t("hints.shows.analyzePrompt")}>
                 <Button
