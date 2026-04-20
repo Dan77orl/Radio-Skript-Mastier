@@ -154,6 +154,13 @@ function ScheduleScriptPopover({
   );
 }
 
+const LENGTH_CONSTRAINT_REGEX = /(?:\d+\s*[-–—]?\s*\d*\s*(?:слов|строк|предложен|фраз|секунд|минут|words?|lines?|sentences?|phrases?|seconds?|minutes?))|(?:не\s+более|не\s+менее|ровно|максимум|минимум|exactly|no\s+more\s+than|at\s+most|at\s+least)\s+\d+|готовый\s+сценарий|готовый\s+шаблон|готовый\s+текст|используй\s+(?:этот|данный)\s+(?:сценарий|текст|шаблон)|ready[-\s]made\s+script|use\s+this\s+script\s+verbatim/iu;
+
+function hasLengthConstraintInPrompt(prompt: string): boolean {
+  if (!prompt) return false;
+  return LENGTH_CONSTRAINT_REGEX.test(prompt);
+}
+
 const getDefaultProgramTypes = (stationName: string, t: (key: string) => string) => [
   {
     name: t("defaults.newsName"),
@@ -1829,13 +1836,33 @@ export default function ShowsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2 min-w-0">
-                  <Label>{t("shows.durationSec")}</Label>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Label>{t("shows.durationSec")}</Label>
+                    {hasLengthConstraintInPrompt(settingsType.defaultPrompt || "") && (
+                      <Badge
+                        variant="outline"
+                        className="text-xs font-normal"
+                        title={t("shows.lengthConstraintHint")}
+                        data-testid="badge-length-constraint-detected"
+                      >
+                        {t("shows.lengthConstraintDetected")}
+                      </Badge>
+                    )}
+                  </div>
                   <Input
                     type="number"
                     value={settingsType.defaultDurationSeconds || 60}
                     onChange={(e) => setSettingsType(prev => prev ? { ...prev, defaultDurationSeconds: Number(e.target.value) } : null)}
                     data-testid="input-duration"
                   />
+                  {hasLengthConstraintInPrompt(settingsType.defaultPrompt || "") && (
+                    <p
+                      className="text-xs text-muted-foreground"
+                      data-testid="text-length-constraint-hint"
+                    >
+                      {t("shows.lengthConstraintHint")}
+                    </p>
+                  )}
                 </div>
               </div>
 

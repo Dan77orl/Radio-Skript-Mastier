@@ -742,6 +742,8 @@
     "settingsTitle": "Settings: {{name}}",
     "settingsDesc": "Schedule, sponsors, voices and other settings",
     "durationSec": "Duration (sec)",
+    "lengthConstraintDetected": "Length constraint detected in prompt",
+    "lengthConstraintHint": "Your prompt already specifies a length (e.g. words, lines, minutes), so the system's strict word-count rule is suppressed. Remove the length wording in your prompt to re-enable it.",
     "slotDescription": "Slot descriptions (what to generate for each episode)",
     "slotPlaceholder": "Episode #{{num}} description...",
     "sponsorLabel": "Sponsor",
