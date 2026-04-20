@@ -593,13 +593,10 @@ export default function ShowsPage() {
     }
   };
 
-  const changePlaybackRate = () => {
-    const rates = [1, 1.5, 2, 3];
-    const currentIdx = rates.indexOf(audioPlaybackRate);
-    const nextRate = rates[(currentIdx + 1) % rates.length];
-    setAudioPlaybackRate(nextRate);
+  const setPlaybackRate = (rate: number) => {
+    setAudioPlaybackRate(rate);
     if (audioRef.current) {
-      audioRef.current.playbackRate = nextRate;
+      audioRef.current.playbackRate = rate;
     }
   };
 
@@ -1580,15 +1577,23 @@ export default function ShowsPage() {
                             <span className="text-xs text-muted-foreground w-10 shrink-0 tabular-nums" data-testid={`text-duration-${program.id}`}>
                               {formatTime(audioDuration)}
                             </span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 px-2 text-xs font-mono shrink-0 min-w-[42px]"
-                              onClick={changePlaybackRate}
-                              data-testid={`button-speed-${program.id}`}
-                            >
-                              x{audioPlaybackRate}
-                            </Button>
+                            <div className="flex border rounded-md overflow-hidden shrink-0 h-7">
+                              {[1, 1.5, 2].map((speed) => (
+                                <button
+                                  key={speed}
+                                  type="button"
+                                  className={`px-2 text-xs font-medium transition-colors ${
+                                    audioPlaybackRate === speed
+                                      ? "bg-primary text-primary-foreground"
+                                      : "bg-background hover:bg-muted text-muted-foreground"
+                                  }`}
+                                  onClick={() => setPlaybackRate(speed)}
+                                  data-testid={`button-speed-${speed}x-${program.id}`}
+                                >
+                                  {speed}x
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </CardContent>
