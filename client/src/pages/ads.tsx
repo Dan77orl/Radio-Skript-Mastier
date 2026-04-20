@@ -41,6 +41,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { usePlaybackRate } from "@/hooks/use-playback-rate";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getCleanVoiceName } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -113,7 +114,7 @@ export default function AdsPage() {
   const [voiceSearchLanguage, setVoiceSearchLanguage] = useState("all");
   const [previewingVoiceUrl, setPreviewingVoiceUrl] = useState<string | null>(null);
   const voicePreviewRef = useRef<HTMLAudioElement | null>(null);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [playbackSpeed, setPlaybackSpeed] = usePlaybackRate(1);
   const [playingVersionUrl, setPlayingVersionUrl] = useState<string | null>(null);
   const versionAudioRef = useRef<HTMLAudioElement | null>(null);
   const [musicSearchQuery, setMusicSearchQuery] = useState("");

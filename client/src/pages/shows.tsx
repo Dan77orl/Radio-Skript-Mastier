@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
+import { usePlaybackRate } from "@/hooks/use-playback-rate";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getCleanVoiceName } from "@/lib/utils";
 import { 
@@ -268,7 +269,7 @@ export default function ShowsPage() {
   const [playingProgramId, setPlayingProgramId] = useState<string | null>(null);
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
-  const [audioPlaybackRate, setAudioPlaybackRate] = useState(1);
+  const [audioPlaybackRate, setAudioPlaybackRate] = usePlaybackRate(1);
   const [slotInputs, setSlotInputs] = useState<string[]>([]);
   const [firecrawlTopicInput, setFirecrawlTopicInput] = useState("");
   const [firecrawlTestResult, setFirecrawlTestResult] = useState<string | null>(null);
@@ -306,7 +307,6 @@ export default function ShowsPage() {
     setPlayingProgramId(null);
     setAudioCurrentTime(0);
     setAudioDuration(0);
-    setAudioPlaybackRate(1);
   }, []);
 
   const { data: appSettings } = useQuery<AppSettings>({
