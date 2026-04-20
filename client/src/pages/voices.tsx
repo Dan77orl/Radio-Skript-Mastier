@@ -47,6 +47,10 @@ import {
   useSensor,
   useSensors,
   closestCenter,
+  pointerWithin,
+  rectIntersection,
+  useDroppable,
+  useDraggable,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import type { DraggableAttributes, DraggableSyntheticListeners } from "@dnd-kit/core";
@@ -76,6 +80,64 @@ function SortableVoiceCard({ id, children }: { id: string; children: (handleProp
   return (
     <div ref={setNodeRef} style={style} data-testid={`sortable-voice-${id}`}>
       {children({ attributes, listeners, isDragging })}
+    </div>
+  );
+}
+
+function ShowDropZone({
+  programId,
+  name,
+  icon,
+  children,
+}: {
+  programId: string;
+  name: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `show:${programId}` });
+  return (
+    <div
+      ref={setNodeRef}
+      data-testid={`show-drop-${programId}`}
+      className={`rounded-lg border p-3 transition-colors ${
+        isOver ? "border-primary bg-primary/10 ring-2 ring-primary" : "bg-card"
+      }`}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        {icon}
+        <span className="text-sm font-medium truncate">{name}</span>
+      </div>
+      <div className="flex flex-wrap gap-1 min-h-[32px]">{children}</div>
+    </div>
+  );
+}
+
+function AssignedVoiceChip({
+  voiceId,
+  programId,
+  name,
+}: {
+  voiceId: string;
+  programId: string;
+  name: string;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `chip:${voiceId}:${programId}`,
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      data-testid={`chip-assigned-${voiceId}-${programId}`}
+      className={`inline-flex items-center gap-1 rounded-md border bg-secondary px-2 py-1 text-xs cursor-grab active:cursor-grabbing touch-none select-none hover-elevate ${
+        isDragging ? "opacity-50" : ""
+      }`}
+    >
+      <GripVertical className="h-3 w-3 text-muted-foreground" />
+      <Mic className="h-3 w-3" />
+      <span>{name}</span>
     </div>
   );
 }
@@ -252,14 +314,77 @@ export default function VoicesPage() {
     },
   });
 
+  const assignProgramMutation = useMutation({
+    mutationFn: async ({ voiceId, assignedProgramTypeIds }: { voiceId: string; assignedProgramTypeIds: string[] }) => {
+      const response = await apiRequest("PATCH", `/api/voices/${voiceId}`, { assignedProgramTypeIds });
+      return response.json();
+    },
+    onMutate: async ({ voiceId, assignedProgramTypeIds }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/voices"] });
+      const previous = queryClient.getQueryData<Voice[]>(["/api/voices"]);
+      queryClient.setQueryData<Voice[]>(["/api/voices"], (old) =>
+        old?.map((v) => (v.id === voiceId ? { ...v, assignedProgramTypeIds } : v)) ?? [],
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(["/api/voices"], context.previous);
+      toast({
+        title: t("common.error"),
+        description: t("voices.assignError", { defaultValue: "Couldn't update assignment" }),
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/voices"] });
+    },
+  });
+
   const handleVoiceDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const current = voices ?? [];
-    const oldIndex = current.findIndex((v) => v.id === active.id);
-    const newIndex = current.findIndex((v) => v.id === over.id);
+    const activeId = String(active.id);
+    const overId = over ? String(over.id) : null;
+    const list = voices ?? [];
+
+    if (activeId.startsWith("chip:")) {
+      const parts = activeId.split(":");
+      const voiceId = parts[1];
+      const fromProgramId = parts.slice(2).join(":");
+      const voice = list.find((v) => v.id === voiceId);
+      if (!voice) return;
+      const current = voice.assignedProgramTypeIds || [];
+
+      if (overId?.startsWith("show:")) {
+        const toProgramId = overId.slice(5);
+        if (toProgramId === fromProgramId) return;
+        const next = current.filter((id) => id !== fromProgramId);
+        if (!next.includes(toProgramId)) next.push(toProgramId);
+        assignProgramMutation.mutate({ voiceId, assignedProgramTypeIds: next });
+      } else {
+        const next = current.filter((id) => id !== fromProgramId);
+        assignProgramMutation.mutate({ voiceId, assignedProgramTypeIds: next });
+      }
+      return;
+    }
+
+    if (overId?.startsWith("show:")) {
+      const programId = overId.slice(5);
+      const voice = list.find((v) => v.id === activeId);
+      if (!voice) return;
+      const current = voice.assignedProgramTypeIds || [];
+      if (current.includes(programId)) return;
+      assignProgramMutation.mutate({
+        voiceId: activeId,
+        assignedProgramTypeIds: [...current, programId],
+      });
+      return;
+    }
+
+    if (!over || activeId === overId) return;
+    const oldIndex = list.findIndex((v) => v.id === activeId);
+    const newIndex = list.findIndex((v) => v.id === overId);
     if (oldIndex === -1 || newIndex === -1) return;
-    const reordered = arrayMove(current, oldIndex, newIndex).map((v, i) => ({ ...v, sortOrder: i }));
+    const reordered = arrayMove(list, oldIndex, newIndex).map((v, i) => ({ ...v, sortOrder: i }));
     queryClient.setQueryData<Voice[]>(["/api/voices"], reordered);
     reorderVoicesMutation.mutate(reordered.map((v) => v.id));
   };
@@ -847,7 +972,54 @@ export default function VoicesPage() {
           ))}
         </div>
       ) : voices && voices.length > 0 ? (
-        <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleVoiceDragEnd}>
+        <DndContext
+          sensors={dndSensors}
+          collisionDetection={(args) => {
+            const pointer = pointerWithin(args);
+            if (pointer.length > 0) return pointer;
+            const intersect = rectIntersection(args);
+            if (intersect.length > 0) return intersect;
+            return closestCenter(args);
+          }}
+          onDragEnd={handleVoiceDragEnd}
+        >
+          <div className="space-y-2 mb-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-medium">{t("voices.assignToShows")}</h2>
+                <span className="text-xs text-muted-foreground">
+                  {t("voices.dragVoiceToShowHint", { defaultValue: "Drag a voice onto a show to assign it. Drag a chip away to unassign." })}
+                </span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <ShowDropZone
+                  programId="dialogs"
+                  name={t("voices.dialogs")}
+                  icon={<Users className="h-4 w-4 text-muted-foreground" />}
+                >
+                  {voices.filter(v => v.assignedProgramTypeIds?.includes("dialogs")).map(v => (
+                    <AssignedVoiceChip key={v.id} voiceId={v.id} programId="dialogs" name={v.name} />
+                  ))}
+                  {voices.filter(v => v.assignedProgramTypeIds?.includes("dialogs")).length === 0 && (
+                    <span className="text-xs text-muted-foreground italic">{t("voices.dropVoiceHere", { defaultValue: "Drop a voice here" })}</span>
+                  )}
+                </ShowDropZone>
+                {programTypes?.map(pt => (
+                  <ShowDropZone
+                    key={pt.id}
+                    programId={pt.id}
+                    name={pt.name}
+                    icon={<Mic className="h-4 w-4 text-muted-foreground" />}
+                  >
+                    {voices.filter(v => v.assignedProgramTypeIds?.includes(pt.id)).map(v => (
+                      <AssignedVoiceChip key={v.id} voiceId={v.id} programId={pt.id} name={v.name} />
+                    ))}
+                    {voices.filter(v => v.assignedProgramTypeIds?.includes(pt.id)).length === 0 && (
+                      <span className="text-xs text-muted-foreground italic">{t("voices.dropVoiceHere", { defaultValue: "Drop a voice here" })}</span>
+                    )}
+                  </ShowDropZone>
+                ))}
+              </div>
+            </div>
           <SortableContext items={voices.map((v) => v.id)} strategy={rectSortingStrategy}>
             <div className="grid gap-4 md:grid-cols-2">
               {voices.map((voice, index) => (
