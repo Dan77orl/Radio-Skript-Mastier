@@ -84,6 +84,7 @@ interface PromptStrings {
   seasonNote: string;
   seasons: Record<string, string>;
   durationStrict: (sec: number, dur: string, min: number, max: number) => string;
+  weatherFormatGuard: (maxLines: number) => string;
   topicArea: (name: string, keywords: string) => string;
   multiSpeakerFormat: (speakers: string, names: string[]) => string;
   singleSpeakerFormat: (name: string) => string;
@@ -142,11 +143,22 @@ function getRuStrings(): PromptStrings {
       autumn: "Осень (сентябрь-ноябрь). Прохлада, золотые листья, уютный сезон. Время подводить итоги.",
     },
     durationStrict: (sec, dur, min, max) =>
-      `ХРОНОМЕТРАЖ — СТРОГО СОБЛЮДАЙ:
-- Целевая длительность: ${sec} секунд (~${dur} мин)
-- Объём текста: от ${min} до ${max} слов (скорость чтения ~150 слов/мин)
-- НЕ ПИШИ БОЛЬШЕ ${max} слов! Лучше короче и ёмче, чем длинно и водянисто
-- Если ${sec} секунд — это коротко, сфокусируйся на ОДНОЙ теме/истории, не пытайся охватить всё`,
+      `ХРОНОМЕТРАЖ — ЖЁСТКИЙ ВЕРХНИЙ ПРЕДЕЛ:
+- Целевая длительность чтения вслух: ${sec} секунд (~${dur} мин), скорость ~150 слов/мин.
+- АБСОЛЮТНЫЙ МАКСИМУМ: ${max} слов во всём сценарии (считаются только слова текста, без тегов [имя]: и [тон]).
+- Можно короче — это нормально и поощряется. Длиннее ${max} слов — НЕЛЬЗЯ ни при каких условиях.
+- Не растягивай текст, чтобы «заполнить» длительность. Лучше меньше слов, чем вода.
+- Если ${sec} секунд — это коротко, выбери ОДНУ тему/мысль и не пытайся охватить всё.`,
+    weatherFormatGuard: (maxLines) =>
+      `РАМКИ ФОРМАТА «ПРОГНОЗ ПОГОДЫ» — ОБЯЗАТЕЛЬНО:
+- Это короткий дата-дайджест, а НЕ повествовательный сценарий.
+- ЗАПРЕЩЕНО любое вступление-приветствие: «Доброе утро», «Привет, Аланья», «С вами …», «Сегодня поговорим…» и т.п. Сразу к фактам.
+- Используй ТОЛЬКО числа из подставленного блока «РЕАЛЬНЫЕ ДАННЫЕ ПРОГНОЗА ПОГОДЫ» выше. Не выдумывай свои значения.
+- ЗАПРЕЩЕНО ссылаться на сторонние источники погоды: AccuWeather, Gismeteo, Яндекс.Погода, Weather.com, "по данным синоптиков" и т.п. Подаём данные как собственный прогноз.
+- Каждый факт — отдельной короткой строкой (1 короткое предложение). Не объединяй несколько фактов в один абзац, не разводи воду и не добавляй «жизненных наблюдений».
+- Не больше ${maxLines} строк всего, если пользователь явно не попросил другое количество.
+- Сохраняй формат [Имя]: [тон] [настроение] текст на каждой строке.
+- Финальную брендовую строку (если она есть в инструкциях пользователя) воспроизведи дословно.`,
     topicArea: (name, keywords) => `Тематика передачи "${name}": ${keywords}. Создавай контент СТРОГО в рамках этой тематики.`,
     multiSpeakerFormat: (speakers, names) =>
       `ОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА: мульти-спикерный скрипт. Спикеры: ${speakers}
@@ -234,11 +246,22 @@ function getEnStrings(): PromptStrings {
       autumn: "Autumn (September-November). Cooling down, golden leaves, cozy season. Time to reflect and wrap up.",
     },
     durationStrict: (sec, dur, min, max) =>
-      `DURATION — STRICTLY FOLLOW:
-- Target duration: ${sec} seconds (~${dur} min)
-- Text volume: from ${min} to ${max} words (reading speed ~150 words/min)
-- DO NOT WRITE MORE than ${max} words! Better short and punchy than long and watery
-- If ${sec} seconds is short, focus on ONE topic/story, don't try to cover everything`,
+      `DURATION — HARD UPPER LIMIT:
+- Target reading duration: ${sec} seconds (~${dur} min) at ~150 words/min.
+- ABSOLUTE MAXIMUM: ${max} words in the entire script (count only spoken words, not [name]: or [tag] markers).
+- Shorter is fine and encouraged. Longer than ${max} words is NOT allowed under any circumstances.
+- Do NOT pad the text to "fill" the duration. Fewer words is better than filler.
+- If ${sec} seconds is short, pick ONE topic/idea and don't try to cover everything.`,
+    weatherFormatGuard: (maxLines) =>
+      `WEATHER FORECAST FORMAT RULES — MANDATORY:
+- This is a short data digest, NOT a narrative script.
+- NO greeting/intro lines: "Good morning", "Hello Alanya", "With you is...", "Today we will talk about..." etc. Start straight with the facts.
+- Use ONLY the numbers from the "REAL WEATHER FORECAST DATA" block above. Do not invent your own values.
+- DO NOT cite third-party weather sources: AccuWeather, Gismeteo, Yandex.Weather, Weather.com, "according to forecasters" etc. Present the data as our own forecast.
+- One fact per short line (a single short sentence). Do not merge facts into paragraphs, do not add "life observations" or filler.
+- No more than ${maxLines} lines total, unless the user explicitly asked for a different count.
+- Keep the format [Name]: [tone] [mood] text on every line.
+- Reproduce the final branded line verbatim if the user's instructions contain one.`,
     topicArea: (name, keywords) => `Show topic area "${name}": ${keywords}. Create content STRICTLY within this topic area.`,
     multiSpeakerFormat: (speakers, names) =>
       `REQUIRED OUTPUT FORMAT: multi-speaker script. Speakers: ${speakers}

@@ -191,6 +191,85 @@ async function buildStationContext(userId?: string, lang?: string): Promise<Stat
   return { stationName, stationDescription, malePersona, femalePersona, personaList, knowledgeBase };
 }
 
+function countSpokenWords(scriptText: string): number {
+  if (!scriptText) return 0;
+  const cleaned = scriptText
+    .replace(/^\s*(?:ТЕМА|TOPIC):\s*.+$/gim, "")
+    .replace(/^\s*\[[^\]]+\]\s*:/gm, "")
+    .replace(/\[[^\]]+\]/g, "")
+    .replace(/[*_`#>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return 0;
+  return cleaned.split(/\s+/).filter(Boolean).length;
+}
+
+async function enforceMaxWords(
+  scriptText: string,
+  maxWords: number,
+  systemPrompt: string,
+  userPromptForContext: string,
+  anthropic: Anthropic | null,
+  lang: string,
+): Promise<string> {
+  if (!scriptText || maxWords <= 0) return scriptText;
+  const current = countSpokenWords(scriptText);
+  const overshootRatio = current / maxWords;
+  if (overshootRatio <= 1.1) return scriptText;
+  const isRu = lang?.toLowerCase().startsWith("ru");
+  const compressInstruction = isRu
+    ? `Сценарий получился ${current} слов, а абсолютный максимум — ${maxWords} слов. СОКРАТИ его до ${maxWords} слов или меньше. Жёсткие правила:
+- сохрани тот же формат строк ([Имя]: [тон] [настроение] текст или [Имя]: текст),
+- сохрани последовательность и состав ведущих,
+- сохрани финальную брендовую строку слово в слово, если она есть,
+- сохрани конкретные числа и факты (температуры, даты и т.п.), не выдумывай новые,
+- убери воду, повторы, лишние эпитеты, длинные подводки — оставь суть.
+Верни ТОЛЬКО переработанный сценарий, без пояснений до или после.
+
+Текущий сценарий:
+${scriptText}`
+    : `The script is ${current} words long but the absolute maximum is ${maxWords} words. COMPRESS it to ${maxWords} words or fewer. Hard rules:
+- keep the same line format ([Name]: [tone] [mood] text or [Name]: text),
+- keep the same hosts and their order,
+- keep the final branded line verbatim if present,
+- keep concrete numbers and facts (temperatures, dates, etc.); do not invent new ones,
+- cut filler, repetition, decorative epithets, long lead-ins — keep the substance.
+Return ONLY the rewritten script, with no commentary before or after.
+
+Current script:
+${scriptText}`;
+  try {
+    if (anthropic) {
+      const message = await anthropic.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: 2048,
+        system: systemPrompt,
+        messages: [{ role: "user", content: compressInstruction }],
+      });
+      const textContent = message.content.find(c => c.type === "text");
+      const compressed = (textContent as any)?.text?.trim();
+      if (compressed && countSpokenWords(compressed) < current) {
+        return compressed;
+      }
+    } else {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: compressInstruction },
+        ],
+      });
+      const compressed = response.choices[0]?.message?.content?.trim();
+      if (compressed && countSpokenWords(compressed) < current) {
+        return compressed;
+      }
+    }
+  } catch (err: any) {
+    console.error("enforceMaxWords compression failed:", err?.message || err);
+  }
+  return scriptText;
+}
+
 interface ScriptSegment {
   speaker: string;
   text: string;
@@ -5575,6 +5654,8 @@ ${existingList}
         } catch (e) {
           console.error("Weather injection failed:", e);
         }
+        const weatherMaxLines = Math.max(5, Math.min(10, 3 + forecastDays * 2));
+        prompt += `\n\n${ps.weatherFormatGuard(weatherMaxLines)}`;
       }
 
       const seasonRefDate = new Date(dateStr + "T12:00:00");
@@ -5588,7 +5669,8 @@ ${existingList}
         prompt += `\n\n${ps.durationStrict(durationSec, durationStr, minWords, maxWords)}`;
       }
 
-      const hasSearchContext = fcKeywords.length > 0 || (rawPrompt && rawPrompt.length > 50);
+      const hasSearchContext = !programType.isWeatherForecast
+        && (fcKeywords.length > 0 || (rawPrompt && rawPrompt.length > 50));
       if (hasSearchContext) {
         try {
           const stationSettings = await storage.getSettings(req.session.userId);
@@ -5684,6 +5766,10 @@ ${ps.narrativeStyle}`;
       } catch (genError) {
         console.error("Script generation failed:", genError);
         return res.status(500).json({ error: ps.generationFailed });
+      }
+
+      if (!userHasLengthConstraint) {
+        scriptText = await enforceMaxWords(scriptText, maxWords, systemPrompt, prompt, anthropic, userLang);
       }
 
       let extractedTopic = "";
@@ -6168,6 +6254,8 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
         
         scriptText = response.choices[0]?.message?.content || "";
       }
+
+      scriptText = await enforceMaxWords(scriptText, genMaxWords, systemPrompt, prompt, anthropic, userLangGen);
 
       const updated = await storage.updateProgram(program.id, req.session.userId!, {
         scriptText,
