@@ -85,6 +85,7 @@ interface PromptStrings {
   seasons: Record<string, string>;
   durationStrict: (sec: number, dur: string, min: number, max: number) => string;
   weatherFormatGuard: (maxLines: number) => string;
+  scriptTemplateGuard: string;
   topicArea: (name: string, keywords: string) => string;
   multiSpeakerFormat: (speakers: string, names: string[]) => string;
   singleSpeakerFormat: (name: string) => string;
@@ -159,6 +160,16 @@ function getRuStrings(): PromptStrings {
 - Не больше ${maxLines} строк всего, если пользователь явно не попросил другое количество.
 - Сохраняй формат [Имя]: [тон] [настроение] текст на каждой строке.
 - Финальную брендовую строку (если она есть в инструкциях пользователя) воспроизведи дословно.`,
+    scriptTemplateGuard:
+      `ПРОМПТ ПОЛЬЗОВАТЕЛЯ — ЭТО ГОТОВЫЙ СЦЕНАРИЙ:
+- В промпте уже есть строки в формате [Имя]: ... Это и есть финальный сценарий, а не «пример» или «вдохновение».
+- Твоя задача — ВОСПРОИЗВЕСТИ ТУ ЖЕ структуру: те же ведущие, тот же порядок реплик, то же количество строк, тот же тон.
+- Подставь актуальные конкретные данные (температуру, ветер, осадки, температуру воды, UV-индекс, дату, день недели и т.п.) из блоков фактов выше, если они есть. Если данных нет — оставь формулировку пользователя как есть.
+- ЗАПРЕЩЕНО: добавлять свои реплики, новых ведущих, вступления, прощания, «подводки», «жизненные наблюдения», эпитеты сверх тех, что уже есть в шаблоне.
+- ЗАПРЕЩЕНО: менять длину сценария, удлинять или сокращать его «для красоты».
+- Финальную брендовую строку из шаблона воспроизведи слово в слово.
+- Если в шаблоне есть теги [тон] [настроение] — сохрани их или подбери эквивалентные к содержанию.
+- Верни ТОЛЬКО готовый сценарий, без пояснений до или после.`,
     topicArea: (name, keywords) => `Тематика передачи "${name}": ${keywords}. Создавай контент СТРОГО в рамках этой тематики.`,
     multiSpeakerFormat: (speakers, names) =>
       `ОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА: мульти-спикерный скрипт. Спикеры: ${speakers}
@@ -262,6 +273,16 @@ function getEnStrings(): PromptStrings {
 - No more than ${maxLines} lines total, unless the user explicitly asked for a different count.
 - Keep the format [Name]: [tone] [mood] text on every line.
 - Reproduce the final branded line verbatim if the user's instructions contain one.`,
+    scriptTemplateGuard:
+      `USER PROMPT IS THE FINAL SCRIPT TEMPLATE:
+- The prompt already contains [Name]: lines. That IS the final script, not an "example" or "inspiration".
+- Your job: REPRODUCE THE SAME structure — same hosts, same order of lines, same number of lines, same tone.
+- Substitute concrete current data (temperature, wind, precipitation, water temperature, UV index, date, day of week, etc.) from the fact blocks above, where the template has placeholders. If no data is available, keep the user's wording as-is.
+- DO NOT: add your own lines, new hosts, intros, outros, lead-ins, "life observations", or epithets beyond what is already in the template.
+- DO NOT: change the script length, expand or shorten it "for style".
+- Reproduce any final branded line from the template verbatim.
+- If the template uses [tone] [mood] tags, keep them or pick equivalents matching the content.
+- Return ONLY the finished script, with no commentary before or after.`,
     topicArea: (name, keywords) => `Show topic area "${name}": ${keywords}. Create content STRICTLY within this topic area.`,
     multiSpeakerFormat: (speakers, names) =>
       `REQUIRED OUTPUT FORMAT: multi-speaker script. Speakers: ${speakers}

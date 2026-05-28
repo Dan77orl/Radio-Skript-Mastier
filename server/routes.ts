@@ -6,7 +6,7 @@ import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertAdPresetSchema, insertVoiceSchema, insertScheduleTemplateSchema, insertHostShiftSchema, insertCustomHolidaySchema } from "@shared/schema";
-import { hasLengthConstraintInPrompt } from "@shared/prompt-length";
+import { hasLengthConstraintInPrompt, looksLikeScriptTemplate } from "@shared/prompt-length";
 import { getHolidaysForDate, getHolidaysForYear, getHolidaysForMonth, getHolidayInfo, setCustomHolidays } from "./holidays";
 import { getPromptStrings, getGenderLabel, getDefaultHostName, getLanguageDirective, getLanguageName } from "./prompt-locale";
 import { handleSupportChat } from "./support-chat";
@@ -5665,11 +5665,16 @@ ${existingList}
       prompt += `\n${ps.seasonNote}`;
 
       const userHasLengthConstraint = hasLengthConstraintInPrompt(rawPrompt);
-      if (!userHasLengthConstraint) {
+      const promptIsScriptTemplate = looksLikeScriptTemplate(rawPrompt);
+      if (!userHasLengthConstraint && !promptIsScriptTemplate) {
         prompt += `\n\n${ps.durationStrict(durationSec, durationStr, minWords, maxWords)}`;
+      }
+      if (promptIsScriptTemplate) {
+        prompt += `\n\n${ps.scriptTemplateGuard}`;
       }
 
       const hasSearchContext = !programType.isWeatherForecast
+        && !promptIsScriptTemplate
         && (fcKeywords.length > 0 || (rawPrompt && rawPrompt.length > 50));
       if (hasSearchContext) {
         try {
@@ -5699,7 +5704,7 @@ ${existingList}
         prompt += `\n\n${ps.templateStructure(programType.scriptTemplate)}`;
       }
 
-      {
+      if (!promptIsScriptTemplate) {
         const scriptsWithFormat = existingPrograms
           .filter(p => p.scriptText && p.scriptText.includes("]:"))
           .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
@@ -5709,20 +5714,20 @@ ${existingList}
         if (latestRef?.scriptText) {
           prompt += `\n\n${ps.referenceFormat(latestRef.scriptText.substring(0, 3000))}`;
         }
-      }
 
-      const existingTitles = existingPrograms
-        .filter(p => p.title)
-        .map(p => p.title)
-        .slice(0, 50);
+        const existingTitles = existingPrograms
+          .filter(p => p.title)
+          .map(p => p.title)
+          .slice(0, 50);
 
-      if (existingTitles.length > 0) {
-        prompt += `\n\n${ps.existingEpisodes(existingTitles.join("\n"))}`;
-      }
+        if (existingTitles.length > 0) {
+          prompt += `\n\n${ps.existingEpisodes(existingTitles.join("\n"))}`;
+        }
 
-      prompt += `\n\n${ps.narrativeRules(!!(hasEpisodeContent || hasUrlContent), speakerNames, fcKeywords)}
+        prompt += `\n\n${ps.narrativeRules(!!(hasEpisodeContent || hasUrlContent), speakerNames, fcKeywords)}
 
 ${ps.topicLine(fcKeywords.length > 0 ? fcKeywords[0].split(" ").slice(0, 3).join(" ") : (userLang === "ru" ? "Новый аспект темы" : "New topic angle"))}`;
+      }
 
       const ctx = await buildStationContext(req.session.userId, userLang);
       const settingsForPrompt = await storage.getSettings(req.session.userId);
@@ -5768,7 +5773,7 @@ ${ps.narrativeStyle}`;
         return res.status(500).json({ error: ps.generationFailed });
       }
 
-      if (!userHasLengthConstraint) {
+      if (!userHasLengthConstraint && !promptIsScriptTemplate) {
         scriptText = await enforceMaxWords(scriptText, maxWords, systemPrompt, prompt, anthropic, userLang);
       }
 
@@ -6220,7 +6225,14 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
       const genMinWords = Math.round(genTargetWords * 0.8);
       const genMaxWords = Math.round(genTargetWords * 1.15);
       const genDurStr = `${Math.floor(genDurationSec / 60)}:${String(genDurationSec % 60).padStart(2, "0")}`;
-      systemPrompt += `\n\n${psGen.durationStrict(genDurationSec, genDurStr, genMinWords, genMaxWords)}`;
+      const genPromptIsScriptTemplate = looksLikeScriptTemplate(prompt);
+      const genUserHasLengthConstraint = hasLengthConstraintInPrompt(prompt);
+      if (!genPromptIsScriptTemplate && !genUserHasLengthConstraint) {
+        systemPrompt += `\n\n${psGen.durationStrict(genDurationSec, genDurStr, genMinWords, genMaxWords)}`;
+      }
+      if (genPromptIsScriptTemplate) {
+        systemPrompt += `\n\n${psGen.scriptTemplateGuard}`;
+      }
 
       const settingsForGen = await storage.getSettings(req.session.userId);
       const stationDefaultPromptGen = settingsForGen?.defaultPrompt || "";
@@ -6255,7 +6267,9 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
         scriptText = response.choices[0]?.message?.content || "";
       }
 
-      scriptText = await enforceMaxWords(scriptText, genMaxWords, systemPrompt, prompt, anthropic, userLangGen);
+      if (!genPromptIsScriptTemplate && !genUserHasLengthConstraint) {
+        scriptText = await enforceMaxWords(scriptText, genMaxWords, systemPrompt, prompt, anthropic, userLangGen);
+      }
 
       const updated = await storage.updateProgram(program.id, req.session.userId!, {
         scriptText,
