@@ -86,6 +86,7 @@ import {
   Filter,
   AudioLines,
   Pencil,
+  ScrollText,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
@@ -920,6 +921,7 @@ export default function ShowsPage() {
         firecrawlTopics: settingsType.firecrawlTopics || [],
         isWeatherForecast: settingsType.isWeatherForecast || false,
         defaultForecastDays: settingsType.defaultForecastDays || 1,
+        promptIsExactScript: settingsType.promptIsExactScript || false,
       },
     });
   };
@@ -2202,6 +2204,25 @@ export default function ShowsPage() {
                     )}
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-3 border rounded-lg p-3 sm:p-4 bg-muted/20 min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <Label className="text-base font-semibold flex items-center gap-2">
+                      <ScrollText className="h-4 w-4" />
+                      {t("shows.exactScriptTitle")}
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">{t("shows.exactScriptDesc")}</p>
+                  </div>
+                  <Switch
+                    checked={!!settingsType.promptIsExactScript}
+                    onCheckedChange={(checked) =>
+                      setSettingsType((prev) => prev ? { ...prev, promptIsExactScript: checked } : null)
+                    }
+                    data-testid="switch-exact-script"
+                  />
+                </div>
               </div>
 
               <div className="space-y-3 border rounded-lg p-3 sm:p-4 bg-muted/20 min-w-0">

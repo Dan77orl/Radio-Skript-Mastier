@@ -702,6 +702,8 @@
     "forecastDays": "Forecast (days)",
     "daysCount_one": "{{count}} day",
     "daysCount_other": "{{count}} days",
+    "exactScriptTitle": "Prompt is an exact script",
+    "exactScriptDesc": "Enable only if the prompt already contains the exact script to reproduce verbatim (e.g. a weather forecast where only the data changes). For regular shows leave it off: the prompt is then treated as a style example and AI creates fresh content every time.",
     "weatherTitle": "Weather forecast",
     "weatherDesc": "Mark this show as a weather forecast. AI will receive real Open-Meteo data and build a script for the chosen day range.",
     "defaultForecastDays": "Default forecast horizon (days)",

@@ -11,11 +11,3 @@ export function hasLengthConstraintInPrompt(prompt: string | null | undefined): 
   if (!prompt) return false;
   return LENGTH_CONSTRAINT_REGEX.test(prompt);
 }
-
-const SPEAKER_LINE_REGEX = /^\s*\[[^\]\n]{1,40}\]\s*:\s*\S/gm;
-
-export function looksLikeScriptTemplate(prompt: string | null | undefined): boolean {
-  if (!prompt) return false;
-  const matches = prompt.match(SPEAKER_LINE_REGEX);
-  return !!matches && matches.length >= 2;
-}

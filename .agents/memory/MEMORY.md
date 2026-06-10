@@ -1,0 +1,1 @@
+- [Exact-script vs style-example prompts](script-template-mode.md) — verbatim template mode must be the explicit promptIsExactScript flag, never auto-detected from [Name]: lines.

@@ -6,7 +6,7 @@ import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertAdPresetSchema, insertVoiceSchema, insertScheduleTemplateSchema, insertHostShiftSchema, insertCustomHolidaySchema } from "@shared/schema";
-import { hasLengthConstraintInPrompt, looksLikeScriptTemplate } from "@shared/prompt-length";
+import { hasLengthConstraintInPrompt } from "@shared/prompt-length";
 import { getHolidaysForDate, getHolidaysForYear, getHolidaysForMonth, getHolidayInfo, setCustomHolidays } from "./holidays";
 import { getPromptStrings, getGenderLabel, getDefaultHostName, getLanguageDirective, getLanguageName } from "./prompt-locale";
 import { handleSupportChat } from "./support-chat";
@@ -5665,7 +5665,7 @@ ${existingList}
       prompt += `\n${ps.seasonNote}`;
 
       const userHasLengthConstraint = hasLengthConstraintInPrompt(rawPrompt);
-      const promptIsScriptTemplate = looksLikeScriptTemplate(rawPrompt);
+      const promptIsScriptTemplate = !!programType.promptIsExactScript;
       if (!userHasLengthConstraint && !promptIsScriptTemplate) {
         prompt += `\n\n${ps.durationStrict(durationSec, durationStr, minWords, maxWords)}`;
       }
@@ -6225,7 +6225,7 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
       const genMinWords = Math.round(genTargetWords * 0.8);
       const genMaxWords = Math.round(genTargetWords * 1.15);
       const genDurStr = `${Math.floor(genDurationSec / 60)}:${String(genDurationSec % 60).padStart(2, "0")}`;
-      const genPromptIsScriptTemplate = looksLikeScriptTemplate(prompt);
+      const genPromptIsScriptTemplate = !!programType.promptIsExactScript;
       const genUserHasLengthConstraint = hasLengthConstraintInPrompt(prompt);
       if (!genPromptIsScriptTemplate && !genUserHasLengthConstraint) {
         systemPrompt += `\n\n${psGen.durationStrict(genDurationSec, genDurStr, genMinWords, genMaxWords)}`;

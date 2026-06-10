@@ -270,6 +270,7 @@ export const programTypes = pgTable("program_types", {
   firecrawlTopics: text("firecrawl_topics").array(),
   isWeatherForecast: boolean("is_weather_forecast").default(false),
   defaultForecastDays: integer("default_forecast_days").default(1),
+  promptIsExactScript: boolean("prompt_is_exact_script").default(false),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 }, (table) => [
   uniqueIndex("program_types_user_slug_idx").on(table.userId, table.slug),
