@@ -5343,14 +5343,14 @@ ${contextParts.join("\n\n")}
     if (searchQueries.length === 0) return "";
 
     const allResults: string[] = [];
-    for (const query of searchQueries.slice(0, 5)) {
-      const results = await firecrawlSearch(query, 2);
+    for (const query of searchQueries.slice(0, 6)) {
+      const results = await firecrawlSearch(query, 3);
       allResults.push(...results);
     }
 
     if (allResults.length === 0) return "";
 
-    return `\n\nАКТУАЛЬНЫЕ ДАННЫЕ ИЗ ИНТЕРНЕТА — ОБЯЗАТЕЛЬНО ИСПОЛЬЗУЙ:\n${allResults.map((r, i) => `--- Источник ${i + 1} ---\n${r}`).join("\n\n")}\n\nКАК ИСПОЛЬЗОВАТЬ ДАННЫЕ ИЗ ИНТЕРНЕТА:\n- ВПЛЕТАЙ факты и цифры в повествование ЕСТЕСТВЕННО, как часть истории: "Кстати, тут интересная цифра — ...", "Я нашёл, что..."\n- НЕ перечисляй факты списком — каждый факт должен быть частью связного рассказа\n- Используй КОНКРЕТНЫЕ данные: названия мест, цены, цифры из источников выше\n- НЕ ВЫДУМЫВАЙ факты, которых нет в источниках. Если чего-то нет — расскажи из личного опыта ведущего\n- Привязывай факты к жизни слушателя: "Это значит, что для вас...", "На практике это выглядит так..."`;
+    return `\n\nАКТУАЛЬНЫЕ ДАННЫЕ ИЗ ИНТЕРНЕТА — ЕДИНСТВЕННЫЙ ИСТОЧНИК КОНКРЕТНЫХ ФАКТОВ:\n${allResults.map((r, i) => `--- Источник ${i + 1} ---\n${r}`).join("\n\n")}\n\nКАК ИСПОЛЬЗОВАТЬ ДАННЫЕ ИЗ ИНТЕРНЕТА:\n- ВПЛЕТАЙ факты и цифры в повествование ЕСТЕСТВЕННО, как часть истории: "Кстати, тут интересная цифра — ...", "Я нашёл, что..."\n- НЕ перечисляй факты списком — каждый факт должен быть частью связного рассказа\n- Используй КОНКРЕТНЫЕ данные (названия мест, географию, стороны света, расстояния, цены, цифры, даты) ТОЛЬКО если они есть в источниках выше\n- НЕ ВЫДУМЫВАЙ факты, которых нет в источниках. Если конкретного факта нет — НЕ придумывай его и НЕ заменяй «личным опытом ведущего»; скажи общими словами или вообще не упоминай\n- ОСОБЕННО про географию: если в источниках нет точного направления/расстояния до объекта относительно Алании — не указывай сторону света и расстояние\n- Привязывай факты к жизни слушателя: "Это значит, что для вас...", "На практике это выглядит так..."`;
   }
 
   app.post("/api/generate-search-topics", async (req, res) => {
@@ -5671,6 +5671,8 @@ ${existingList}
       }
       if (promptIsScriptTemplate) {
         prompt += `\n\n${ps.scriptTemplateGuard}`;
+      } else {
+        prompt += `\n\n${ps.factualAccuracy}`;
       }
 
       const hasSearchContext = !programType.isWeatherForecast
@@ -6007,6 +6009,8 @@ ${programType.scriptTemplate}
         prompt += `\nЭТАЛОНЫЙ КОНТЕНТ — изучи стиль, формат, тон. Создай новые выпуски ТОЧНО В ТАКОМ ЖЕ стиле:\n${referenceContent.substring(0, 30000)}\n`;
       }
 
+      prompt += `\n\n${getPromptStrings("ru").factualAccuracy}\n`;
+
       const batchRawPrompt = programType.defaultPrompt || "";
       const batchHasSearchContext = fcKeywords.length > 0 || (batchRawPrompt && batchRawPrompt.length > 50);
       if (batchHasSearchContext) {
@@ -6232,10 +6236,27 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
       }
       if (genPromptIsScriptTemplate) {
         systemPrompt += `\n\n${psGen.scriptTemplateGuard}`;
+      } else {
+        systemPrompt += `\n\n${psGen.factualAccuracy}`;
       }
 
       const settingsForGen = await storage.getSettings(req.session.userId);
       const stationDefaultPromptGen = settingsForGen?.defaultPrompt || "";
+
+      if (!genPromptIsScriptTemplate && !programType.isWeatherForecast) {
+        const genFcKeywords = extractFirecrawlKeywords(programType.firecrawlTopics || []);
+        const genHasSearchContext = genFcKeywords.length > 0 || (!!prompt && prompt.length > 50);
+        if (genHasSearchContext) {
+          try {
+            const research = await researchForProgram(genFcKeywords, prompt || "", stationDefaultPromptGen, req.session.userId);
+            if (research) {
+              systemPrompt += research;
+            }
+          } catch (err: any) {
+            console.error("Firecrawl research in generate failed:", err.message);
+          }
+        }
+      }
       if (stationDefaultPromptGen) {
         systemPrompt += `\n\n${psGen.stationInstructions}\n${stationDefaultPromptGen}`;
       }

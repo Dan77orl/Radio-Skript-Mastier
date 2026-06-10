@@ -1,1 +1,2 @@
 - [Exact-script vs style-example prompts](script-template-mode.md) — verbatim template mode must be the explicit promptIsExactScript flag, never auto-detected from [Name]: lines.
+- [Factual accuracy guard](factual-accuracy-guard.md) — scripts may only assert verifiable facts (geography/names/dates) from web research or knowledge base; never the old "host personal experience" fabrication license.

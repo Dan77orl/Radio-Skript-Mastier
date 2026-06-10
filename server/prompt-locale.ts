@@ -86,6 +86,7 @@ interface PromptStrings {
   durationStrict: (sec: number, dur: string, min: number, max: number) => string;
   weatherFormatGuard: (maxLines: number) => string;
   scriptTemplateGuard: string;
+  factualAccuracy: string;
   topicArea: (name: string, keywords: string) => string;
   multiSpeakerFormat: (speakers: string, names: string[]) => string;
   singleSpeakerFormat: (name: string) => string;
@@ -170,6 +171,14 @@ function getRuStrings(): PromptStrings {
 - Финальную брендовую строку из шаблона воспроизведи слово в слово.
 - Если в шаблоне есть теги [тон] [настроение] — сохрани их или подбери эквивалентные к содержанию.
 - Верни ТОЛЬКО готовый сценарий, без пояснений до или после.`,
+    factualAccuracy:
+      `ФАКТИЧЕСКАЯ ТОЧНОСТЬ — СТРОГО ОБЯЗАТЕЛЬНО:
+- НЕ ВЫДУМЫВАЙ проверяемые факты: географию (где находится место, в какой оно стороне — север/юг/восток/запад, расстояния, маршрут, как добраться), названия достопримечательностей, пляжей, рек, гор, водопадов, отелей, улиц, исторические даты и события, имена людей, цены и статистику.
+- Утверждай конкретный факт ТОЛЬКО если он есть в блоках «ДАННЫЕ ИЗ ИНТЕРНЕТА» или в базе знаний станции выше. Нет в источниках — не называй его.
+- ОСОБЕННО про географию и направления: НИКОГДА не указывай сторону света, расстояние или направление «по памяти» или «на глаз». Если точно не знаешь, где объект находится относительно Алании — вообще не называй сторону и расстояние.
+- Если конкретных данных нет — говори общими словами и эмоциями («очень красивое место», «стоит съездить», «там приятно прогуляться»), но БЕЗ выдуманных конкретных названий, цифр и фактов.
+- Лучше сказать меньше, но точно, чем добавить красивую, но недостоверную деталь.
+- Не выдавай догадку за факт.`,
     topicArea: (name, keywords) => `Тематика передачи "${name}": ${keywords}. Создавай контент СТРОГО в рамках этой тематики.`,
     multiSpeakerFormat: (speakers, names) =>
       `ОБЯЗАТЕЛЬНЫЙ ФОРМАТ ВЫВОДА: мульти-спикерный скрипт. Спикеры: ${speakers}
@@ -202,7 +211,7 @@ ${getRuStrings().emotionTags}
 - Выбери НОВЫЙ аспект/угол${hasContent ? " в рамках той же предметной области" : ""}, которого НЕТ в списке выше
 - НЕ выдумывай названия институтов, университетов и исследований
 - Если есть данные из интернета — ВПЛЕТАЙ конкретные факты и цифры в повествование естественно, как часть истории
-- Если нет данных из интернета — давай практические советы из опыта ведущего, БЕЗ выдуманных ссылок на исследования и статистику
+- Если нет данных из интернета — говори общими словами и из личных впечатлений ведущего, но НЕ выдумывай конкретные факты: названия, географию, стороны света, расстояния, даты, цифры, исследования и статистику
 - НЕ повторяй темы, которые уже были в списке выше
 - Ведущий(ая): ${speakerNames.join(", ")}`,
     topicLine: (example) => `В САМОЙ ПЕРВОЙ СТРОКЕ ответа напиши ТЕМА: и краткое название темы выпуска (2-5 слов). Например:\nТЕМА: ${example}\nПосле этого начинай сценарий.`,
@@ -283,6 +292,14 @@ function getEnStrings(): PromptStrings {
 - Reproduce any final branded line from the template verbatim.
 - If the template uses [tone] [mood] tags, keep them or pick equivalents matching the content.
 - Return ONLY the finished script, with no commentary before or after.`,
+    factualAccuracy:
+      `FACTUAL ACCURACY — STRICTLY REQUIRED:
+- DO NOT invent verifiable facts: geography (where a place is, which direction — north/south/east/west, distances, routes, how to get there), names of attractions, beaches, rivers, mountains, waterfalls, hotels, streets, historical dates and events, people's names, prices, and statistics.
+- State a concrete fact ONLY if it appears in the "DATA FROM THE INTERNET" blocks or the station knowledge base above. If it is not in the sources, do not state it.
+- ESPECIALLY for geography and directions: NEVER state a compass direction, distance, or route "from memory" or by guessing. If you do not know exactly where an object is relative to Alanya, do not state a direction or distance at all.
+- If there is no concrete data, speak in general terms and emotions ("a beautiful place", "worth a visit", "lovely for a walk"), but WITHOUT invented specific names, numbers, or facts.
+- Better to say less but accurately than to add a nice but false detail.
+- Do not present a guess as a fact.`,
     topicArea: (name, keywords) => `Show topic area "${name}": ${keywords}. Create content STRICTLY within this topic area.`,
     multiSpeakerFormat: (speakers, names) =>
       `REQUIRED OUTPUT FORMAT: multi-speaker script. Speakers: ${speakers}
@@ -315,7 +332,7 @@ STRICT RULES:
 - Choose a NEW angle${hasContent ? " within the same subject area" : ""} that is NOT in the list above
 - DO NOT invent names of institutes, universities, or research studies
 - If there's web data — WEAVE specific facts and figures into the narrative naturally, as part of the story
-- If there's no web data — give practical tips from the host's experience, WITHOUT made-up references to research and statistics
+- If there's no web data — speak in general terms and the host's personal impressions, but DO NOT invent concrete facts: names, geography, compass directions, distances, dates, figures, research, or statistics
 - DO NOT repeat topics that were already in the list above
 - Host(s): ${speakerNames.join(", ")}`,
     topicLine: (example) => `In the VERY FIRST LINE of your response, write TOPIC: followed by a short episode topic name (2-5 words). For example:\nTOPIC: ${example}\nThen start the script.`,
