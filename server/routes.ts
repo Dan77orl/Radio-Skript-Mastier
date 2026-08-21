@@ -10,6 +10,7 @@ import { hasExactScriptDirective, extractDurationSecondsFromPrompt } from "@shar
 import { getHolidaysForDate, getHolidaysForYear, getHolidaysForMonth, getHolidayInfo, setCustomHolidays } from "./holidays";
 import { getPromptStrings, getGenderLabel, getDefaultHostName, getLanguageDirective, getLanguageName } from "./prompt-locale";
 import { handleSupportChat } from "./support-chat";
+import { synthesizeSpeech, describeTtsError } from "./tts";
 import { createRateLimiter } from "./rate-limit";
 import { getJob, listJobs, enqueueJob, registerJobHandler } from "./jobs/queue";
 import { archiveAudio } from "./storage-providers";
@@ -2896,30 +2897,13 @@ ${ps.minReplicas(dialogReplicas)}`;
       const ttsSimilarityBoost = settings.ttsSimilarityBoost ?? 0.75;
 
       const generateVoice = async (text: string, voiceId: string): Promise<Buffer> => {
-        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-          method: "POST",
-          headers: {
-            "xi-api-key": settings.elevenLabsApiKey!,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            text,
-            model_id: "eleven_v3",
-            output_format: "mp3_44100_192",
-            voice_settings: {
-              stability: ttsStability,
-              similarity_boost: ttsSimilarityBoost,
-            },
-          }),
+        return synthesizeSpeech({
+          apiKey: settings.elevenLabsApiKey!,
+          voiceId,
+          text,
+          stability: ttsStability,
+          similarityBoost: ttsSimilarityBoost,
         });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
-        }
-
-        const arrayBuffer = await response.arrayBuffer();
-        return Buffer.from(arrayBuffer);
       };
 
       const [maleAudio, femaleAudio] = await Promise.all([
@@ -3426,30 +3410,13 @@ IMPORTANT: Response in JSON format:
       const ttsSimilarityBoost2 = settings.ttsSimilarityBoost ?? 0.75;
 
       const generateVoiceAudio = async (text: string, voiceId: string): Promise<Buffer> => {
-        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-          method: "POST",
-          headers: {
-            "xi-api-key": settings.elevenLabsApiKey!,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            text,
-            model_id: "eleven_v3",
-            output_format: "mp3_44100_192",
-            voice_settings: {
-              stability: ttsStability2,
-              similarity_boost: ttsSimilarityBoost2,
-            },
-          }),
+        return synthesizeSpeech({
+          apiKey: settings.elevenLabsApiKey!,
+          voiceId,
+          text,
+          stability: ttsStability2,
+          similarityBoost: ttsSimilarityBoost2,
         });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
-        }
-
-        const arrayBuffer = await response.arrayBuffer();
-        return Buffer.from(arrayBuffer);
       };
 
       const resolveVoicesForDialog = (dialog: typeof dialogsForDate[0]) => {
@@ -4671,26 +4638,13 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
                 }
               }
 
-              const segResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${segVoiceId}`, {
-                method: "POST",
-                headers: {
-                  "xi-api-key": settings.elevenLabsApiKey!,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  text: cleanText,
-                  model_id: "eleven_v3",
-                  output_format: "mp3_44100_192",
-                  voice_settings: { stability: adTtsStability, similarity_boost: adTtsSimilarityBoost },
-                }),
+              const segBuffer = await synthesizeSpeech({
+                apiKey: settings.elevenLabsApiKey!,
+                voiceId: segVoiceId,
+                text: cleanText,
+                stability: adTtsStability,
+                similarityBoost: adTtsSimilarityBoost,
               });
-
-              if (!segResponse.ok) {
-                const errorText = await segResponse.text();
-                throw new Error(`ElevenLabs API error for segment ${i}: ${segResponse.status} - ${errorText}`);
-              }
-
-              const segBuffer = Buffer.from(await segResponse.arrayBuffer());
               const segFile = path.join(audioDir, `_ad_seg_${timestamp}_${i}.mp3`);
               await fs.writeFile(segFile, segBuffer);
               segmentFiles.push(segFile);
@@ -4709,26 +4663,13 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
 
             voiceNameForVersion = usedVoiceNames.join(" + ");
           } else {
-            const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${defaultVoiceId}`, {
-              method: "POST",
-              headers: {
-                "xi-api-key": settings.elevenLabsApiKey!,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                text: scriptText,
-                model_id: "eleven_v3",
-                output_format: "mp3_44100_192",
-                voice_settings: { stability: adTtsStability, similarity_boost: adTtsSimilarityBoost },
-              }),
+            const audioBuffer = await synthesizeSpeech({
+              apiKey: settings.elevenLabsApiKey!,
+              voiceId: defaultVoiceId,
+              text: scriptText,
+              stability: adTtsStability,
+              similarityBoost: adTtsSimilarityBoost,
             });
-
-            if (!response.ok) {
-              const errorText = await response.text();
-              throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
-            }
-
-            const audioBuffer = Buffer.from(await response.arrayBuffer());
             finalAudioFile = path.join(audioDir, `ad_${id}_${timestamp}.mp3`);
             await fs.writeFile(finalAudioFile, audioBuffer);
 
@@ -6842,30 +6783,13 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
       const progTtsSimilarityBoost = settings.ttsSimilarityBoost ?? 0.75;
 
       const generateVoiceSegment = async (text: string, voiceId: string): Promise<Buffer> => {
-        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-          method: "POST",
-          headers: {
-            "xi-api-key": settings.elevenLabsApiKey!,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            text,
-            model_id: "eleven_v3",
-            output_format: "mp3_44100_192",
-            voice_settings: {
-              stability: progTtsStability,
-              similarity_boost: progTtsSimilarityBoost,
-            },
-          }),
+        return synthesizeSpeech({
+          apiKey: settings.elevenLabsApiKey!,
+          voiceId,
+          text,
+          stability: progTtsStability,
+          similarityBoost: progTtsSimilarityBoost,
         });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
-        }
-
-        const arrayBuffer = await response.arrayBuffer();
-        return Buffer.from(arrayBuffer);
       };
 
       const audioDir = path.join(process.cwd(), "public", "audio");
@@ -6940,7 +6864,7 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
             segmentSpeakers.push(segment.speaker);
           } catch (err) {
             console.error(`Segment ${i + 1} synthesis error:`, err);
-            segmentErrors.push(`Сегмент ${i + 1} (${segment.speaker}): ошибка синтеза`);
+            segmentErrors.push(`Сегмент ${i + 1} (${segment.speaker}): ${describeTtsError(err)}`);
           }
         }
 
