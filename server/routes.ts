@@ -157,7 +157,9 @@ async function fetchNewsFromSource(source: { url: string; type: string }): Promi
 }
 
 function getEffectiveElevenLabsKey(settings: any): string | null {
-  return settings?.elevenLabsApiKey || process.env.ELEVENLABS_API_KEY || null;
+  // Env first, like Anthropic below: keys are operated centrally in secrets,
+  // and a stale per-user value in the database must not shadow a rotated one.
+  return process.env.ELEVENLABS_API_KEY || settings?.elevenLabsApiKey || null;
 }
 
 function getEffectiveAnthropicKey(settings: any): string | null {

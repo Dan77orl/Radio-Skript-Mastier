@@ -377,10 +377,15 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (result) {
+      // Secrets are the source of truth for provider keys; the per-user column
+      // is only a fallback for installs that have no secret configured. This
+      // way rotating a key in the environment takes effect immediately, even
+      // if a user once pasted an old (or wrong) value into their settings.
       return {
         ...result,
-        elevenLabsApiKey: result.elevenLabsApiKey || process.env.ELEVENLABS_API_KEY || null,
-        anthropicApiKey: result.anthropicApiKey || process.env.ANTHROPIC_API_KEY || null,
+        elevenLabsApiKey: process.env.ELEVENLABS_API_KEY || result.elevenLabsApiKey || null,
+        anthropicApiKey:
+          process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || result.anthropicApiKey || null,
       };
     }
     return result;
