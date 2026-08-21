@@ -103,7 +103,8 @@ interface PromptStrings {
 
 function getRuStrings(): PromptStrings {
   return {
-    langDirective: "ЯЗЫК: Весь контент ОБЯЗАТЕЛЬНО на русском языке.",
+    langDirective: `ЯЗЫК: Весь контент ОБЯЗАТЕЛЬНО на русском языке.
+ИНОЯЗЫЧНЫЕ НАЗВАНИЯ — ВАЖНО ДЛЯ ОЗВУЧКИ: слова из других языков (названия блюд, заведений, песен, специфические термины) пиши в их ОРИГИНАЛЬНОЙ графике — künefe, kokoreç, meze, dondurma — а НЕ кириллицей («кюнефе», «кокореч»). Синтез речи ставит правильное ударение (в турецком — на последний слог) только когда видит родное написание; кириллическая транслитерация ломает произношение. Исключение: слова с давно устоявшимся русским написанием (Стамбул, Анталия, кебаб, айран) пиши по-русски.`,
     scriptWriter: "Ты - сценарист для радио",
     aboutStation: (desc) => `О станции: ${desc}`,
     dialogTask: (male, female) => `Твоя задача - написать короткий диалог между ведущими: ${male} (мужчина) и ${female} (женщина).`,
@@ -235,7 +236,8 @@ ${getRuStrings().emotionTags}
 
 function getEnStrings(): PromptStrings {
   return {
-    langDirective: "LANGUAGE: ALL content MUST be written in English.",
+    langDirective: `LANGUAGE: ALL content MUST be written in English.
+FOREIGN NAMES — MATTERS FOR VOICE-OVER: words from other languages (dish names, venues, songs, specific terms) must keep their ORIGINAL spelling — künefe, kokoreç, meze — never a phonetic transliteration. The speech synthesizer only places the stress correctly (Turkish stresses the last syllable) when it sees the native spelling. Exception: words with a long-established English form (Istanbul, kebab) stay in English.`,
     scriptWriter: "You are a scriptwriter for the radio station",
     aboutStation: (desc) => `About the station: ${desc}`,
     dialogTask: (male, female) => `Your task is to write a short dialog between hosts: ${male} (male) and ${female} (female).`,
@@ -368,7 +370,8 @@ STRICT RULES:
 function getTrStrings(): PromptStrings {
   return {
     ...getEnStrings(),
-    langDirective: "DİL: Tüm içerik MUTLAKA Türkçe olmalıdır.",
+    langDirective: `DİL: Tüm içerik MUTLAKA Türkçe olmalıdır.
+YABANCI İSİMLER — SESLENDİRME İÇİN ÖNEMLİ: başka dillerden kelimeleri (yemek, mekân, şarkı adları, özel terimler) ORİJİNAL yazımıyla bırak — fonetik çevirisiyle değil. Ses sentezi vurguyu ancak kelimenin kendi yazımını görünce doğru yerleştirir.`,
     scriptWriter: "Radyo istasyonu için senaryo yazarısınız",
     aboutStation: (desc) => `İstasyon hakkında: ${desc}`,
     dialogTask: (male, female) => `Göreviniz sunucular arasında kısa bir diyalog yazmak: ${male} (erkek) ve ${female} (kadın).`,
