@@ -73,7 +73,11 @@
     "userExists": "Пользователь с таким email уже существует",
     "subtitle": "AI Radio Automation",
     "appName": "RadioFlow AI",
-    "emailPlaceholder": "your@email.com"
+    "emailPlaceholder": "your@email.com",
+    "orContinueWith": "или войдите через",
+    "twoFactorTitle": "Подтвердите вход в Telegram",
+    "twoFactorDesc": "Пароль принят. Остался второй шаг — подтвердите, что это вы.",
+    "twoFactorDescNamed": "Пароль принят. Подтвердите вход аккаунтом @{{username}}."
   },
   "nav": {
     "dashboard": "Дашборд",
@@ -387,7 +391,28 @@
     "newPassword": "Новый пароль",
     "userManagement": "Управление пользователями",
     "userManagementDescription": "Добавление и управление доступом других пользователей к системе.",
-    "saveSettings": "Сохранить настройки"
+    "saveSettings": "Сохранить настройки",
+    "storageTitle": "Хранилище записей",
+    "storageDescription": "Куда складывать готовые эфиры. Файлы остаются доступными в системе, но хранятся в облаке.",
+    "storageProvider": "Провайдер",
+    "storageYandex": "Яндекс Диск",
+    "storageGoogle": "Google Диск",
+    "storageNone": "Не выгружать",
+    "googleNotConfigured": "Не настроен на сервере",
+    "googleNotConnected": "Не подключён",
+    "googleConnected": "Google Диск подключён",
+    "googleDisconnected": "Google Диск отключён",
+    "googleConnectFailed": "Не удалось подключить Google Диск",
+    "connect": "Подключить",
+    "disconnect": "Отключить",
+    "telegramTitle": "Вход через Telegram",
+    "telegramDescription": "Вход без пароля и подтверждение входа вторым фактором.",
+    "telegramLinked": "Telegram привязан",
+    "telegramUnlinked": "Telegram отвязан",
+    "telegramNotLinked": "Telegram не привязан. Привяжите, чтобы входить без пароля.",
+    "telegramOnlyWayIn": "Отвязать нельзя: Telegram — единственный способ войти. Сначала задайте пароль.",
+    "telegramTwoFactor": "Требовать Telegram при входе",
+    "telegramTwoFactorDesc": "Одного пароля будет недостаточно — вход нужно подтвердить в Telegram."
   },
   "voices": {
     "title": "Голоса",
@@ -621,7 +646,18 @@
     "version": "версия",
     "versions": "версий",
     "current": "текущий",
-    "audioVersionsTitle": "Рендеры аудио"
+    "audioVersionsTitle": "Рендеры аудио",
+    "produceTitle": "Собрать ролик целиком",
+    "produceDesc": "Сценарий, озвучка, подбор музыки и сведение — одним действием, без ручных шагов.",
+    "produceButton": "Собрать ролик",
+    "produceRunning": "Собираю ролик…",
+    "produceStarted": "Сборка запущена",
+    "produceStartedDesc": "Можно закрыть страницу — работа продолжится и не потеряется.",
+    "produceDone": "Ролик готов",
+    "produceFailed": "Не удалось собрать ролик",
+    "playWithMusic": "Слушать с музыкой",
+    "versionWithMusic": "С музыкой",
+    "versionVoiceOnly": "Только голос"
   },
   "shows": {
     "title": "Передачи",
@@ -865,7 +901,14 @@
     "expandedPrompt": "Развёрнутый промпт (как видит система)",
     "scriptTemplateOpening": "Открытие: [{{name}}] — объявляет передачу, представляет ведущего",
     "scriptTemplateMain": "Основная часть: [{{name}}] — ведёт весь выпуск",
-    "scriptTemplateClosing": "Закрытие: [{{name}}] — прощается со слушателями"
+    "scriptTemplateClosing": "Закрытие: [{{name}}] — прощается со слушателями",
+    "seasonalTitle": "Учитывать сезон",
+    "seasonalDesc": "Подмешивать в промпт текущее время года. Нужно для погоды, лайфстайла и событий. Для психологии, науки и новостей лучше выключить — иначе темы начинают крутиться вокруг сезона.",
+    "researchProfileTitle": "Источники для исследования",
+    "researchProfileDesc": "Что искать в интернете перед написанием сценария.",
+    "researchProfileLocal": "Новости и события — местные новости, афиша, лайфстайл",
+    "researchProfileAcademic": "Наука и публикации — исследования, журналы, университеты",
+    "researchProfileNone": "Не искать — только промпт и база знаний станции"
   },
   "automations": {
     "title": "Автоматизации",

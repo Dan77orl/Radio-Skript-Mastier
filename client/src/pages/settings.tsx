@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StorageSettings, TelegramSettings } from "@/components/settings-integrations";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -982,6 +983,8 @@ export default function SettingsPage() {
             </TabsContent>
 
             <TabsContent value="account" className="space-y-6">
+              <TelegramSettings />
+              <StorageSettings />
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">

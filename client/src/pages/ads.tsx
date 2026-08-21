@@ -55,7 +55,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { 
-  Sparkles, Loader2, Trash2, Play, Building2, ChevronRight, 
+  Sparkles, Wand2, Loader2, Trash2, Play, Building2, ChevronRight, 
   Check, RefreshCw, Volume2, Music, FileText, Link, Instagram,
   Clock, PauseCircle, PlayCircle, ArrowLeft, Upload, X, File,
   Plus, Pencil, Users, User, Mic, Settings2, FileStack, Download
@@ -445,6 +445,59 @@ export default function AdsPage() {
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
       }, 3000);
+    },
+    onError: (error: Error) => {
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
+    },
+  });
+
+  // End-to-end production runs as a durable job, so the UI follows the job
+  // rather than the request — it survives a page reload or a server restart.
+  const [produceJobId, setProduceJobId] = useState<string | null>(null);
+  // Prefer the music-bedded mix once one exists — that is the deliverable.
+  const [withMusic, setWithMusic] = useState(true);
+
+  const { data: produceJob } = useQuery<{
+    id: string;
+    status: string;
+    progress: string | null;
+    lastError: string | null;
+    result: { steps?: string[]; audioWithMusicUrl?: string | null } | null;
+  }>({
+    queryKey: [`/api/jobs/${produceJobId}`],
+    enabled: !!produceJobId,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "succeeded" || status === "failed" ? false : 3000;
+    },
+  });
+
+  useEffect(() => {
+    if (!produceJob || !produceJobId) return;
+    if (produceJob.status === "succeeded") {
+      const steps = produceJob.result?.steps || [];
+      toast({ title: t("ads.produceDone"), description: steps.join(" · ") });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
+      setProduceJobId(null);
+    } else if (produceJob.status === "failed") {
+      toast({
+        title: t("ads.produceFailed"),
+        description: produceJob.lastError || undefined,
+        variant: "destructive",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
+      setProduceJobId(null);
+    }
+  }, [produceJob, produceJobId, t]);
+
+  const produceAdMutation = useMutation({
+    mutationFn: async ({ adId, voiceIds, speakerVoiceMap }: { adId: string; voiceIds?: string[]; speakerVoiceMap?: Record<string, string> }) => {
+      const response = await apiRequest("POST", `/api/ads/${adId}/produce`, { voiceIds, speakerVoiceMap });
+      return response.json();
+    },
+    onSuccess: (data: { jobId: string }) => {
+      setProduceJobId(data.jobId);
+      toast({ title: t("ads.produceStarted"), description: t("ads.produceStartedDesc") });
     },
     onError: (error: Error) => {
       toast({ title: t("common.error"), description: error.message, variant: "destructive" });
@@ -889,10 +942,39 @@ export default function AdsPage() {
                   </p>
                 )}
               </div>
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+                <div className="flex items-start gap-2">
+                  <Wand2 className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">{t("ads.produceTitle")}</p>
+                    <p className="text-xs text-muted-foreground">{t("ads.produceDesc")}</p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => produceAdMutation.mutate({ adId: currentAd.id })}
+                  disabled={produceAdMutation.isPending || !!produceJobId}
+                  className="w-full"
+                  data-testid="button-produce-ad"
+                >
+                  {produceAdMutation.isPending || produceJobId ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {produceJob?.progress || t("ads.produceRunning")}
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="mr-2 h-4 w-4" />
+                      {t("ads.produceButton")}
+                    </>
+                  )}
+                </Button>
+              </div>
+
               <HintTooltip hint={t("hints.ads.generateVariants")}>
                 <Button
                   onClick={() => generateVariantsMutation.mutate(currentAd.id)}
-                  disabled={generateVariantsMutation.isPending}
+                  disabled={generateVariantsMutation.isPending || !!produceJobId}
+                  variant="outline"
                   className="w-full"
                   data-testid="button-generate-variants"
                 >
@@ -1513,31 +1595,71 @@ export default function AdsPage() {
                   })}
                 </div>
 
-                {audioVersions.length === 0 && currentAd.audioUrl && (
-                  <div className="flex items-center gap-2 rounded-lg border p-2.5">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0"
-                      onClick={() => playVersionAudio(currentAd.audioUrl!)}
-                      data-testid="button-play-audio"
-                    >
-                      {playingVersionUrl === currentAd.audioUrl ? (
-                        <PauseCircle className="h-5 w-5 text-primary" />
-                      ) : (
-                        <PlayCircle className="h-5 w-5" />
+                {audioVersions.length === 0 && currentAd.audioUrl && (() => {
+                  // A mixed track only exists once music has been laid under the
+                  // voice; until then there is nothing to switch between.
+                  const mixedUrl = (currentAd as any).audioWithMusicUrl as string | undefined;
+                  const activeUrl = withMusic && mixedUrl ? mixedUrl : currentAd.audioUrl!;
+                  return (
+                    <div className="space-y-2">
+                      {mixedUrl && (
+                        <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/20 p-2.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Music className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">{t("ads.playWithMusic")}</p>
+                              {(currentAd as any).musicTrackName && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {(currentAd as any).musicTrackName}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <Switch
+                            checked={withMusic}
+                            onCheckedChange={(checked) => {
+                              // Swapping the source mid-playback would keep the old
+                              // track running, so stop first.
+                              if (playingVersionUrl) playVersionAudio(playingVersionUrl);
+                              setWithMusic(checked);
+                            }}
+                            data-testid="switch-play-with-music"
+                          />
+                        </div>
                       )}
-                    </Button>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">#1</p>
+
+                      <div className="flex items-center gap-2 rounded-lg border p-2.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => playVersionAudio(activeUrl)}
+                          data-testid="button-play-audio"
+                        >
+                          {playingVersionUrl === activeUrl ? (
+                            <PauseCircle className="h-5 w-5 text-primary" />
+                          ) : (
+                            <PlayCircle className="h-5 w-5" />
+                          )}
+                        </Button>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">
+                            {withMusic && mixedUrl ? t("ads.versionWithMusic") : t("ads.versionVoiceOnly")}
+                          </p>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                          <a
+                            href={activeUrl}
+                            download={`${currentAd.title || "ad"}${withMusic && mixedUrl ? "_music" : ""}.mp3`}
+                            data-testid="button-download-audio"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </a>
+                        </Button>
+                      </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-                      <a href={currentAd.audioUrl} download={`${currentAd.title || "ad"}.mp3`} data-testid="button-download-audio">
-                        <Download className="h-3.5 w-3.5" />
-                      </a>
-                    </Button>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
 
               <div className="border rounded-lg p-4 space-y-3">

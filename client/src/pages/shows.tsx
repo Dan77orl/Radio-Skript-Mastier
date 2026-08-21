@@ -58,7 +58,8 @@ import {
   Play, 
   Pause, 
   Trash2, 
-  CloudSun, 
+  CloudSun,
+  Sun,
   Newspaper, 
   Sparkles, 
   FileText, 
@@ -922,6 +923,8 @@ export default function ShowsPage() {
         isWeatherForecast: settingsType.isWeatherForecast || false,
         defaultForecastDays: settingsType.defaultForecastDays || 1,
         promptIsExactScript: settingsType.promptIsExactScript || false,
+        useSeasonalContext: settingsType.useSeasonalContext || false,
+        researchProfile: settingsType.researchProfile || "local",
       },
     });
   };
@@ -2223,6 +2226,50 @@ export default function ShowsPage() {
                     data-testid="switch-exact-script"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-3 border rounded-lg p-3 sm:p-4 bg-muted/20 min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <Label className="text-base font-semibold flex items-center gap-2">
+                      <Sun className="h-4 w-4" />
+                      {t("shows.seasonalTitle")}
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">{t("shows.seasonalDesc")}</p>
+                  </div>
+                  <Switch
+                    checked={!!settingsType.useSeasonalContext}
+                    onCheckedChange={(checked) =>
+                      setSettingsType((prev) => prev ? { ...prev, useSeasonalContext: checked } : null)
+                    }
+                    data-testid="switch-seasonal-context"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3 border rounded-lg p-3 sm:p-4 bg-muted/20 min-w-0">
+                <div className="min-w-0">
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    <Search className="h-4 w-4" />
+                    {t("shows.researchProfileTitle")}
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">{t("shows.researchProfileDesc")}</p>
+                </div>
+                <Select
+                  value={settingsType.researchProfile || "local"}
+                  onValueChange={(value) =>
+                    setSettingsType((prev) => prev ? { ...prev, researchProfile: value } : null)
+                  }
+                >
+                  <SelectTrigger data-testid="select-research-profile">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="local">{t("shows.researchProfileLocal")}</SelectItem>
+                    <SelectItem value="academic">{t("shows.researchProfileAcademic")}</SelectItem>
+                    <SelectItem value="none">{t("shows.researchProfileNone")}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-3 border rounded-lg p-3 sm:p-4 bg-muted/20 min-w-0">

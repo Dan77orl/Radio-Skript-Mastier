@@ -281,6 +281,35 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByTelegramId(telegramId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.telegramId, telegramId));
+    return user || undefined;
+  }
+
+  async linkTelegramAccount(
+    userId: string,
+    data: { telegramId: string; telegramUsername: string | null; telegramPhotoUrl: string | null },
+  ): Promise<User | undefined> {
+    const [updated] = await db.update(users).set(data).where(eq(users.id, userId)).returning();
+    return updated || undefined;
+  }
+
+  async unlinkTelegramAccount(userId: string): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ telegramId: null, telegramUsername: null, telegramPhotoUrl: null, requireTelegramLogin: false })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated || undefined;
+  }
+
+  async setRequireTelegramLogin(userId: string, required: boolean): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ requireTelegramLogin: required })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated || undefined;
+  }
+
   async updateUserLanguage(id: string, language: string): Promise<void> {
     await db.update(users).set({ language }).where(eq(users.id, id));
   }
@@ -367,25 +396,35 @@ export class DatabaseStorage implements IStorage {
   }
 
   async saveSettings(newSettings: InsertSettings, userId?: string): Promise<Settings> {
+    // `id` and `userId` are owned by the server, never by the request body:
+    // letting a caller set userId would reassign their settings row to another
+    // tenant.
+    const { id: _ignoredId, userId: _ignoredUserId, ...incoming } = newSettings as Record<string, unknown>;
+
     const existing = await this.getRawSettings(userId);
     if (existing) {
-      const merged: Record<string, unknown> = { userId: userId || existing.userId };
-      for (const key of Object.keys(newSettings) as (keyof InsertSettings)[]) {
-        if (key === "id") continue;
-        merged[key] = newSettings[key] ?? (existing as Record<string, unknown>)[key];
+      const merged: Record<string, unknown> = {};
+      for (const key of Object.keys(incoming)) {
+        // undefined = "not supplied, keep what is stored"; null = "clear it".
+        // Collapsing the two (`??`) made it impossible to erase a value, so
+        // disconnecting a cloud account left its refresh token in the database.
+        merged[key] = incoming[key] !== undefined
+          ? incoming[key]
+          : (existing as Record<string, unknown>)[key];
       }
       for (const key of Object.keys(existing) as string[]) {
         if (!(key in merged) && key !== "id") {
           merged[key] = (existing as Record<string, unknown>)[key];
         }
       }
+      merged.userId = userId || existing.userId;
       const [updated] = await db.update(settings)
         .set(merged)
         .where(eq(settings.id, existing.id))
         .returning();
       return updated;
     }
-    const [created] = await db.insert(settings).values({ ...newSettings, userId: userId || null }).returning();
+    const [created] = await db.insert(settings).values({ ...incoming, userId: userId || null } as InsertSettings).returning();
     return created;
   }
 

@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Radio, Loader2 } from "lucide-react";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { TelegramLoginButton } from "@/components/telegram-login";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -22,18 +23,41 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
 
+  const [twoFactorPending, setTwoFactorPending] = useState<{ telegramUsername: string | null } | null>(null);
+
+  const finishAuth = (data: any) => {
+    if (data?.language) {
+      i18n.changeLanguage(data.language);
+      localStorage.setItem("radioflow-language", data.language);
+    }
+    setTwoFactorPending(null);
+    queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    setLocation("/");
+  };
+
+  const telegramMutation = useMutation({
+    mutationFn: async (payload: Record<string, unknown>) => {
+      const res = await apiRequest("POST", "/api/auth/telegram", payload);
+      return res.json();
+    },
+    onSuccess: finishAuth,
+    onError: (error: Error) => {
+      toast({ title: t("auth.loginError"), description: error.message, variant: "destructive" });
+    },
+  });
+
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
       const res = await apiRequest("POST", "/api/auth/login", data);
       return res.json();
     },
     onSuccess: (data: any) => {
-      if (data?.language) {
-        i18n.changeLanguage(data.language);
-        localStorage.setItem("radioflow-language", data.language);
+      // 202 + twoFactorRequired: password was right, Telegram must confirm.
+      if (data?.twoFactorRequired) {
+        setTwoFactorPending({ telegramUsername: data.telegramUsername ?? null });
+        return;
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      setLocation("/");
+      finishAuth(data);
     },
     onError: (error: Error) => {
       toast({
@@ -149,6 +173,31 @@ export default function AuthPage() {
                 {isLogin ? t("auth.login") : t("auth.register")}
               </Button>
             </form>
+
+            {twoFactorPending ? (
+              <div className="mt-6 space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-4 text-center">
+                <p className="text-sm font-semibold">{t("auth.twoFactorTitle")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {twoFactorPending.telegramUsername
+                    ? t("auth.twoFactorDescNamed", { username: twoFactorPending.telegramUsername })
+                    : t("auth.twoFactorDesc")}
+                </p>
+                <TelegramLoginButton onAuth={(data) => telegramMutation.mutate(data)} />
+              </div>
+            ) : (
+              <div className="mt-6 space-y-3">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">{t("auth.orContinueWith")}</span>
+                  </div>
+                </div>
+                <TelegramLoginButton onAuth={(data) => telegramMutation.mutate(data)} />
+              </div>
+            )}
+
             <div className="mt-6 text-center text-sm">
               <span className="text-muted-foreground">
                 {isLogin ? t("auth.noAccount") : t("auth.hasAccount")}

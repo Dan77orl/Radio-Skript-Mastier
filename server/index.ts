@@ -4,7 +4,9 @@ import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { registerVoiceAgentRoutes } from "./voice-agent-api";
 import { seedDemoIfNeeded } from "./seed-demo";
-import { ensureAdminExists } from "./auth";
+import { ensureAdminExists, requireAuth } from "./auth";
+import { registerJobHandlers } from "./jobs/handlers";
+import { startJobWorker, stopJobWorker } from "./jobs/queue";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import path from "path";
@@ -64,23 +66,14 @@ export function log(message: string, source = "express") {
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
 
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      log(logLine);
+      // Response bodies are deliberately not logged: /api/settings returns
+      // provider API keys in plaintext for admins, and most endpoints carry
+      // tenant content.
+      log(`${req.method} ${path} ${res.statusCode} in ${duration}ms`);
     }
   });
 
@@ -88,42 +81,30 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  registerJobHandlers();
   registerVoiceAgentRoutes(app);
   await registerRoutes(httpServer, app);
 
-  try {
-    const { pool: dbPool } = await import("./db");
-    const orphanCheck = await dbPool.query("SELECT COUNT(*) as cnt FROM programs WHERE user_id IS NULL");
-    const orphanCount = parseInt(orphanCheck.rows[0]?.cnt || "0");
-    if (orphanCount > 0) {
-      console.log(`[migration] Found ${orphanCount} orphan programs, fixing...`);
-      const typesResult = await dbPool.query("SELECT id, user_id FROM program_types WHERE user_id IS NOT NULL");
-      const typeMap = new Map<string, string>();
-      for (const t of typesResult.rows) typeMap.set(t.id, t.user_id);
-      const orphans = await dbPool.query("SELECT id, program_type_id FROM programs WHERE user_id IS NULL");
-      let fixed = 0;
-      for (const p of orphans.rows) {
-        const ownerId = typeMap.get(p.program_type_id);
-        if (ownerId) {
-          await dbPool.query("UPDATE programs SET user_id = $1 WHERE id = $2", [ownerId, p.id]);
-          fixed++;
-        }
-      }
-      console.log(`[migration] Fixed ${fixed}/${orphanCount} orphan programs`);
-    }
-  } catch (e) {
-    console.error("[migration] Error fixing orphan programs:", e);
-  }
+  // Orphan-program repair used to run here on every boot. It is a data fix, not
+  // startup work: it races across instances and hides the schema gap that causes
+  // it. Run migrations/manual/001_tenant_integrity.sql once instead, or call
+  // POST /api/admin/fix-orphan-programs.
 
-  // Serve static files from public folder (audio files, etc.)
-  app.use(express.static(path.join(process.cwd(), "public")));
+  // public/ holds per-tenant generated audio and user uploads — never serve it
+  // anonymously. Filenames are predictable, so unauthenticated access would let
+  // anyone enumerate other tenants' content.
+  app.use(requireAuth, express.static(path.join(process.cwd(), "public")));
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || (err.name === "MulterError" ? 400 : 500);
 
-    res.status(status).json({ message });
-    throw err;
+    console.error(`[error] ${req.method} ${req.path}`, err);
+
+    if (res.headersSent) return;
+    // Internal messages can carry upstream provider errors — only surface them
+    // for client errors, never for 5xx. Re-throwing here would crash the process.
+    const message = status < 500 ? err.message || "Bad Request" : "Internal Server Error";
+    res.status(status).json({ message, error: message });
   });
 
   // importantly only setup vite in development and after
@@ -149,6 +130,7 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      startJobWorker({ concurrency: 2 });
       setTimeout(() => seedDemoIfNeeded(), 5000);
       setTimeout(() => ensureAdminExists().catch(e => console.error("[admin-bootstrap]", e)), 3000);
       setTimeout(async () => {
@@ -172,4 +154,21 @@ app.use((req, res, next) => {
       }, 8000);
     },
   );
+
+  // Give in-flight jobs a chance to finish, and release the ones that cannot,
+  // so a redeploy does not leave rows locked until the stale-lock timeout.
+  let shuttingDown = false;
+  for (const signal of ["SIGTERM", "SIGINT"] as const) {
+    process.on(signal, () => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      log(`received ${signal}, draining jobs…`);
+      stopJobWorker()
+        .catch((e) => console.error("[jobs] shutdown error:", e))
+        .finally(() => {
+          httpServer.close(() => process.exit(0));
+          setTimeout(() => process.exit(0), 5000).unref();
+        });
+    });
+  }
 })();

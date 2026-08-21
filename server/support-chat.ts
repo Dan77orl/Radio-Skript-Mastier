@@ -8,9 +8,7 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-const CLAUDE_MODEL = (process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY && process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL)
-  ? "claude-sonnet-4-5"
-  : "claude-sonnet-4-20250514";
+const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-opus-5";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -20,6 +18,21 @@ interface ChatMessage {
 const sessionChats = new Map<string, ChatMessage[]>();
 const adminReplyTracker = new Map<string, Set<string>>();
 
+// Hard cap so an unauthenticated caller that discards cookies (a new session id
+// per request) cannot grow these maps without bound between cleanup passes.
+const MAX_TRACKED_SESSIONS = 5000;
+
+function rememberSession(sessionId: string, history: ChatMessage[]) {
+  if (sessionChats.size >= MAX_TRACKED_SESSIONS && !sessionChats.has(sessionId)) {
+    const oldest = sessionChats.keys().next().value;
+    if (oldest !== undefined) {
+      sessionChats.delete(oldest);
+      adminReplyTracker.delete(oldest);
+    }
+  }
+  sessionChats.set(sessionId, history);
+}
+
 const CLEANUP_INTERVAL = 60 * 60 * 1000;
 setInterval(() => {
   sessionChats.clear();
@@ -27,24 +40,6 @@ setInterval(() => {
 }, CLEANUP_INTERVAL);
 
 const MAX_MESSAGE_LENGTH = 2000;
-
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_WINDOW = 60 * 1000;
-const RATE_LIMIT_MAX = 10;
-
-function checkRateLimit(key: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(key);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-    return true;
-  }
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return false;
-  }
-  entry.count++;
-  return true;
-}
 
 function getSystemPrompt(language: string): string {
   const langInstructions: Record<string, string> = {
@@ -189,17 +184,17 @@ export async function handleSupportChat(req: Request, res: Response) {
       return res.status(400).json({ error: "Message too long" });
     }
 
-    const rateLimitKey = req.sessionID || req.ip || "unknown";
-    if (!checkRateLimit(rateLimitKey)) {
-      return res.status(429).json({ error: "Too many requests. Please wait a moment." });
-    }
-
     const lang = language || "en";
     const sessionId = req.sessionID;
 
     if (!sessionId) {
       return res.status(400).json({ error: "Session required" });
     }
+
+    // Persist the session so the same id (and therefore the same chat history)
+    // is reused on the next request. Without this, `saveUninitialized: false`
+    // hands out a fresh session id per request and history never accumulates.
+    (req.session as any).supportChat = true;
 
     if (!sessionChats.has(sessionId)) {
       try {
@@ -210,14 +205,14 @@ export async function handleSupportChat(req: Request, res: Response) {
             role: m.role === "admin" ? "assistant" as const : m.role as "user" | "assistant",
             content: m.content,
           }));
-        sessionChats.set(sessionId, restored);
+        rememberSession(sessionId, restored);
         const restoredAdminIds = new Set(
           dbMessages.filter(m => m.role === "admin").map(m => m.id)
         );
         adminReplyTracker.set(sessionId, restoredAdminIds);
       } catch (err) {
         console.error("[support-chat] Failed to restore session history:", err);
-        sessionChats.set(sessionId, []);
+        rememberSession(sessionId, []);
       }
     }
 
@@ -282,7 +277,7 @@ export async function handleSupportChat(req: Request, res: Response) {
     if (anthropic) {
       const response = await anthropic.messages.create({
         model: CLAUDE_MODEL,
-        max_tokens: 1024,
+        max_tokens: 6000,
         system: systemPrompt,
         messages: history.map((m) => ({ role: m.role, content: m.content })),
       });

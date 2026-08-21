@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, real, timestamp, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, timestamp, boolean, jsonb, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
@@ -7,12 +7,19 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
-  password: text("password").notNull(),
+  // Nullable: accounts created through Telegram never have a password.
+  password: text("password"),
   name: text("name"),
   language: text("language"),
   role: text("role").default("user"),
   blocked: boolean("blocked").default(false),
   hasCompletedOnboarding: boolean("has_completed_onboarding").default(false),
+  telegramId: text("telegram_id").unique(),
+  telegramUsername: text("telegram_username"),
+  telegramPhotoUrl: text("telegram_photo_url"),
+  // When set, a password alone is not enough — the login must also be confirmed
+  // through Telegram. This is what makes it two factors rather than one.
+  requireTelegramLogin: boolean("require_telegram_login").default(false),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
@@ -73,7 +80,16 @@ Must include: greeting to listeners, an interesting fact or useful tip.`),
   showHints: boolean("show_hints").default(true),
   ttsStability: real("tts_stability").default(0.75),
   ttsSimilarityBoost: real("tts_similarity_boost").default(0.75),
-});
+  // Where generated audio is archived: "yandex", "google_drive" or "none".
+  storageProvider: text("storage_provider").default("yandex"),
+  // Long-lived Google grant. Access tokens are short-lived and derived from it,
+  // so only this is persisted.
+  googleDriveRefreshToken: text("google_drive_refresh_token"),
+  googleDriveFolderId: text("google_drive_folder_id"),
+  googleDriveEmail: text("google_drive_email"),
+}, (table) => [
+  index("settings_user_idx").on(table.userId),
+]);
 
 export const insertSettingsSchema = createInsertSchema(settings).omit({
   id: true,
@@ -103,7 +119,10 @@ export const dialogs = pgTable("dialogs", {
   hostVoiceIds: text("host_voice_ids").array(),
   newsSourceIds: text("news_source_ids").array(),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  index("dialogs_user_idx").on(table.userId),
+  index("dialogs_user_scheduled_idx").on(table.userId, table.scheduledDate),
+]);
 
 export const newsSources = pgTable("news_sources", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -115,7 +134,9 @@ export const newsSources = pgTable("news_sources", {
   isActive: boolean("is_active").default(true),
   description: text("description"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  index("news_sources_user_idx").on(table.userId),
+]);
 
 export const insertNewsSourceSchema = createInsertSchema(newsSources).omit({
   id: true,
@@ -141,7 +162,9 @@ export const promptTemplates = pgTable("prompt_templates", {
   category: text("category").default("general"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  index("prompt_templates_user_idx").on(table.userId),
+]);
 
 export const insertPromptTemplateSchema = createInsertSchema(promptTemplates).omit({
   id: true,
@@ -180,7 +203,9 @@ export const ads = pgTable("ads", {
   presetId: text("preset_id"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  index("ads_user_idx").on(table.userId),
+]);
 
 export const insertAdSchema = createInsertSchema(ads).omit({
   id: true,
@@ -207,7 +232,9 @@ export const adPresets = pgTable("ad_presets", {
   isActive: boolean("is_active").default(true),
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  index("ad_presets_user_idx").on(table.userId),
+]);
 
 export const insertAdPresetSchema = createInsertSchema(adPresets).omit({
   id: true,
@@ -230,7 +257,9 @@ export const voices = pgTable("voices", {
   sortOrder: integer("sort_order").default(0),
   assignedProgramTypeIds: text("assigned_program_type_ids").array(),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  index("voices_user_idx").on(table.userId),
+]);
 
 export const insertVoiceSchema = createInsertSchema(voices).omit({
   id: true,
@@ -271,6 +300,14 @@ export const programTypes = pgTable("program_types", {
   isWeatherForecast: boolean("is_weather_forecast").default(false),
   defaultForecastDays: integer("default_forecast_days").default(1),
   promptIsExactScript: boolean("prompt_is_exact_script").default(false),
+  // Off by default: injecting "сейчас лето" into every show made non-seasonal
+  // formats (psychology, science) drift onto seasonal topics. Turn on for
+  // weather, lifestyle and events.
+  useSeasonalContext: boolean("use_seasonal_context").default(false),
+  // Which kind of sources to research before writing: "local" (news, events,
+  // lifestyle near the station), "academic" (studies, journals, university
+  // publications), "none".
+  researchProfile: text("research_profile").default("local"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 }, (table) => [
   uniqueIndex("program_types_user_slug_idx").on(table.userId, table.slug),
@@ -305,7 +342,11 @@ export const programs = pgTable("programs", {
   scriptGeneratedAt: timestamp("script_generated_at"),
   audioGeneratedAt: timestamp("audio_generated_at"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  index("programs_user_idx").on(table.userId),
+  index("programs_type_idx").on(table.programTypeId),
+  index("programs_user_scheduled_idx").on(table.userId, table.scheduledDate),
+]);
 
 export const insertProgramSchema = createInsertSchema(programs).omit({
   id: true,
@@ -347,7 +388,9 @@ export const automations = pgTable("automations", {
   isActive: boolean("is_active").default(true),
   lastRunAt: timestamp("last_run_at"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  index("automations_user_idx").on(table.userId),
+]);
 
 export const insertAutomationSchema = createInsertSchema(automations).omit({
   id: true,
@@ -367,7 +410,9 @@ export const automationRuns = pgTable("automation_runs", {
   errorMessage: text("error_message"),
   startedAt: timestamp("started_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
   completedAt: timestamp("completed_at"),
-});
+}, (table) => [
+  index("automation_runs_automation_idx").on(table.automationId),
+]);
 
 export const insertAutomationRunSchema = createInsertSchema(automationRuns).omit({
   id: true,
@@ -389,7 +434,9 @@ export const scheduleTemplates = pgTable("schedule_templates", {
   isActive: boolean("is_active").default(true),
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  index("schedule_templates_user_idx").on(table.userId),
+]);
 
 export const insertScheduleTemplateSchema = createInsertSchema(scheduleTemplates).omit({
   id: true,
@@ -409,7 +456,10 @@ export const hostShifts = pgTable("host_shifts", {
   label: text("label"),
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  index("host_shifts_user_idx").on(table.userId),
+  index("host_shifts_template_idx").on(table.templateId),
+]);
 
 export const insertHostShiftSchema = createInsertSchema(hostShifts).omit({
   id: true,
@@ -428,7 +478,9 @@ export const customHolidays = pgTable("custom_holidays", {
   country: text("country").notNull().default("BOTH"),
   isPublic: boolean("is_public").default(false),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  index("custom_holidays_user_idx").on(table.userId),
+]);
 
 export const insertCustomHolidaySchema = createInsertSchema(customHolidays).omit({
   id: true,
@@ -450,7 +502,10 @@ export const newsItems = pgTable("news_items", {
   category: text("category"),
   isUsed: boolean("is_used").default(false),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  index("news_items_user_idx").on(table.userId),
+  index("news_items_source_idx").on(table.sourceId),
+]);
 
 export const insertNewsItemSchema = createInsertSchema(newsItems).omit({
   id: true,
@@ -467,7 +522,9 @@ export const usageLogs = pgTable("usage_logs", {
   details: text("details"),
   tokensUsed: integer("tokens_used"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  index("usage_logs_user_idx").on(table.userId),
+]);
 
 export const insertUsageLogSchema = createInsertSchema(usageLogs).omit({
   id: true,
@@ -477,6 +534,46 @@ export const insertUsageLogSchema = createInsertSchema(usageLogs).omit({
 export type InsertUsageLog = z.infer<typeof insertUsageLogSchema>;
 export type UsageLog = typeof usageLogs.$inferSelect;
 
+/**
+ * Durable background work. Replaces fire-and-forget `(async () => {})()`, where
+ * a restart lost the work silently and left rows stuck mid-status forever.
+ *
+ * Claimed with SELECT ... FOR UPDATE SKIP LOCKED so several instances can run
+ * workers against the same table without handing the same job out twice.
+ */
+export const jobs = pgTable("jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  payload: jsonb("payload").notNull().default(sql`'{}'::jsonb`),
+  status: text("status").notNull().default("pending"),
+  progress: text("progress"),
+  result: jsonb("result"),
+  attempts: integer("attempts").notNull().default(0),
+  maxAttempts: integer("max_attempts").notNull().default(3),
+  lastError: text("last_error"),
+  // When the job becomes eligible to run. Also carries retry backoff.
+  runAt: timestamp("run_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+  // Set while a worker holds the job; used to reclaim jobs from a dead process.
+  lockedAt: timestamp("locked_at"),
+  lockedBy: text("locked_by"),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+}, (table) => [
+  index("jobs_claim_idx").on(table.status, table.runAt),
+  index("jobs_user_idx").on(table.userId),
+  index("jobs_type_idx").on(table.type),
+]);
+
+export const insertJobSchema = createInsertSchema(jobs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertJob = z.infer<typeof insertJobSchema>;
+export type Job = typeof jobs.$inferSelect;
+
 export const supportMessages = pgTable("support_messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
@@ -484,7 +581,10 @@ export const supportMessages = pgTable("support_messages", {
   role: text("role").notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
-});
+}, (table) => [
+  index("support_messages_user_idx").on(table.userId),
+  index("support_messages_session_idx").on(table.sessionId),
+]);
 
 export const insertSupportMessageSchema = createInsertSchema(supportMessages).omit({
   id: true,

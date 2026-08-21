@@ -82,6 +82,7 @@ interface PromptStrings {
   dateSlot: (date: string, slot: number, total: number) => string;
   seasonPrefix: string;
   seasonNote: string;
+  broadcastContext: (facts: string) => string;
   seasons: Record<string, string>;
   durationStrict: (sec: number, dur: string, min: number, max: number) => string;
   weatherFormatGuard: (maxLines: number) => string;
@@ -138,6 +139,17 @@ function getRuStrings(): PromptStrings {
     dateSlot: (date, slot, total) => `Дата: ${date}, выпуск #${slot} из ${total}`,
     seasonPrefix: "Сезон:",
     seasonNote: "Учитывай текущий сезон при создании контента — темы, настроение и советы должны соответствовать времени года.",
+    broadcastContext: (facts) =>
+      `ЭФИРНЫЙ КОНТЕКСТ ДНЯ — РЕАЛЬНЫЕ ДАННЫЕ НА МОМЕНТ ВЫХОДА:
+${facts}
+
+КАК ЭТИМ ПОЛЬЗОВАТЬСЯ:
+- Ведущие находятся ВНУТРИ этого дня, а не в вакууме. Они видят погоду за окном, знают, какой сегодня день и что происходит вокруг.
+- Вплетай это в живую речь как повод и как реакцию: «на улице пекло, сорок в тени», «сегодня как раз День знаний», «слышал новость про...». Никаких зачитанных списков.
+- Достаточно ОДНОЙ-ДВУХ привязок к реальности за выпуск. Это фон и повод для разговора, а не содержание передачи — тема выпуска остаётся главной.
+- Если факт не ложится в тему передачи — молча пропусти его. Натянутая привязка хуже её отсутствия.
+- Числа (температуру, даты, названия) бери ТОЛЬКО отсюда. Своих не выдумывай.
+- Не начинай каждый выпуск с погоды — это признак шаблонного эфира.`,
     seasons: {
       winter: "Зима (декабрь-февраль). Мягкая зима, короткие дни. Период праздников и уютной атмосферы.",
       spring: "Весна (март-май). Потепление, цветение, начало активного сезона. Период обновления и новых начинаний.",
@@ -259,6 +271,17 @@ function getEnStrings(): PromptStrings {
     dateSlot: (date, slot, total) => `Date: ${date}, episode #${slot} of ${total}`,
     seasonPrefix: "Season:",
     seasonNote: "Consider the current season when creating content — topics, mood, and advice should match the time of year.",
+    broadcastContext: (facts) =>
+      `ON-AIR CONTEXT FOR TODAY — REAL DATA AS OF BROADCAST:
+${facts}
+
+HOW TO USE THIS:
+- The hosts are INSIDE this day, not in a vacuum. They can see the weather outside, they know what day it is and what is going on around them.
+- Weave it into natural speech as a prompt and a reaction: "it's baking out there, forty in the shade", "today happens to be...", "I saw the news about...". Never read it out as a list.
+- ONE OR TWO touchpoints with reality per episode is enough. This is background and conversational fuel, not the subject — the episode's own topic stays in charge.
+- If a fact does not fit the show's topic, silently skip it. A forced connection is worse than none.
+- Take numbers (temperatures, dates, names) ONLY from here. Do not invent your own.
+- Do not open every episode with the weather — that is the mark of a formulaic station.`,
     seasons: {
       winter: "Winter (December-February). Short days, cozy atmosphere. Holiday season and winter activities.",
       spring: "Spring (March-May). Warming up, blossoming, fresh starts. A season of renewal and new beginnings.",

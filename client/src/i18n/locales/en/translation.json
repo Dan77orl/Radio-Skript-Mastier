@@ -73,7 +73,11 @@
     "userExists": "A user with this email already exists",
     "subtitle": "AI Radio Automation",
     "appName": "RadioFlow AI",
-    "emailPlaceholder": "your@email.com"
+    "emailPlaceholder": "your@email.com",
+    "orContinueWith": "or continue with",
+    "twoFactorTitle": "Confirm the login in Telegram",
+    "twoFactorDesc": "Password accepted. One step left — confirm it is you.",
+    "twoFactorDescNamed": "Password accepted. Confirm with the @{{username}} account."
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -369,7 +373,28 @@
     "newPassword": "New password",
     "userManagement": "User management",
     "userManagementDescription": "Add and manage access for other users.",
-    "saveSettings": "Save settings"
+    "saveSettings": "Save settings",
+    "storageTitle": "Recording storage",
+    "storageDescription": "Where finished broadcasts are archived. Files stay visible in the app but live in the cloud.",
+    "storageProvider": "Provider",
+    "storageYandex": "Yandex Disk",
+    "storageGoogle": "Google Drive",
+    "storageNone": "Do not upload",
+    "googleNotConfigured": "Not configured on the server",
+    "googleNotConnected": "Not connected",
+    "googleConnected": "Google Drive connected",
+    "googleDisconnected": "Google Drive disconnected",
+    "googleConnectFailed": "Could not connect Google Drive",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "telegramTitle": "Telegram sign-in",
+    "telegramDescription": "Passwordless sign-in and second-factor confirmation.",
+    "telegramLinked": "Telegram linked",
+    "telegramUnlinked": "Telegram unlinked",
+    "telegramNotLinked": "No Telegram account linked. Link one to sign in without a password.",
+    "telegramOnlyWayIn": "Cannot unlink: Telegram is your only way in. Set a password first.",
+    "telegramTwoFactor": "Require Telegram at sign-in",
+    "telegramTwoFactorDesc": "A password alone will not be enough — the sign-in must be confirmed in Telegram."
   },
   "voices": {
     "title": "Voices",
@@ -603,7 +628,18 @@
     "version": "version",
     "versions": "versions",
     "current": "current",
-    "audioVersionsTitle": "Audio renders"
+    "audioVersionsTitle": "Audio renders",
+    "produceTitle": "Produce the whole spot",
+    "produceDesc": "Script, voice-over, music selection and mixing — one action, no manual steps.",
+    "produceButton": "Produce spot",
+    "produceRunning": "Producing…",
+    "produceStarted": "Production started",
+    "produceStartedDesc": "You can close the page — the work continues and will not be lost.",
+    "produceDone": "Spot is ready",
+    "produceFailed": "Could not produce the spot",
+    "playWithMusic": "Play with music",
+    "versionWithMusic": "With music",
+    "versionVoiceOnly": "Voice only"
   },
   "shows": {
     "title": "Shows",
@@ -846,7 +882,14 @@
     "expandedPrompt": "Expanded prompt (as the system sees it)",
     "scriptTemplateOpening": "Opening: [{{name}}] — announces the show, introduces the host",
     "scriptTemplateMain": "Main part: [{{name}}] — hosts the entire episode",
-    "scriptTemplateClosing": "Closing: [{{name}}] — says goodbye to listeners"
+    "scriptTemplateClosing": "Closing: [{{name}}] — says goodbye to listeners",
+    "seasonalTitle": "Use seasonal context",
+    "seasonalDesc": "Inject the current season into the prompt. Useful for weather, lifestyle and events. Turn it off for psychology, science and news — otherwise topics drift toward the season.",
+    "researchProfileTitle": "Research sources",
+    "researchProfileDesc": "What to search for online before writing the script.",
+    "researchProfileLocal": "News and events — local news, listings, lifestyle",
+    "researchProfileAcademic": "Science and publications — studies, journals, universities",
+    "researchProfileNone": "No search — prompt and station knowledge base only"
   },
   "automations": {
     "title": "Automations",

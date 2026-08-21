@@ -1,11 +1,13 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
+import { enqueueJob } from "./jobs/queue";
+import { internalApiKey } from "./auth";
 
 const AGENT_USER_ID = "96995f3b-637e-49f4-8eaa-6f43eb9280bf";
 
 function requireAgentKey(req: Request, res: Response, next: NextFunction) {
   const apiKey = req.headers["x-api-key"] || req.query.api_key;
-  const expected = process.env.VOICE_AGENT_API_KEY;
+  const expected = internalApiKey();
   if (!expected || apiKey !== expected) {
     return res.status(401).json({ error: "Unauthorized" });
   }
@@ -20,7 +22,7 @@ async function internalFetch(path: string, method: string = "GET", body?: any) {
     method,
     headers: {
       "Content-Type": "application/json",
-      "X-Internal-Key": process.env.VOICE_AGENT_API_KEY || "",
+      "X-Internal-Key": internalApiKey() || "",
       "X-Internal-User-Id": AGENT_USER_ID,
     },
   };
@@ -80,8 +82,12 @@ export function registerVoiceAgentRoutes(app: Express) {
 
       for (let i = 0; i < numPrograms; i++) {
         try {
-          const targetDate = new Date(dateStr);
-          targetDate.setDate(targetDate.getDate() + Math.floor(i / (programType.dailyCount || 1)));
+          // Built from date parts in UTC: new Date("YYYY-MM-DD") is UTC midnight,
+          // and setDate/getDate work in local time, so on a negative offset the
+          // day silently shifted back by one.
+          const [y, mo, d] = dateStr.split("-").map(Number);
+          const targetDate = new Date(Date.UTC(y, mo - 1, d));
+          targetDate.setUTCDate(targetDate.getUTCDate() + Math.floor(i / (programType.dailyCount || 1)));
           const targetDateStr = targetDate.toISOString().split("T")[0];
 
           const response = await internalFetch(`/api/programs/auto-create/${programType.id}`, "POST", { date: targetDateStr });
@@ -154,30 +160,19 @@ export function registerVoiceAgentRoutes(app: Express) {
 
       const totalCount = programIds.length;
 
+      const job = await enqueueJob({
+        type: "program.generate-audio",
+        userId: AGENT_USER_ID,
+        payload: { userId: AGENT_USER_ID, programIds },
+      });
+
       res.json({
         success: true,
         message: `Запущена озвучка ${totalCount} программ${typeName ? ` "${typeName}"` : ""}. Аудио генерируется в фоне, это займёт 1-2 минуты. Проверь статус через get_programs_status.`,
         total: totalCount,
         status: "processing",
+        jobId: job.id,
       });
-
-      (async () => {
-        for (const pid of programIds) {
-          try {
-            console.log(`[voice-agent] Generating audio for program ${pid}...`);
-            const audioRes = await internalFetch(`/api/programs/${pid}/generate-audio`, "POST");
-            if (audioRes.ok) {
-              console.log(`[voice-agent] Audio done for program ${pid}`);
-            } else {
-              const err = await audioRes.json().catch(() => ({}));
-              console.error(`[voice-agent] Audio error for ${pid}: ${(err as any).error}`);
-            }
-          } catch (e: any) {
-            console.error(`[voice-agent] Audio error for ${pid}:`, e.message);
-          }
-        }
-        console.log(`[voice-agent] Audio generation complete for ${totalCount} programs`);
-      })();
     } catch (error) {
       console.error("Voice agent generate-audio error:", error);
       res.status(500).json({ error: "Не удалось сгенерировать аудио" });
@@ -202,6 +197,17 @@ export function registerVoiceAgentRoutes(app: Express) {
       const dateStr = date || new Date().toISOString().split("T")[0];
       const numPrograms = Math.min(count || 1, 20);
 
+      const job = await enqueueJob({
+        type: "program.full-pipeline",
+        userId: AGENT_USER_ID,
+        payload: {
+          userId: AGENT_USER_ID,
+          programTypeId: programType.id,
+          count: numPrograms,
+          date: dateStr,
+        },
+      });
+
       res.json({
         success: true,
         message: `Запущено создание ${numPrograms} выпуск(ов) "${programType.name}" на ${dateStr}. Скрипты и аудио генерируются в фоне. Через пару минут всё будет готово. Проверь статус через get_programs_status.`,
@@ -209,41 +215,8 @@ export function registerVoiceAgentRoutes(app: Express) {
         count: numPrograms,
         date: dateStr,
         status: "processing",
+        jobId: job.id,
       });
-
-      (async () => {
-        for (let i = 0; i < numPrograms; i++) {
-          try {
-            const targetDate = new Date(dateStr);
-            targetDate.setDate(targetDate.getDate() + Math.floor(i / (programType.dailyCount || 1)));
-            const targetDateStr = targetDate.toISOString().split("T")[0];
-
-            console.log(`[voice-agent] Creating program ${i + 1}/${numPrograms} for "${programType.name}" on ${targetDateStr}`);
-            const createRes = await internalFetch(`/api/programs/auto-create/${programType.id}`, "POST", { date: targetDateStr });
-
-            if (!createRes.ok) {
-              const err = await createRes.json().catch(() => ({}));
-              console.error(`[voice-agent] Script error: ${(err as any).error}`);
-              continue;
-            }
-
-            const program = await createRes.json();
-            console.log(`[voice-agent] Script created: "${program.title}"`);
-
-            console.log(`[voice-agent] Generating audio for "${program.title}"...`);
-            const audioRes = await internalFetch(`/api/programs/${program.id}/generate-audio`, "POST");
-            if (audioRes.ok) {
-              console.log(`[voice-agent] Audio done for "${program.title}"`);
-            } else {
-              const err = await audioRes.json().catch(() => ({}));
-              console.error(`[voice-agent] Audio error: ${(err as any).error}`);
-            }
-          } catch (e: any) {
-            console.error(`[voice-agent] Pipeline error ${i + 1}:`, e.message);
-          }
-        }
-        console.log(`[voice-agent] Pipeline complete for "${programType.name}": ${numPrograms} programs`);
-      })();
     } catch (error) {
       console.error("Voice agent full-pipeline error:", error);
       res.status(500).json({ error: "Не удалось выполнить пайплайн" });

@@ -1,23 +1,48 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { registerUser, loginUser, logoutUser, getCurrentUser, completeOnboarding, updateUserLanguage, requireAuth, requireAdmin } from "./auth";
+import { registerUser, loginUser, logoutUser, getCurrentUser, completeOnboarding, updateUserLanguage, requireAuth, requireAdmin, internalAuthHeaders, telegramAuth, internalApiKey } from "./auth";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertAdPresetSchema, insertVoiceSchema, insertScheduleTemplateSchema, insertHostShiftSchema, insertCustomHolidaySchema } from "@shared/schema";
-import { hasLengthConstraintInPrompt } from "@shared/prompt-length";
+import { hasExactScriptDirective, extractDurationSecondsFromPrompt } from "@shared/prompt-length";
 import { getHolidaysForDate, getHolidaysForYear, getHolidaysForMonth, getHolidayInfo, setCustomHolidays } from "./holidays";
 import { getPromptStrings, getGenderLabel, getDefaultHostName, getLanguageDirective, getLanguageName } from "./prompt-locale";
 import { handleSupportChat } from "./support-chat";
+import { createRateLimiter } from "./rate-limit";
+import { getJob, listJobs, enqueueJob, registerJobHandler } from "./jobs/queue";
+import { archiveAudio } from "./storage-providers";
+import { buildAuthUrl, exchangeCodeForTokens, isGoogleDriveConfigured } from "./storage-providers/google-drive";
 import { z } from "zod";
 import { promises as fs } from "fs";
 import path from "path";
+import { randomUUID } from "crypto";
 import multer from "multer";
 import mammoth from "mammoth";
 import * as cheerio from "cheerio";
 
 const uploadDir = path.join(process.cwd(), "public", "uploads");
+
+// Extension is derived from the mime type, never from the client-supplied
+// filename: uploads are served from public/, so an attacker-chosen ".html" or
+// ".svg" would execute as same-origin script.
+const ALLOWED_UPLOAD_TYPES: Record<string, string> = {
+  "application/pdf": ".pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+  "application/msword": ".doc",
+  "text/plain": ".txt",
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+  "audio/mpeg": ".mp3",
+  "audio/mp4": ".m4a",
+  "audio/wav": ".wav",
+  "audio/x-wav": ".wav",
+  "audio/webm": ".webm",
+  "audio/ogg": ".ogg",
+};
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -26,12 +51,19 @@ const upload = multer({
       cb(null, uploadDir);
     },
     filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      const name = `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
-      cb(null, name);
+      const ext = ALLOWED_UPLOAD_TYPES[file.mimetype] || ".bin";
+      cb(null, `${Date.now()}-${randomUUID()}${ext}`);
     },
   }),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (!ALLOWED_UPLOAD_TYPES[file.mimetype]) {
+      const err: any = new Error(`Unsupported file type: ${file.mimetype}`);
+      err.status = 400;
+      return cb(err);
+    }
+    cb(null, true);
+  },
 });
 
 const openai = new OpenAI({
@@ -47,14 +79,28 @@ const geminiAI = new GoogleGenAI({
   },
 });
 
-const CLAUDE_MODEL_DIRECT = "claude-sonnet-4-20250514";
-const CLAUDE_MODEL_REPLIT = "claude-sonnet-4-5";
+// claude-sonnet-4-20250514 was scheduled for retirement on 2026-06-15; anything
+// still pinned to it will start failing. Override with CLAUDE_MODEL if the
+// proxy in front of the API only exposes a specific model.
+const CLAUDE_MODEL_DIRECT = "claude-opus-5";
+const CLAUDE_MODEL_REPLIT = "claude-opus-5";
 function getClaudeModel(): string {
+  if (process.env.CLAUDE_MODEL) return process.env.CLAUDE_MODEL;
   return (process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY && process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL)
     ? CLAUDE_MODEL_REPLIT
     : CLAUDE_MODEL_DIRECT;
 }
 const CLAUDE_MODEL = getClaudeModel();
+
+/**
+ * Current Claude models think by default, and max_tokens caps thinking AND the
+ * reply together. The small budgets these call sites were written with (10, 300,
+ * 512 …) would now truncate the answer before it starts, so enforce a floor.
+ */
+const MIN_AI_MAX_TOKENS = 6000;
+function aiMaxTokens(requested: number): number {
+  return Math.max(requested, MIN_AI_MAX_TOKENS);
+}
 
 interface ParsedNewsItem {
   title: string;
@@ -242,7 +288,7 @@ ${scriptText}`;
     if (anthropic) {
       const message = await anthropic.messages.create({
         model: CLAUDE_MODEL,
-        max_tokens: 2048,
+        max_tokens: aiMaxTokens(2048),
         system: systemPrompt,
         messages: [{ role: "user", content: compressInstruction }],
       });
@@ -1513,14 +1559,29 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
-  app.post("/api/auth/register", registerUser);
-  app.post("/api/auth/login", loginUser);
+  const authLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: "Too many attempts. Please try again in a few minutes.",
+  });
+  const supportChatLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 10 });
+
+  app.post("/api/auth/register", authLimiter, registerUser);
+  app.post("/api/auth/login", authLimiter, loginUser);
+  app.post("/api/auth/telegram", authLimiter, telegramAuth);
+  app.get("/api/auth/telegram/config", (_req, res) => {
+    // The bot username is public (it is embedded in the widget); the token is not.
+    res.json({
+      enabled: !!process.env.TELEGRAM_BOT_TOKEN && !!process.env.TELEGRAM_BOT_USERNAME,
+      botUsername: process.env.TELEGRAM_BOT_USERNAME || null,
+    });
+  });
   app.post("/api/auth/logout", logoutUser);
   app.get("/api/auth/me", getCurrentUser);
   app.patch("/api/auth/language", updateUserLanguage);
   app.post("/api/auth/complete-onboarding", completeOnboarding);
 
-  app.post("/api/support-chat", handleSupportChat);
+  app.post("/api/support-chat", supportChatLimiter, handleSupportChat);
 
   app.get("/api/support-chat/admin-replies", async (req, res) => {
     try {
@@ -1537,9 +1598,26 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * Everything past this point requires a session.
+   *
+   * The allowlist is explicit rather than a "/auth/" prefix match: a prefix
+   * silently made every future /api/auth/* route public, which is how
+   * /api/auth/telegram/status and /require ended up unauthenticated.
+   */
+  const PUBLIC_API_PATHS = new Set([
+    "/auth/register",
+    "/auth/login",
+    "/auth/logout",
+    "/auth/me",
+    "/auth/telegram",
+    "/auth/telegram/config",
+    "/support-chat",
+    "/support-chat/admin-replies",
+  ]);
+
   app.use("/api", (req, res, next) => {
-    if (req.path.startsWith("/auth/")) return next();
-    if (req.path === "/support-chat") return next();
+    if (PUBLIC_API_PATHS.has(req.path)) return next();
     return requireAuth(req, res, next);
   });
 
@@ -2136,6 +2214,170 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/storage/status", async (req, res) => {
+    try {
+      const settings = await storage.getSettings(req.session.userId);
+      res.json({
+        provider: settings?.storageProvider || "yandex",
+        googleDrive: {
+          available: isGoogleDriveConfigured(),
+          connected: !!settings?.googleDriveRefreshToken,
+          email: settings?.googleDriveEmail || null,
+          folderId: settings?.googleDriveFolderId || null,
+        },
+        yandex: { connected: !!settings?.yandexDiskToken },
+      });
+    } catch (error) {
+      console.error("Error reading storage status:", error);
+      res.status(500).json({ error: "Failed to read storage status" });
+    }
+  });
+
+  app.post("/api/storage/provider", async (req, res) => {
+    try {
+      const { provider } = req.body || {};
+      if (!["yandex", "google_drive", "none"].includes(provider)) {
+        return res.status(400).json({ error: "Unknown storage provider" });
+      }
+      const settings = await storage.getSettings(req.session.userId);
+      if (provider === "google_drive" && !settings?.googleDriveRefreshToken) {
+        return res.status(400).json({ error: "Connect Google Drive first" });
+      }
+      await storage.saveSettings({ storageProvider: provider } as any, req.session.userId);
+      res.json({ ok: true, provider });
+    } catch (error) {
+      console.error("Error setting storage provider:", error);
+      res.status(500).json({ error: "Failed to set storage provider" });
+    }
+  });
+
+  app.get("/api/storage/google/auth-url", async (req, res) => {
+    try {
+      if (!isGoogleDriveConfigured()) {
+        return res.status(503).json({ error: "Google Drive is not configured on this server" });
+      }
+      // Bind the callback to this session: a code redeemed under a different
+      // session must not attach someone else's Drive to this account.
+      const state = randomUUID();
+      req.session.googleOAuthState = state;
+      res.json({ url: buildAuthUrl(state) });
+    } catch (error: any) {
+      console.error("Error building Google auth URL:", error);
+      res.status(500).json({ error: error?.message || "Failed to build authorization URL" });
+    }
+  });
+
+  app.get("/api/storage/google/callback", async (req, res) => {
+    try {
+      const { code, state, error: oauthError } = req.query as Record<string, string | undefined>;
+      if (oauthError) return res.redirect(`/settings?google=denied`);
+      if (!code || !state || state !== req.session.googleOAuthState) {
+        return res.redirect(`/settings?google=invalid_state`);
+      }
+      delete req.session.googleOAuthState;
+
+      const tokens = await exchangeCodeForTokens(code);
+      await storage.saveSettings({
+        googleDriveRefreshToken: tokens.refreshToken,
+        googleDriveEmail: tokens.email,
+        storageProvider: "google_drive",
+      } as any, req.session.userId);
+
+      logUsage(req.session.userId!, "storage_connect", "google_drive");
+      res.redirect(`/settings?google=connected`);
+    } catch (error: any) {
+      console.error("Google Drive callback failed:", error);
+      res.redirect(`/settings?google=failed`);
+    }
+  });
+
+  app.post("/api/storage/google/disconnect", async (req, res) => {
+    try {
+      const settings = await storage.getSettings(req.session.userId);
+      await storage.saveSettings({
+        googleDriveRefreshToken: null,
+        googleDriveEmail: null,
+        googleDriveFolderId: null,
+        storageProvider: settings?.storageProvider === "google_drive" ? "none" : settings?.storageProvider,
+      } as any, req.session.userId);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error disconnecting Google Drive:", error);
+      res.status(500).json({ error: "Failed to disconnect Google Drive" });
+    }
+  });
+
+  app.get("/api/auth/telegram/status", async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      res.json({
+        linked: !!user.telegramId,
+        telegramUsername: user.telegramUsername || null,
+        requireTelegramLogin: !!user.requireTelegramLogin,
+        hasPassword: !!user.password,
+      });
+    } catch (error) {
+      console.error("Error reading Telegram status:", error);
+      res.status(500).json({ error: "Failed to read Telegram status" });
+    }
+  });
+
+  app.post("/api/auth/telegram/unlink", async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      // Unlinking a passwordless account would lock the owner out permanently.
+      if (!user.password) {
+        return res.status(400).json({ error: "Set a password before unlinking Telegram — it is your only way in." });
+      }
+      await storage.unlinkTelegramAccount(user.id);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error unlinking Telegram:", error);
+      res.status(500).json({ error: "Failed to unlink Telegram" });
+    }
+  });
+
+  app.post("/api/auth/telegram/require", async (req, res) => {
+    try {
+      const { required } = req.body || {};
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      if (required && !user.telegramId) {
+        return res.status(400).json({ error: "Link a Telegram account first" });
+      }
+      await storage.setRequireTelegramLogin(user.id, !!required);
+      res.json({ ok: true, requireTelegramLogin: !!required });
+    } catch (error) {
+      console.error("Error updating Telegram 2FA:", error);
+      res.status(500).json({ error: "Failed to update two-factor setting" });
+    }
+  });
+
+  app.get("/api/jobs", async (req, res) => {
+    try {
+      const type = typeof req.query.type === "string" ? req.query.type : undefined;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const jobs = await listJobs(req.session.userId!, { type, limit });
+      res.json(jobs);
+    } catch (error) {
+      console.error("Error listing jobs:", error);
+      res.status(500).json({ error: "Failed to list jobs" });
+    }
+  });
+
+  app.get("/api/jobs/:id", async (req, res) => {
+    try {
+      const job = await getJob(req.params.id, req.session.userId!);
+      if (!job) return res.status(404).json({ error: "Job not found" });
+      res.json(job);
+    } catch (error) {
+      console.error("Error getting job:", error);
+      res.status(500).json({ error: "Failed to get job" });
+    }
+  });
+
   app.get("/api/settings", async (req, res) => {
     try {
       const settings = await storage.getSettings(req.session.userId);
@@ -2300,7 +2542,7 @@ export async function registerRoutes(
       if (anthropic) {
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 4000,
+          max_tokens: aiMaxTokens(4000),
           system: systemPrompt,
           messages: [{ role: "user", content: text }],
         });
@@ -2418,7 +2660,7 @@ ${ps.minReplicas(dialogReplicas)}`;
       if (anthropic) {
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 1024,
+          max_tokens: aiMaxTokens(1024),
           system: systemPrompt,
           messages: [{ role: "user", content: prompt }],
         });
@@ -2480,7 +2722,7 @@ ${ps.minReplicas(dialogReplicas)}`;
       if (anthropic) {
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 512,
+          max_tokens: aiMaxTokens(512),
           system: systemPrompt,
           messages: [{ role: "user", content: prompt }],
         });
@@ -2543,7 +2785,7 @@ ${ps.minReplicas(dialogReplicas)}`;
       
       await anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 10,
+        max_tokens: aiMaxTokens(10),
         messages: [{ role: "user", content: "Hi" }],
       });
 
@@ -2701,6 +2943,8 @@ ${ps.minReplicas(dialogReplicas)}`;
       await fs.unlink(maleFile).catch(() => {});
       await fs.unlink(femaleFile).catch(() => {});
 
+      const combinedStat = await fs.stat(combinedFile);
+
       const dialog = await storage.createDialog({
         userId: req.session.userId,
         title: title || "Подводка",
@@ -2709,7 +2953,7 @@ ${ps.minReplicas(dialogReplicas)}`;
         maleText,
         femaleText,
         audioUrl: `/audio/dialog_${timestamp}.mp3`,
-        duration: Math.round((combined.length / 1024) * 0.5),
+        duration: Math.round(combinedStat.size / (192000 / 8)),
         status: "ready",
         scheduledDate: scheduledDate || null,
         slotNumber: slotNumber || null,
@@ -2949,7 +3193,7 @@ ${ps.minReplicas(dialogReplicas)}`;
           if (anthropic) {
             const response = await anthropic.messages.create({
               model: CLAUDE_MODEL,
-              max_tokens: 1024,
+              max_tokens: aiMaxTokens(1024),
               system: systemPrompt,
               messages: [{ role: "user", content: userPrompt }],
             });
@@ -3090,7 +3334,7 @@ IMPORTANT: Response in JSON format:
       if (anthropic) {
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 1024,
+          max_tokens: aiMaxTokens(1024),
           system: systemPrompt,
           messages: [{ role: "user", content: prompt }],
         });
@@ -3396,7 +3640,7 @@ IMPORTANT: Response in JSON format:
       if (anthropic) {
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 512,
+          max_tokens: aiMaxTokens(512),
           system: systemPrompt,
           messages: [{ role: "user", content: fullScript }],
         });
@@ -3514,7 +3758,7 @@ Create exactly ${dailyCount} dialogs.`;
       if (anthropic) {
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 4096,
+          max_tokens: aiMaxTokens(4096),
           system: systemPrompt,
           messages: [{ role: "user", content: basePrompt || "Создай подводки на день" }],
         });
@@ -3813,7 +4057,7 @@ Return ONLY valid JSON, no extra text.`;
 
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 1024,
+          max_tokens: aiMaxTokens(1024),
           system: systemPrompt,
           messages: [{ role: "user", content: userContent as any }],
         });
@@ -3901,7 +4145,7 @@ Return ONLY valid JSON, no extra text.`;
       if (anthropic) {
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 512,
+          max_tokens: aiMaxTokens(512),
           system: systemPrompt,
           messages: [{ role: "user", content: text }],
         });
@@ -3973,7 +4217,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       if (anthropic) {
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 1024,
+          max_tokens: aiMaxTokens(1024),
           system: systemPrompt,
           messages: [{ role: "user", content: prompt }],
         });
@@ -4038,6 +4282,45 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
     } catch (error) {
       console.error("Error generating ad:", error);
       res.status(500).json({ error: "Failed to generate ad" });
+    }
+  });
+
+  /**
+   * One call takes an ad from its materials to a finished, music-bedded spot:
+   * script → voice → music → mix. Runs as a durable job, so a restart resumes
+   * instead of losing the work; follow it via GET /api/jobs/:id.
+   */
+  app.post("/api/ads/:id/produce", async (req, res) => {
+    try {
+      const ad = await storage.getAd(req.params.id, req.session.userId!);
+      if (!ad) return res.status(404).json({ error: "Ad not found" });
+
+      const { voiceIds, speakerVoiceMap, skipMusic } = req.body || {};
+
+      const job = await enqueueJob({
+        type: "ad.produce",
+        userId: req.session.userId!,
+        // Producing costs real money at every step; do not silently retry it.
+        maxAttempts: 1,
+        payload: {
+          userId: req.session.userId!,
+          adId: ad.id,
+          voiceIds: voiceIds || ad.voiceIds || undefined,
+          speakerVoiceMap,
+          skipMusic: !!skipMusic,
+        },
+      });
+
+      await storage.updateAd(ad.id, req.session.userId!, { status: "generating", stage: "producing" });
+
+      res.status(202).json({
+        jobId: job.id,
+        status: "queued",
+        message: "Ролик собирается: сценарий, озвучка, музыка, сведение.",
+      });
+    } catch (error) {
+      console.error("Error starting ad production:", error);
+      res.status(500).json({ error: "Failed to start ad production" });
     }
   });
 
@@ -4145,7 +4428,7 @@ IMPORTANT: Response in JSON format:
       if (anthropic) {
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 4096,
+          max_tokens: aiMaxTokens(4096),
           system: systemPrompt,
           messages: [{ role: "user", content: "Создай 5 вариантов рекламного ролика" }],
         });
@@ -4279,7 +4562,7 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
       if (anthropic) {
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 1024,
+          max_tokens: aiMaxTokens(1024),
           system: systemPrompt,
           messages: [{ role: "user", content: "Создай новый вариант" }],
         });
@@ -4320,45 +4603,28 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
     }
   });
 
-  app.post("/api/ads/:id/synthesize-audio", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { voiceIds, voiceName: requestVoiceName, speakerVoiceMap: reqSpeakerVoiceMap, scriptText: editedScriptText } = req.body;
-      
-      const ad = await storage.getAd(id, req.session.userId!);
-      if (!ad) {
-        return res.status(404).json({ error: "Ad not found" });
-      }
+  /**
+   * Ad voice synthesis, as a durable job. It used to run as a detached
+   * `(async () => {})()`: a restart mid-render lost the work and left the ad
+   * stuck on status "generating" with nothing to retry.
+   */
+  registerJobHandler("ad.synthesize-audio", async (payload: {
+    adId: string; userId: string; voiceIds?: string[];
+    speakerVoiceMap?: Record<string, string>; scriptText?: string; voiceName?: string;
+  }) => {
+    const { adId: id, userId, voiceIds, speakerVoiceMap: reqSpeakerVoiceMap, voiceName: requestVoiceName } = payload;
 
-      if (!ad.selectedVariantText && !editedScriptText) {
-        return res.status(400).json({ error: "No variant selected" });
-      }
+    const ad = await storage.getAd(id, userId);
+    if (!ad) throw new Error(`Ad ${id} not found`);
 
-      const settings = await storage.getSettings(req.session.userId);
-      if (!settings?.elevenLabsApiKey) {
-        return res.status(400).json({ error: "ElevenLabs API key not configured" });
-      }
+    const settings = await storage.getSettings(userId);
+    if (!settings?.elevenLabsApiKey) throw new Error("ElevenLabs API key not configured");
 
-      if (editedScriptText && editedScriptText !== ad.selectedVariantText) {
-        await storage.updateAd(id, req.session.userId!, { selectedVariantText: editedScriptText });
-      }
+    const scriptText = payload.scriptText || ad.selectedVariantText;
+    if (!scriptText) throw new Error("No script to synthesise");
+    const defaultVoiceId = voiceIds?.[0] || settings.maleVoiceId || "onwK4e9ZLuTAKqWW03F9";
+    const isMultiSpeaker = isMultiSpeakerScript(scriptText);
 
-      const defaultVoiceId = voiceIds?.[0] || settings.maleVoiceId || "onwK4e9ZLuTAKqWW03F9";
-      const scriptText = editedScriptText || ad.selectedVariantText;
-      const isMultiSpeaker = isMultiSpeakerScript(scriptText);
-
-      if (reqSpeakerVoiceMap) {
-        await storage.updateAd(id, req.session.userId!, { 
-          status: "generating", 
-          voiceIds, 
-          speakerVoiceMap: JSON.stringify(reqSpeakerVoiceMap) 
-        });
-      } else {
-        await storage.updateAd(id, req.session.userId!, { status: "generating", voiceIds });
-      }
-      res.json({ message: "Audio generation started" });
-
-      (async () => {
         try {
           const audioDir = path.join(process.cwd(), "public", "audio");
           await fs.mkdir(audioDir, { recursive: true });
@@ -4374,7 +4640,7 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
             const segments = parseMultiSpeakerScript(scriptText);
             const spkVoiceMap: Record<string, string> = reqSpeakerVoiceMap || {};
 
-            const allVoices = await storage.getVoices(req.session.userId!);
+            const allVoices = await storage.getVoices(userId);
             const voiceNameMap = new Map<string, string>();
             for (const v of allVoices) {
               voiceNameMap.set(v.elevenLabsVoiceId, v.personaName || v.name);
@@ -4466,7 +4732,7 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
             finalAudioFile = path.join(audioDir, `ad_${id}_${timestamp}.mp3`);
             await fs.writeFile(finalAudioFile, audioBuffer);
 
-            const allVoices = await storage.getVoices(req.session.userId!);
+            const allVoices = await storage.getVoices(userId);
             const usedVoice = allVoices.find(v => v.elevenLabsVoiceId === defaultVoiceId);
             voiceNameForVersion = usedVoice ? (usedVoice.personaName || usedVoice.name) : (requestVoiceName || defaultVoiceId);
           }
@@ -4475,7 +4741,7 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
           const fileStats = await fs.stat(finalAudioFile);
           const estimatedDuration = Math.round(fileStats.size / 24000);
 
-          const freshAd = await storage.getAd(id, req.session.userId!);
+          const freshAd = await storage.getAd(id, userId);
           let existingVersions: Array<{ url: string; voiceId: string; voiceName: string; createdAt: string; duration: number }> = [];
           try {
             if (freshAd?.audioVersions) {
@@ -4492,7 +4758,7 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
             duration: estimatedDuration,
           });
 
-          await storage.updateAd(id, req.session.userId!, {
+          await storage.updateAd(id, userId, {
             audioUrl: newAudioUrl,
             audioVersions: JSON.stringify(existingVersions),
             duration: estimatedDuration,
@@ -4503,9 +4769,63 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
           console.log(`Audio generated for ad ${id} (version ${existingVersions.length})${isMultiSpeaker ? " [multi-speaker]" : ""}`);
         } catch (error) {
           console.error(`Error generating audio for ad ${id}:`, error);
-          await storage.updateAd(id, req.session.userId!, { status: "error" });
+          await storage.updateAd(id, userId, { status: "error" });
         }
-      })();
+    return { adId: id };
+  });
+
+  app.post("/api/ads/:id/synthesize-audio", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { voiceIds, voiceName: requestVoiceName, speakerVoiceMap: reqSpeakerVoiceMap, scriptText: editedScriptText } = req.body;
+      
+      const ad = await storage.getAd(id, req.session.userId!);
+      if (!ad) {
+        return res.status(404).json({ error: "Ad not found" });
+      }
+
+      if (!ad.selectedVariantText && !editedScriptText) {
+        return res.status(400).json({ error: "No variant selected" });
+      }
+
+      const settings = await storage.getSettings(req.session.userId);
+      if (!settings?.elevenLabsApiKey) {
+        return res.status(400).json({ error: "ElevenLabs API key not configured" });
+      }
+
+      if (editedScriptText && editedScriptText !== ad.selectedVariantText) {
+        await storage.updateAd(id, req.session.userId!, { selectedVariantText: editedScriptText });
+      }
+
+      const defaultVoiceId = voiceIds?.[0] || settings.maleVoiceId || "onwK4e9ZLuTAKqWW03F9";
+      const scriptText = editedScriptText || ad.selectedVariantText;
+      const isMultiSpeaker = isMultiSpeakerScript(scriptText);
+
+      if (reqSpeakerVoiceMap) {
+        await storage.updateAd(id, req.session.userId!, { 
+          status: "generating", 
+          voiceIds, 
+          speakerVoiceMap: JSON.stringify(reqSpeakerVoiceMap) 
+        });
+      } else {
+        await storage.updateAd(id, req.session.userId!, { status: "generating", voiceIds });
+      }
+
+      const job = await enqueueJob({
+        type: "ad.synthesize-audio",
+        userId: req.session.userId!,
+        // Synthesis bills per character at ElevenLabs — never retry silently.
+        maxAttempts: 1,
+        payload: {
+          adId: id,
+          userId: req.session.userId!,
+          voiceIds,
+          speakerVoiceMap: reqSpeakerVoiceMap,
+          scriptText,
+          voiceName: requestVoiceName,
+        },
+      });
+      res.json({ message: "Audio generation started", jobId: job.id });
     } catch (error) {
       console.error("Error starting audio synthesis:", error);
       res.status(500).json({ error: "Failed to start audio synthesis" });
@@ -4570,12 +4890,24 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
   app.get("/api/stream-audio/*", async (req, res) => {
     try {
       if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
-      const filePath = req.params[0];
-      if (!filePath || filePath.includes("..")) {
+      const filePath = (req.params as Record<string, string>)[0];
+      if (!filePath) {
         return res.status(400).json({ error: "Invalid path" });
       }
-      const decodedPath = decodeURIComponent(filePath);
-      const audioPath = path.join(process.cwd(), "public", "audio", decodedPath);
+      let decodedPath: string;
+      try {
+        decodedPath = decodeURIComponent(filePath);
+      } catch {
+        return res.status(400).json({ error: "Invalid path" });
+      }
+      // Containment check must happen on the fully decoded path: Express decodes
+      // route params once, so a double-encoded "%252e%252e%252f" survives any
+      // substring test done before this point.
+      const audioRoot = path.resolve(process.cwd(), "public", "audio");
+      const audioPath = path.resolve(audioRoot, decodedPath);
+      if (audioPath !== audioRoot && !audioPath.startsWith(audioRoot + path.sep)) {
+        return res.status(400).json({ error: "Invalid path" });
+      }
       try {
         await fs.access(audioPath);
       } catch {
@@ -4666,7 +4998,7 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
         if (anthropic) {
           const response = await anthropic.messages.create({
             model: CLAUDE_MODEL,
-            max_tokens: 3000,
+            max_tokens: aiMaxTokens(3000),
             messages: [
               {
                 role: "user",
@@ -4870,29 +5202,63 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
         return res.status(400).json({ error: "ElevenLabs API key not configured" });
       }
 
-      const response = await fetch("https://api.elevenlabs.io/v1/voices", {
-        headers: {
-          "xi-api-key": settings.elevenLabsApiKey,
-        },
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        console.error("ElevenLabs API error:", error);
-        return res.status(response.status).json({ error: "Failed to fetch voices from ElevenLabs" });
-      }
-
-      const data = await response.json();
-      const voicesList = data.voices?.map((v: any) => ({
+      // /v1/voices returns a single truncated page, which is why large accounts
+      // only ever saw part of their library. /v2/voices is paginated — walk it.
+      const mapVoice = (v: any) => ({
         voice_id: v.voice_id,
         name: v.name,
         category: v.category,
         labels: v.labels,
         preview_url: v.preview_url,
         description: v.description,
-      })) || [];
+      });
 
-      res.json({ voices: voicesList });
+      const collected: any[] = [];
+      let nextPageToken: string | undefined;
+      let usedFallback = false;
+
+      for (let page = 0; page < 20; page++) {
+        const params = new URLSearchParams({ page_size: "100" });
+        if (nextPageToken) params.append("next_page_token", nextPageToken);
+
+        const response = await fetch(`https://api.elevenlabs.io/v2/voices?${params.toString()}`, {
+          headers: { "xi-api-key": settings.elevenLabsApiKey },
+        });
+
+        if (!response.ok) {
+          if (page === 0 && (response.status === 404 || response.status === 400)) {
+            usedFallback = true;
+            break;
+          }
+          const error = await response.text();
+          console.error("ElevenLabs API error:", response.status, error);
+          if (page === 0) {
+            return res.status(response.status).json({ error: "Failed to fetch voices from ElevenLabs" });
+          }
+          break; // keep whatever pages already succeeded
+        }
+
+        const data = await response.json();
+        collected.push(...(data.voices || []).map(mapVoice));
+
+        if (!data.has_more || !data.next_page_token) break;
+        nextPageToken = data.next_page_token;
+      }
+
+      if (usedFallback) {
+        const legacy = await fetch("https://api.elevenlabs.io/v1/voices", {
+          headers: { "xi-api-key": settings.elevenLabsApiKey },
+        });
+        if (!legacy.ok) {
+          const error = await legacy.text();
+          console.error("ElevenLabs API error (v1 fallback):", error);
+          return res.status(legacy.status).json({ error: "Failed to fetch voices from ElevenLabs" });
+        }
+        const legacyData = await legacy.json();
+        collected.push(...(legacyData.voices || []).map(mapVoice));
+      }
+
+      res.json({ voices: collected, total: collected.length });
     } catch (error) {
       console.error("Error fetching ElevenLabs voices:", error);
       res.status(500).json({ error: "Failed to fetch voices from ElevenLabs" });
@@ -5260,7 +5626,134 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
     return fallbackWebSearch(query, limit);
   }
 
-  async function generateSmartSearchQueries(programPrompt: string, stationPrompt: string, topics: string[], userId?: string): Promise<string[]> {
+  const INTL_LOCALES: Record<string, string> = { ru: "ru-RU", en: "en-US", tr: "tr-TR" };
+
+  /**
+   * Weather, holidays and fresh news already existed, but each was wired into a
+   * different endpoint, so a generic show had no idea what day it was and fell
+   * back to timeless small talk ("so, coffee..."). This assembles the three into
+   * one block every show can be grounded in.
+   *
+   * Returns "" when nothing real is known — an empty context block is worse than
+   * none, because it invites the model to fill the gap with invention.
+   */
+  async function buildBroadcastContext(opts: {
+    userId?: string;
+    dateStr: string;
+    lang: string;
+    includeWeather: boolean;
+  }): Promise<string> {
+    const { userId, dateStr, lang, includeWeather } = opts;
+    const isRu = lang === "ru";
+    const locale = INTL_LOCALES[lang] || "en-US";
+    const facts: string[] = [];
+
+    try {
+      const dayLabel = new Date(dateStr + "T12:00:00").toLocaleDateString(locale, {
+        weekday: "long", day: "numeric", month: "long", year: "numeric",
+      });
+      facts.push(isRu ? `Дата: ${dayLabel}` : `Date: ${dayLabel}`);
+    } catch {
+      facts.push(isRu ? `Дата: ${dateStr}` : `Date: ${dateStr}`);
+    }
+
+    if (includeWeather) {
+      try {
+        const weather = await fetchWeather();
+        const idx = weather?.daily?.time?.findIndex(d => d === dateStr) ?? -1;
+        if (weather?.daily && idx >= 0) {
+          const tMax = Math.round(weather.daily.temperature_max[idx]);
+          const tMin = Math.round(weather.daily.temperature_min[idx]);
+          const desc = getWeatherDescription(weather.daily.weathercode?.[idx] ?? 0, lang);
+          facts.push(isRu
+            ? `Погода: днём до ${tMax}°C, ночью ${tMin}°C, ${desc}`
+            : `Weather: high ${tMax}°C, low ${tMin}°C, ${desc}`);
+        }
+      } catch (e: any) {
+        console.warn("[broadcast-context] weather unavailable:", e?.message);
+      }
+    }
+
+    try {
+      const custom = userId ? await getUserCustomHolidays(userId) : [];
+      const holidays = getHolidaysForDate(dateStr, custom);
+      if (holidays.length) {
+        const names = holidays.map(h => (isRu ? h.nameRu || h.name : h.name)).filter(Boolean);
+        if (names.length) {
+          facts.push(isRu ? `Праздники сегодня: ${names.join(", ")}` : `Holidays today: ${names.join(", ")}`);
+        }
+      }
+    } catch (e: any) {
+      console.warn("[broadcast-context] holidays unavailable:", e?.message);
+    }
+
+    try {
+      if (userId) {
+        const news = await storage.getUnusedNewsItems(userId, 4);
+        if (news.length) {
+          const lines = news.map(n => {
+            const summary = (n.summary || "").trim().replace(/\s+/g, " ").slice(0, 160);
+            return `- ${n.title}${summary ? ` — ${summary}` : ""}`;
+          });
+          facts.push((isRu ? "Новости дня:\n" : "Today's news:\n") + lines.join("\n"));
+        }
+      }
+    } catch (e: any) {
+      console.warn("[broadcast-context] news unavailable:", e?.message);
+    }
+
+    // Just the date is not grounding — require at least one real-world fact.
+    if (facts.length < 2) return "";
+
+    return `\n\n${getPromptStrings(lang).broadcastContext(facts.join("\n"))}`;
+  }
+
+  type ResearchProfile = "local" | "academic" | "none";
+
+  /**
+   * Few-shot examples steer the generated queries hard, so each profile gets its
+   * own. The previous single set was written for showbiz news, which is why a
+   * psychology show never surfaced research papers.
+   */
+  function searchProfileInstructions(profile: ResearchProfile, year: number): string {
+    if (profile === "academic") {
+      return `На основе промпта передачи сгенерируй 4-6 поисковых запросов для поиска НАУЧНЫХ ИССЛЕДОВАНИЙ и публикаций.
+
+ПРАВИЛА:
+1. Ищи ИССЛЕДОВАНИЯ, НЕ новости и НЕ популярные статьи: "study", "research", "trial", "meta-analysis", "findings"
+2. Запросы преимущественно НА АНГЛИЙСКОМ — основной язык научных публикаций
+3. Добавляй свежесть: "${year}", "recent study", "new research"
+4. Целься в источники: университеты, journals, PubMed, ScienceDaily, Nature, APA
+5. Каждый запрос — конкретный МЕХАНИЗМ или СВЯЗЬ, а не общая тема
+
+Примеры хороших запросов для психологии:
+- "sleep quality cognitive performance study ${year}"
+- "university research procrastination motivation findings"
+- "meta-analysis social media anxiety ${year}"
+- "APA new study habit formation"
+- "ScienceDaily psychology memory research"
+
+Плохие запросы (НЕ делай так): "психология новости", "интересные факты о психологии", "советы психолога"`;
+    }
+
+    return `На основе промпта передачи и станции сгенерируй 4-6 поисковых запросов для веб-поиска актуальных новостей.
+
+ПРАВИЛА:
+1. Запросы должны покрывать ВСЕ направления из промпта (если написано "мировой, турецкий, российский" — нужны запросы по КАЖДОМУ)
+2. Запросы на РАЗНЫХ языках: английский для мировых тем, русский для российских, можно турецкий для турецких
+3. Запросы должны находить СВЕЖИЕ новости (добавляй "${year}", "latest", "news", "today")
+4. Каждый запрос — 3-6 слов, конкретный и поисковый
+5. НЕ дублируй одну и ту же тему на разных языках
+
+Примеры хороших запросов для шоу-бизнеса:
+- "Hollywood celebrity news ${year}"
+- "Turkish TV series stars ${year}"
+- "российские звёзды новости сегодня"
+- "Grammy Oscar awards ${year}"
+- "турецкие сериалы актёры новости"`;
+  }
+
+  async function generateSmartSearchQueries(programPrompt: string, stationPrompt: string, topics: string[], userId?: string, profile: ResearchProfile = "local"): Promise<string[]> {
     const today = new Date();
     const dateStr = today.toISOString().split("T")[0];
 
@@ -5273,21 +5766,7 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
 
 ${contextParts.join("\n\n")}
 
-На основе промпта передачи и станции сгенерируй 4-6 поисковых запросов для веб-поиска актуальных новостей.
-
-ПРАВИЛА:
-1. Запросы должны покрывать ВСЕ направления из промпта (если написано "мировой, турецкий, российский" — нужны запросы по КАЖДОМУ)
-2. Запросы на РАЗНЫХ языках: английский для мировых тем, русский для российских, можно турецкий для турецких
-3. Запросы должны находить СВЕЖИЕ новости (добавляй "2026", "latest", "news", "today")
-4. Каждый запрос — 3-6 слов, конкретный и поисковый
-5. НЕ дублируй одну и ту же тему на разных языках
-
-Примеры хороших запросов для шоу-бизнеса:
-- "Hollywood celebrity news March 2026"
-- "Turkish TV series stars 2026"
-- "российские звёзды новости сегодня"
-- "Grammy Oscar awards 2026"
-- "турецкие сериалы актёры новости"
+${searchProfileInstructions(profile, today.getFullYear())}
 
 Ответь JSON: {"queries": ["запрос1", "запрос2", ...]}`;
 
@@ -5299,7 +5778,7 @@ ${contextParts.join("\n\n")}
       if (anthropicSearch) {
         const response = await anthropicSearch.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 300,
+          max_tokens: aiMaxTokens(300),
           system: "Ты генерируешь поисковые запросы для веб-поиска. Отвечай ТОЛЬКО JSON.",
           messages: [{ role: "user", content: aiPrompt }],
         });
@@ -5329,13 +5808,15 @@ ${contextParts.join("\n\n")}
     }
   }
 
-  async function researchForProgram(topics: string[], programPrompt?: string, stationPrompt?: string, userId?: string): Promise<string> {
+  async function researchForProgram(topics: string[], programPrompt?: string, stationPrompt?: string, userId?: string, profile: ResearchProfile = "local"): Promise<string> {
+    if (profile === "none") return "";
+
     const hasPromptContext = (programPrompt && programPrompt.length > 20) || (topics && topics.length > 0);
     if (!hasPromptContext) return "";
 
     let searchQueries: string[];
     if (programPrompt && programPrompt.length > 20) {
-      searchQueries = await generateSmartSearchQueries(programPrompt, stationPrompt || "", topics || [], userId);
+      searchQueries = await generateSmartSearchQueries(programPrompt, stationPrompt || "", topics || [], userId, profile);
     } else {
       searchQueries = topics.slice(0, 4);
     }
@@ -5394,7 +5875,7 @@ ${existingList}
       if (anthropicTopics) {
         const response = await anthropicTopics.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 500,
+          max_tokens: aiMaxTokens(500),
           system: systemPrompt,
           messages: [{ role: "user", content: prompt }],
         });
@@ -5448,7 +5929,7 @@ ${existingList}
       if (topics.length === 0 && !programType.defaultPrompt) return res.status(400).json({ error: "No topics configured" });
 
       const settingsForResearch = await storage.getSettings(req.session?.userId);
-      const research = await researchForProgram(topics, programType.defaultPrompt || "", settingsForResearch?.defaultPrompt || "", req.session?.userId);
+      const research = await researchForProgram(topics, programType.defaultPrompt || "", settingsForResearch?.defaultPrompt || "", req.session?.userId, (programType.researchProfile as ResearchProfile) || "local");
       res.json({ research, topicsUsed: topics });
     } catch (error) {
       console.error("Firecrawl research error:", error);
@@ -5607,7 +6088,9 @@ ${existingList}
         prompt += `\n\n${ps.sponsor(programType.sponsorName, programType.sponsorText || undefined)}`;
       }
 
-      const durationSec = programType.defaultDurationSeconds || 60;
+      // A duration written into the prompt ("длительность 45 секунд") wins over
+      // the UI setting — it is the more specific instruction the author gave.
+      const durationSec = extractDurationSecondsFromPrompt(rawPrompt) ?? programType.defaultDurationSeconds ?? 60;
       const wordsPerMinute = 150;
       const targetWords = Math.round((durationSec / 60) * wordsPerMinute);
       const minWords = Math.round(targetWords * 0.8);
@@ -5658,15 +6141,37 @@ ${existingList}
         prompt += `\n\n${ps.weatherFormatGuard(weatherMaxLines)}`;
       }
 
-      const seasonRefDate = new Date(dateStr + "T12:00:00");
-      const month = seasonRefDate.getMonth();
-      const season = month <= 1 || month === 11 ? "winter" : month <= 4 ? "spring" : month <= 7 ? "summer" : "autumn";
-      prompt += `\n${ps.seasonPrefix} ${ps.seasons[season]}`;
-      prompt += `\n${ps.seasonNote}`;
+      // Seasonal framing is opt-in per show. Injecting it unconditionally told
+      // every format — including psychology and science — to tie its topics to
+      // the time of year, which is where the "everything is about summer" drift
+      // came from.
+      // Ground the hosts in the actual day. Skipped for exact-script shows (the
+      // script is fixed) and for weather shows (they already receive a full,
+      // more detailed forecast block above — repeating it invites contradictions).
+      const promptIsScriptTemplate = !!programType.promptIsExactScript || hasExactScriptDirective(rawPrompt);
 
-      const userHasLengthConstraint = hasLengthConstraintInPrompt(rawPrompt);
-      const promptIsScriptTemplate = !!programType.promptIsExactScript;
-      if (!userHasLengthConstraint && !promptIsScriptTemplate) {
+      if (!promptIsScriptTemplate && !programType.isWeatherForecast) {
+        prompt += await buildBroadcastContext({
+          userId: req.session.userId,
+          dateStr,
+          lang: userLang,
+          includeWeather: true,
+        });
+      }
+
+      if (programType.useSeasonalContext || programType.isWeatherForecast) {
+        const seasonRefDate = new Date(dateStr + "T12:00:00");
+        const month = seasonRefDate.getMonth();
+        const season = month <= 1 || month === 11 ? "winter" : month <= 4 ? "spring" : month <= 7 ? "summer" : "autumn";
+        prompt += `\n${ps.seasonPrefix} ${ps.seasons[season]}`;
+        prompt += `\n${ps.seasonNote}`;
+      }
+
+      // The word budget is always supplied. A duration expressed in seconds is
+      // not something the model can convert into an amount of text on its own,
+      // so writing "60 секунд" in the prompt must not suppress the budget — it
+      // only changes the number the budget is computed from (see durationSec).
+      if (!promptIsScriptTemplate) {
         prompt += `\n\n${ps.durationStrict(durationSec, durationStr, minWords, maxWords)}`;
       }
       if (promptIsScriptTemplate) {
@@ -5681,7 +6186,7 @@ ${existingList}
       if (hasSearchContext) {
         try {
           const stationSettings = await storage.getSettings(req.session.userId);
-          const research = await researchForProgram(fcKeywords, rawPrompt, stationSettings?.defaultPrompt || "", req.session.userId);
+          const research = await researchForProgram(fcKeywords, rawPrompt, stationSettings?.defaultPrompt || "", req.session.userId, (programType.researchProfile as ResearchProfile) || "local");
           if (research) {
             prompt += research;
           }
@@ -5754,7 +6259,7 @@ ${ps.narrativeStyle}`;
         if (anthropic) {
           const message = await anthropic.messages.create({
             model: CLAUDE_MODEL,
-            max_tokens: 2048,
+            max_tokens: aiMaxTokens(2048),
             system: systemPrompt,
             messages: [{ role: "user", content: prompt }],
           });
@@ -5775,7 +6280,7 @@ ${ps.narrativeStyle}`;
         return res.status(500).json({ error: ps.generationFailed });
       }
 
-      if (!userHasLengthConstraint && !promptIsScriptTemplate) {
+      if (!promptIsScriptTemplate) {
         scriptText = await enforceMaxWords(scriptText, maxWords, systemPrompt, prompt, anthropic, userLang);
       }
 
@@ -6016,7 +6521,7 @@ ${programType.scriptTemplate}
       if (batchHasSearchContext) {
         try {
           const batchStationSettings = await storage.getSettings(req.session.userId);
-          const research = await researchForProgram(fcKeywords, batchRawPrompt, batchStationSettings?.defaultPrompt || "", req.session.userId);
+          const research = await researchForProgram(fcKeywords, batchRawPrompt, batchStationSettings?.defaultPrompt || "", req.session.userId, (programType.researchProfile as ResearchProfile) || "local");
           if (research) {
             prompt += research;
           }
@@ -6044,7 +6549,7 @@ ${programType.scriptTemplate}
       }
 
       const hasReference = hasEpisodeContent || hasUrlContent || hasReferenceContent;
-      const batchDurationSec = programType.defaultDurationSeconds || 60;
+      const batchDurationSec = extractDurationSecondsFromPrompt(batchRawPrompt) ?? programType.defaultDurationSeconds ?? 60;
       const batchWordsPerMinute = 150;
       const batchTargetWords = Math.round((batchDurationSec / 60) * batchWordsPerMinute);
       const batchMinWords = Math.round(batchTargetWords * 0.8);
@@ -6099,7 +6604,7 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
         if (anthropic) {
           const message = await anthropic.messages.create({
             model: CLAUDE_MODEL,
-            max_tokens: 16384,
+            max_tokens: aiMaxTokens(16384),
             system: systemPrompt,
             messages: [{ role: "user", content: prompt }],
           });
@@ -6224,14 +6729,23 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
         systemPrompt += `\n\n${psGen.templateStructure(programType.scriptTemplate)}`;
       }
 
-      const genDurationSec = programType.defaultDurationSeconds || 60;
+      const genDurationSec = extractDurationSecondsFromPrompt(prompt) ?? programType.defaultDurationSeconds ?? 60;
       const genTargetWords = Math.round((genDurationSec / 60) * 150);
       const genMinWords = Math.round(genTargetWords * 0.8);
       const genMaxWords = Math.round(genTargetWords * 1.15);
       const genDurStr = `${Math.floor(genDurationSec / 60)}:${String(genDurationSec % 60).padStart(2, "0")}`;
-      const genPromptIsScriptTemplate = !!programType.promptIsExactScript;
-      const genUserHasLengthConstraint = hasLengthConstraintInPrompt(prompt);
-      if (!genPromptIsScriptTemplate && !genUserHasLengthConstraint) {
+      const genPromptIsScriptTemplate = !!programType.promptIsExactScript || hasExactScriptDirective(prompt);
+
+      if (!genPromptIsScriptTemplate && !programType.isWeatherForecast) {
+        systemPrompt += await buildBroadcastContext({
+          userId: req.session.userId,
+          dateStr: program.scheduledDate || new Date().toISOString().split("T")[0],
+          lang: userLangGen,
+          includeWeather: true,
+        });
+      }
+
+      if (!genPromptIsScriptTemplate) {
         systemPrompt += `\n\n${psGen.durationStrict(genDurationSec, genDurStr, genMinWords, genMaxWords)}`;
       }
       if (genPromptIsScriptTemplate) {
@@ -6248,7 +6762,7 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
         const genHasSearchContext = genFcKeywords.length > 0 || (!!prompt && prompt.length > 50);
         if (genHasSearchContext) {
           try {
-            const research = await researchForProgram(genFcKeywords, prompt || "", stationDefaultPromptGen, req.session.userId);
+            const research = await researchForProgram(genFcKeywords, prompt || "", stationDefaultPromptGen, req.session.userId, (programType.researchProfile as ResearchProfile) || "local");
             if (research) {
               systemPrompt += research;
             }
@@ -6269,7 +6783,7 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
       if (anthropic) {
         const message = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 2048,
+          max_tokens: aiMaxTokens(2048),
           system: systemPrompt,
           messages: [{ role: "user", content: prompt }],
         });
@@ -6288,7 +6802,7 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
         scriptText = response.choices[0]?.message?.content || "";
       }
 
-      if (!genPromptIsScriptTemplate && !genUserHasLengthConstraint) {
+      if (!genPromptIsScriptTemplate) {
         scriptText = await enforceMaxWords(scriptText, genMaxWords, systemPrompt, prompt, anthropic, userLangGen);
       }
 
@@ -7031,7 +7545,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
       const claudeResponse = await anthropic.messages.create({
         model: CLAUDE_MODEL,
-        max_tokens: 500,
+        max_tokens: aiMaxTokens(500),
         messages: [{ role: "user", content: analysisPrompt }],
       });
 
@@ -7160,38 +7674,20 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
           }
 
           if (programType.autoUpload !== false && program.audioUrl) {
-            try {
-              const settings = await storage.getSettings(req.session.userId);
-              if (settings?.yandexDiskToken) {
-                const normalizedUrl = program.audioUrl.startsWith("/") ? program.audioUrl.slice(1) : program.audioUrl;
-                const audioPath = path.join(process.cwd(), "public", normalizedUrl);
-                const fileData = await fs.readFile(audioPath);
-                const yandexFolder = programType.uploadFolder || `/radio/${programType.slug}`;
-
-                await fetch(`https://cloud-api.yandex.net/v1/disk/resources?path=${encodeURIComponent(yandexFolder)}`, {
-                  method: "PUT",
-                  headers: { Authorization: `OAuth ${settings.yandexDiskToken}` },
-                }).catch(() => {});
-
-                const fileName = program.audioUrl.split("/").pop();
-                const uploadUrlRes = await fetch(
-                  `https://cloud-api.yandex.net/v1/disk/resources/upload?path=${encodeURIComponent(`${yandexFolder}/${fileName}`)}&overwrite=true`,
-                  { headers: { Authorization: `OAuth ${settings.yandexDiskToken}` } }
-                );
-
-                if (uploadUrlRes.ok) {
-                  const { href } = await uploadUrlRes.json();
-                  await fetch(href, { method: "PUT", body: fileData });
-                  await storage.updateProgram(program.id, req.session.userId!, {
-                    uploadedToYandex: true,
-                    yandexPath: `${yandexFolder}/${fileName}`,
-                  });
-                  program.uploadedToYandex = true;
-                  logUsage(req.session.userId!, "file_upload", "yandex_disk");
-                }
-              }
-            } catch (uploadErr: any) {
-              console.error(`Auto-pipeline upload error for ${program.id}:`, uploadErr.message);
+            const archived = await archiveAudio({
+              userId: req.session.userId!,
+              audioUrl: program.audioUrl,
+              folder: programType.uploadFolder || `/radio/${programType.slug}`,
+            });
+            if (archived.uploaded) {
+              await storage.updateProgram(program.id, req.session.userId!, {
+                uploadedToYandex: true,
+                yandexPath: archived.remotePath,
+              });
+              program.uploadedToYandex = true;
+              logUsage(req.session.userId!, "file_upload", archived.provider);
+            } else if (archived.error) {
+              console.error(`Auto-pipeline upload error for ${program.id}: ${archived.error}`);
             }
           }
 
@@ -7215,6 +7711,10 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
   const runAutoScheduler = async () => {
     try {
+      if (!internalApiKey()) {
+        console.error("[scheduler] INTERNAL_API_KEY (or VOICE_AGENT_API_KEY) is not set — the scheduler cannot authenticate against its own API. Auto-generation is disabled.");
+        return;
+      }
       const types = await storage.getProgramTypes();
       const autoTypes = types.filter(t => t.isActive && t.autoGenerate);
 
@@ -7259,6 +7759,11 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
 
         if (remaining <= 0) continue;
 
+        if (!pType.userId) {
+          console.error(`[scheduler] Skipping "${pType.name}": program type has no owner (user_id is null).`);
+          continue;
+        }
+
         console.log(`[scheduler] Auto-generating ${remaining} program(s) for "${pType.name}" (${dateStr})`);
 
         try {
@@ -7266,11 +7771,18 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
           if (pType.isWeatherForecast) {
             pipelineBody.forecastDays = Math.min(7, Math.max(1, pType.defaultForecastDays || 1));
           }
-          await fetch(`http://localhost:${process.env.PORT || 5000}/api/programs/${pType.id}/auto-pipeline`, {
+          const res = await fetch(`http://localhost:${process.env.PORT || 5000}/api/programs/${pType.id}/auto-pipeline`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              ...internalAuthHeaders(pType.userId),
+            },
             body: JSON.stringify(pipelineBody),
           });
+          if (!res.ok) {
+            const detail = await res.text().catch(() => "");
+            console.error(`[scheduler] Pipeline failed for "${pType.name}": ${res.status} ${detail.slice(0, 200)}`);
+          }
         } catch (err: any) {
           console.error(`[scheduler] Error for "${pType.name}":`, err.message);
         }
@@ -7285,7 +7797,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
     setInterval(runAutoScheduler, 60 * 60 * 1000);
   }, 30000);
 
-  app.post("/api/remux-audio", async (_req, res) => {
+  app.post("/api/remux-audio", requireAdmin, async (_req, res) => {
     try {
       const audioDir = path.join(process.cwd(), "public", "audio");
       const { readdir } = await import("fs/promises");
@@ -7312,7 +7824,7 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
     }
   });
 
-  app.post("/api/run-scheduler", async (_req, res) => {
+  app.post("/api/run-scheduler", requireAdmin, async (_req, res) => {
     runAutoScheduler();
     res.json({ status: "Scheduler triggered" });
   });
@@ -7643,12 +8155,8 @@ ${title ? `НАЗВАНИЕ: ${title}` : ""}
     }
   });
 
-  app.post("/api/admin/fix-orphan-programs", async (req, res) => {
+  app.post("/api/admin/fix-orphan-programs", requireAdmin, async (req, res) => {
     try {
-      if (!req.session.userId) return res.status(401).json({ error: "Unauthorized" });
-      const user = await storage.getUser(req.session.userId);
-      if (!user || !isAdmin(user.email)) return res.status(403).json({ error: "Forbidden" });
-
       const { pool } = await import("./db");
       const typesResult = await pool.query("SELECT id, user_id FROM program_types WHERE user_id IS NOT NULL");
       const typeOwnerMap = new Map<string, string>();

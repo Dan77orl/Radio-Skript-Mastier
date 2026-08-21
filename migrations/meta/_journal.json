@@ -8,6 +8,41 @@
       "when": 1774549490422,
       "tag": "0000_lean_the_santerians",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787168743977,
+      "tag": "0001_tidy_sally_floyd",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787171042362,
+      "tag": "0002_lying_hex",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787172528179,
+      "tag": "0003_polite_korg",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787173810763,
+      "tag": "0004_rich_oracle",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787173962728,
+      "tag": "0005_rich_chat",
+      "breakpoints": true
     }
   ]
 }

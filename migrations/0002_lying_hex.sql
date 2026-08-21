@@ -1,0 +1,2 @@
+ALTER TABLE "program_types" ADD COLUMN IF NOT EXISTS "use_seasonal_context" boolean DEFAULT false;--> statement-breakpoint
+ALTER TABLE "program_types" ADD COLUMN IF NOT EXISTS "research_profile" text DEFAULT 'local';
