@@ -394,7 +394,8 @@
     "telegramNotLinked": "No Telegram account linked. Link one to sign in without a password.",
     "telegramOnlyWayIn": "Cannot unlink: Telegram is your only way in. Set a password first.",
     "telegramTwoFactor": "Require Telegram at sign-in",
-    "telegramTwoFactorDesc": "A password alone will not be enough — the sign-in must be confirmed in Telegram."
+    "telegramTwoFactorDesc": "A password alone will not be enough — the sign-in must be confirmed in Telegram.",
+    "openDriveFolder": "Open the Drive folder"
   },
   "voices": {
     "title": "Voices",

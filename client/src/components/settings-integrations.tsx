@@ -14,7 +14,7 @@ import { TelegramLoginButton } from "@/components/telegram-login";
 
 interface StorageStatus {
   provider: string;
-  googleDrive: { available: boolean; connected: boolean; email: string | null; folderId: string | null };
+  googleDrive: { available: boolean; connected: boolean; email: string | null; folderId: string | null; folderLink: string | null };
   yandex: { connected: boolean };
 }
 
@@ -107,6 +107,17 @@ export function StorageSettings() {
                     ? status.googleDrive.email || t("settings.googleConnected")
                     : t("settings.googleNotConnected")}
               </p>
+              {status.googleDrive.connected && status.googleDrive.folderLink && (
+                <a
+                  href={status.googleDrive.folderLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary underline underline-offset-2"
+                  data-testid="link-google-drive-folder"
+                >
+                  {t("settings.openDriveFolder")}
+                </a>
+              )}
             </div>
             {status.googleDrive.available && (
               status.googleDrive.connected ? (

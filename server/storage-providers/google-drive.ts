@@ -121,6 +121,16 @@ async function findOrCreateFolder(accessToken: string, name: string, parentId?: 
   return ((await create.json()) as any).id;
 }
 
+/**
+ * Find or create the app's root folder on the user's Drive. Everything the
+ * app uploads lives under it, so the user has a single place to open —
+ * without it uploads scatter folders across the Drive root.
+ */
+export async function ensureRootFolder(refreshToken: string, name = "RadioFlow"): Promise<string> {
+  const accessToken = await getAccessToken(refreshToken);
+  return findOrCreateFolder(accessToken, name);
+}
+
 /** Resolve a "/radio/news" style path into a Drive folder id, creating segments as needed. */
 export async function resolveFolderPath(accessToken: string, folderPath: string, rootId?: string): Promise<string | undefined> {
   const segments = folderPath.split("/").map(s => s.trim()).filter(Boolean);

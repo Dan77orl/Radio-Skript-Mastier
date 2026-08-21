@@ -15,7 +15,7 @@ import { parseImportedScripts } from "./script-import";
 import { createRateLimiter } from "./rate-limit";
 import { getJob, listJobs, enqueueJob, registerJobHandler } from "./jobs/queue";
 import { archiveAudio } from "./storage-providers";
-import { buildAuthUrl, exchangeCodeForTokens, isGoogleDriveConfigured } from "./storage-providers/google-drive";
+import { buildAuthUrl, exchangeCodeForTokens, isGoogleDriveConfigured, ensureRootFolder as googleDriveEnsureRootFolder } from "./storage-providers/google-drive";
 import { z } from "zod";
 import { promises as fs } from "fs";
 import path from "path";
@@ -2221,13 +2221,29 @@ export async function registerRoutes(
   app.get("/api/storage/status", async (req, res) => {
     try {
       const settings = await storage.getSettings(req.session.userId);
+
+      // Make sure a connected account has the app's root folder ("RadioFlow")
+      // and remember its id: uploads then land under one folder, and the UI
+      // can link straight to it. Lazy so accounts connected before this
+      // existed get one too. Failure is non-fatal — the link just stays off.
+      let folderId = settings?.googleDriveFolderId || null;
+      if (!folderId && settings?.googleDriveRefreshToken && isGoogleDriveConfigured()) {
+        try {
+          folderId = await googleDriveEnsureRootFolder(settings.googleDriveRefreshToken);
+          await storage.saveSettings({ googleDriveFolderId: folderId } as any, req.session.userId);
+        } catch (err: any) {
+          console.error("Could not ensure Drive root folder:", err?.message);
+        }
+      }
+
       res.json({
         provider: settings?.storageProvider || "yandex",
         googleDrive: {
           available: isGoogleDriveConfigured(),
           connected: !!settings?.googleDriveRefreshToken,
           email: settings?.googleDriveEmail || null,
-          folderId: settings?.googleDriveFolderId || null,
+          folderId,
+          folderLink: folderId ? `https://drive.google.com/drive/folders/${folderId}` : null,
         },
         yandex: { connected: !!settings?.yandexDiskToken },
       });
@@ -2281,9 +2297,21 @@ export async function registerRoutes(
       delete req.session.googleOAuthState;
 
       const tokens = await exchangeCodeForTokens(code);
+
+      // Create the app's root folder right away so the first upload and the
+      // settings link work without an extra round-trip. Non-fatal: the status
+      // endpoint retries this lazily if it fails here.
+      let rootFolderId: string | null = null;
+      try {
+        rootFolderId = await googleDriveEnsureRootFolder(tokens.refreshToken);
+      } catch (err: any) {
+        console.error("Could not create Drive root folder on connect:", err?.message);
+      }
+
       await storage.saveSettings({
         googleDriveRefreshToken: tokens.refreshToken,
         googleDriveEmail: tokens.email,
+        googleDriveFolderId: rootFolderId,
         storageProvider: "google_drive",
       } as any, req.session.userId);
 

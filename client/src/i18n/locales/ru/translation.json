@@ -412,7 +412,8 @@
     "telegramNotLinked": "Telegram не привязан. Привяжите, чтобы входить без пароля.",
     "telegramOnlyWayIn": "Отвязать нельзя: Telegram — единственный способ войти. Сначала задайте пароль.",
     "telegramTwoFactor": "Требовать Telegram при входе",
-    "telegramTwoFactorDesc": "Одного пароля будет недостаточно — вход нужно подтвердить в Telegram."
+    "telegramTwoFactorDesc": "Одного пароля будет недостаточно — вход нужно подтвердить в Telegram.",
+    "openDriveFolder": "Открыть папку на Диске"
   },
   "voices": {
     "title": "Голоса",
