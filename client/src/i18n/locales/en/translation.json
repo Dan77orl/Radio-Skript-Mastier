@@ -889,7 +889,24 @@
     "researchProfileDesc": "What to search for online before writing the script.",
     "researchProfileLocal": "News and events — local news, listings, lifestyle",
     "researchProfileAcademic": "Science and publications — studies, journals, universities",
-    "researchProfileNone": "No search — prompt and station knowledge base only"
+    "researchProfileNone": "No search — prompt and station knowledge base only",
+    "import": "Import",
+    "importTitle": "Import ready scripts — {{name}}",
+    "importDesc": "Paste approved texts or upload a file. No AI generation — the texts become episodes verbatim, the show prompt is not used.",
+    "importFileLabel": "File (.docx or .txt)",
+    "importTextLabel": "…or paste text",
+    "importTextPlaceholder": "Episode 1\n\"Title\"\nHost: text…",
+    "importParse": "Parse",
+    "importParseFailed": "Could not parse the text",
+    "importFound": "Episodes found: {{count}}",
+    "importSelectAll": "Select all",
+    "importDeselectAll": "Deselect all",
+    "importWords": "{{count}} words",
+    "importBack": "Back",
+    "importCreateBtn": "Create {{count}} episodes",
+    "importDone": "Import finished",
+    "importCreated": "{{count}} episodes created. Scripts are ready for voicing.",
+    "importFailed": "Could not create episodes"
   },
   "automations": {
     "title": "Automations",
@@ -1288,7 +1305,8 @@
       "statusPending": "Script hasn't been generated yet",
       "statusScriptReady": "Script is ready but audio not yet synthesized",
       "statusReady": "Program is fully complete with script and audio",
-      "statusError": "An error occurred during generation"
+      "statusError": "An error occurred during generation",
+      "importScripts": "Upload ready-made, pre-written scripts (e.g. client-approved) — no generation"
     },
     "ads": {
       "generateVariants": "Generate several AI-written script variants to choose from",

@@ -11,6 +11,7 @@ import { getHolidaysForDate, getHolidaysForYear, getHolidaysForMonth, getHoliday
 import { getPromptStrings, getGenderLabel, getDefaultHostName, getLanguageDirective, getLanguageName } from "./prompt-locale";
 import { handleSupportChat } from "./support-chat";
 import { synthesizeSpeech, describeTtsError } from "./tts";
+import { parseImportedScripts } from "./script-import";
 import { createRateLimiter } from "./rate-limit";
 import { getJob, listJobs, enqueueJob, registerJobHandler } from "./jobs/queue";
 import { archiveAudio } from "./storage-providers";
@@ -5430,6 +5431,95 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
     } catch (error) {
       console.error("Error creating program:", error);
       res.status(500).json({ error: "Failed to create program" });
+    }
+  });
+
+  // Ready-made scripts approved by the client: parse a document into
+  // episodes without touching the AI prompt at all. Step 1 of 2 — returns
+  // the parsed episodes for review; nothing is created yet.
+  app.post("/api/program-types/:typeId/parse-scripts", upload.single("file"), async (req, res) => {
+    let uploadedPath: string | null = req.file?.path || null;
+    try {
+      const programType = await storage.getProgramType(req.params.typeId, req.session.userId!);
+      if (!programType) {
+        return res.status(404).json({ error: "Program type not found" });
+      }
+
+      let raw = "";
+      if (uploadedPath) {
+        const ext = path.extname(uploadedPath).toLowerCase();
+        if (ext === ".docx") {
+          const result = await mammoth.extractRawText({ path: uploadedPath });
+          raw = result.value;
+        } else if (ext === ".txt") {
+          raw = await fs.readFile(uploadedPath, "utf-8");
+        } else {
+          return res.status(400).json({ error: "Поддерживаются файлы .docx и .txt" });
+        }
+      } else if (typeof req.body?.text === "string" && req.body.text.trim()) {
+        raw = req.body.text;
+      } else {
+        return res.status(400).json({ error: "Прикрепите файл или вставьте текст" });
+      }
+
+      const episodes = parseImportedScripts(raw);
+      if (episodes.length === 0) {
+        return res.status(400).json({ error: "Не удалось найти ни одного выпуска в тексте" });
+      }
+      res.json({ episodes });
+    } catch (error) {
+      console.error("Error parsing imported scripts:", error);
+      res.status(500).json({ error: "Failed to parse scripts" });
+    } finally {
+      // The document is transient input, not content to serve.
+      if (uploadedPath) await fs.unlink(uploadedPath).catch(() => {});
+    }
+  });
+
+  // Step 2 of 2 — create programs from the (possibly trimmed) episode list.
+  // Skips generation entirely: the text goes in verbatim as a ready script.
+  app.post("/api/program-types/:typeId/import-scripts", async (req, res) => {
+    try {
+      const programType = await storage.getProgramType(req.params.typeId, req.session.userId!);
+      if (!programType) {
+        return res.status(404).json({ error: "Program type not found" });
+      }
+
+      const bodySchema = z.object({
+        episodes: z.array(z.object({
+          title: z.string().min(1).max(300),
+          scriptText: z.string().min(1).max(50000),
+        })).min(1).max(100),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid episodes payload" });
+      }
+
+      const dateStr = new Date().toISOString().split("T")[0];
+      const created = [];
+      for (let i = 0; i < parsed.data.episodes.length; i++) {
+        const ep = parsed.data.episodes[i];
+        const title = ep.title.startsWith(programType.name)
+          ? ep.title
+          : `${programType.name}: ${ep.title}`;
+        const program = await storage.createProgram({
+          userId: req.session.userId,
+          programTypeId: programType.id,
+          title,
+          prompt: null,
+          scheduledDate: dateStr,
+          slotNumber: i + 1,
+          status: "script_ready",
+          scriptText: ep.scriptText,
+          scriptGeneratedAt: new Date(),
+        });
+        created.push(program);
+      }
+      res.json({ created: created.length, programs: created });
+    } catch (error) {
+      console.error("Error importing scripts:", error);
+      res.status(500).json({ error: "Failed to import scripts" });
     }
   });
 

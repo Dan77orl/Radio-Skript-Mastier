@@ -88,6 +88,7 @@ import {
   AudioLines,
   Pencil,
   ScrollText,
+  FileUp,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
@@ -319,6 +320,14 @@ export default function ShowsPage() {
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchResult, setBatchResult] = useState<{ created: number; total: number; errors: string[] } | null>(null);
   const [batchProgress, setBatchProgress] = useState(0);
+  // Import of ready-made (client-approved) scripts — no AI generation.
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importText, setImportText] = useState("");
+  const [importParsing, setImportParsing] = useState(false);
+  const [importEpisodes, setImportEpisodes] = useState<{ number: number; title: string; scriptText: string; words: number }[] | null>(null);
+  const [importSelected, setImportSelected] = useState<Set<number>>(new Set());
+  const [importCreating, setImportCreating] = useState(false);
   const [viewScriptProgram, setViewScriptProgram] = useState<Program | null>(null);
   const [editingBlocks, setEditingBlocks] = useState<{ text: string; speaker: string }[] | null>(null);
   const [editingText, setEditingText] = useState<string | null>(null);
@@ -977,6 +986,71 @@ export default function ShowsPage() {
     setBatchGenerating(false);
   };
 
+  const resetImportDialog = () => {
+    setImportFile(null);
+    setImportText("");
+    setImportEpisodes(null);
+    setImportSelected(new Set());
+    setImportParsing(false);
+    setImportCreating(false);
+  };
+
+  const parseImport = async () => {
+    if (!activeTab) return;
+    setImportParsing(true);
+    try {
+      let res: Response;
+      if (importFile) {
+        const fd = new FormData();
+        fd.append("file", importFile);
+        res = await fetch(`/api/program-types/${activeTab}/parse-scripts`, {
+          method: "POST",
+          body: fd,
+          credentials: "include",
+        });
+      } else {
+        res = await fetch(`/api/program-types/${activeTab}/parse-scripts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: importText }),
+          credentials: "include",
+        });
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `${res.status}`);
+      }
+      const data = await res.json();
+      setImportEpisodes(data.episodes);
+      setImportSelected(new Set(data.episodes.map((_: unknown, i: number) => i)));
+    } catch (e: any) {
+      toast({ title: t("shows.importParseFailed"), description: e.message, variant: "destructive" });
+    } finally {
+      setImportParsing(false);
+    }
+  };
+
+  const createImported = async () => {
+    if (!activeTab || !importEpisodes) return;
+    const episodes = importEpisodes
+      .filter((_, i) => importSelected.has(i))
+      .map(e => ({ title: e.title, scriptText: e.scriptText }));
+    if (episodes.length === 0) return;
+    setImportCreating(true);
+    try {
+      const res = await apiRequest("POST", `/api/program-types/${activeTab}/import-scripts`, { episodes });
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
+      toast({ title: t("shows.importDone"), description: t("shows.importCreated", { count: data.created }) });
+      setIsImportDialogOpen(false);
+      resetImportDialog();
+    } catch (e: any) {
+      toast({ title: t("shows.importFailed"), description: e.message, variant: "destructive" });
+    } finally {
+      setImportCreating(false);
+    }
+  };
+
   if (isLoadingTypes) {
     return (
       <div className="p-6 space-y-4">
@@ -1279,6 +1353,20 @@ export default function ShowsPage() {
                           >
                             <PackagePlus className="mr-1.5 h-4 w-4" />
                             {t("shows.batch")}
+                          </Button>
+                        </HintTooltip>
+                        <HintTooltip hint={t("hints.shows.importScripts")}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              resetImportDialog();
+                              setIsImportDialogOpen(true);
+                            }}
+                            data-testid="button-import-scripts"
+                          >
+                            <FileUp className="mr-1.5 h-4 w-4" />
+                            {t("shows.import")}
                           </Button>
                         </HintTooltip>
                         {selectedPrograms.size > 0 && (
@@ -2577,6 +2665,121 @@ export default function ShowsPage() {
                       {t("shows.batchCreateBtn", { count: batchCount })}
                     </>
                   )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isImportDialogOpen} onOpenChange={(open) => {
+        if (!importParsing && !importCreating) {
+          setIsImportDialogOpen(open);
+          if (!open) resetImportDialog();
+        }
+      }}>
+        <DialogContent className="!w-[min(42rem,calc(100vw-2rem))] !max-w-none max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileUp className="h-5 w-5" />
+              {t("shows.importTitle", { name: currentType?.name })}
+            </DialogTitle>
+            <DialogDescription>
+              {t("shows.importDesc")}
+            </DialogDescription>
+          </DialogHeader>
+
+          {importEpisodes ? (
+            <div className="space-y-4 py-2">
+              <div className="flex items-center justify-between">
+                <p className="font-medium">{t("shows.importFound", { count: importEpisodes.length })}</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setImportSelected(prev =>
+                      prev.size === importEpisodes.length
+                        ? new Set()
+                        : new Set(importEpisodes.map((_, i) => i))
+                    );
+                  }}
+                >
+                  {importSelected.size === importEpisodes.length ? t("shows.importDeselectAll") : t("shows.importSelectAll")}
+                </Button>
+              </div>
+              <div className="max-h-[45vh] overflow-y-auto space-y-1 border rounded-md p-2">
+                {importEpisodes.map((ep, i) => (
+                  <label key={i} className="flex items-start gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer">
+                    <Checkbox
+                      checked={importSelected.has(i)}
+                      onCheckedChange={(checked) => {
+                        setImportSelected(prev => {
+                          const next = new Set(prev);
+                          if (checked) next.add(i); else next.delete(i);
+                          return next;
+                        });
+                      }}
+                      className="mt-0.5"
+                    />
+                    <span className="text-sm leading-snug">
+                      <span className="text-muted-foreground mr-1.5">#{ep.number}</span>
+                      {ep.title}
+                      <span className="text-xs text-muted-foreground ml-1.5">{t("shows.importWords", { count: ep.words })}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setImportEpisodes(null); setImportSelected(new Set()); }} disabled={importCreating}>
+                  {t("shows.importBack")}
+                </Button>
+                <Button onClick={createImported} disabled={importCreating || importSelected.size === 0} data-testid="button-import-create">
+                  {importCreating ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="mr-2 h-4 w-4" />
+                  )}
+                  {t("shows.importCreateBtn", { count: importSelected.size })}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label>{t("shows.importFileLabel")}</Label>
+                <Input
+                  type="file"
+                  accept=".docx,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                  onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                  disabled={importParsing}
+                  data-testid="input-import-file"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("shows.importTextLabel")}</Label>
+                <Textarea
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder={t("shows.importTextPlaceholder")}
+                  rows={8}
+                  disabled={importParsing || !!importFile}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsImportDialogOpen(false)} disabled={importParsing}>
+                  {t("shows.cancel")}
+                </Button>
+                <Button
+                  onClick={parseImport}
+                  disabled={importParsing || (!importFile && !importText.trim())}
+                  data-testid="button-import-parse"
+                >
+                  {importParsing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="mr-2 h-4 w-4" />
+                  )}
+                  {t("shows.importParse")}
                 </Button>
               </DialogFooter>
             </div>
