@@ -93,7 +93,11 @@ app.use((req, res, next) => {
   // public/ holds per-tenant generated audio and user uploads — never serve it
   // anonymously. Filenames are predictable, so unauthenticated access would let
   // anyone enumerate other tenants' content.
-  app.use(requireAuth, express.static(path.join(process.cwd(), "public")));
+  // Mounted per-directory on purpose. A bare app.use(requireAuth, ...) applies
+  // the guard to EVERY request, including "/", so the SPA itself answers 401.
+  const publicDir = path.join(process.cwd(), "public");
+  app.use("/audio", requireAuth, express.static(path.join(publicDir, "audio")));
+  app.use("/uploads", requireAuth, express.static(path.join(publicDir, "uploads")));
 
   app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || (err.name === "MulterError" ? 400 : 500);
