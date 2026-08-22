@@ -908,7 +908,12 @@
     "importDone": "Import finished",
     "importCreated": "{{count}} episodes created. Scripts are ready for voicing.",
     "importFailed": "Could not create episodes",
-    "downloadedBadge": "Downloaded"
+    "downloadedBadge": "Downloaded",
+    "batchPeriodLabel": "Release period (optional)",
+    "batchPeriodHint": "Pick \"from\" and \"to\" dates — one episode per date, with topics matching its season. Or leave empty and set a count below.",
+    "batchPeriodCount": "{{count}} episodes will be created — one per date, each with its own air date",
+    "batchEveryDay": "every day",
+    "batchEveryOtherDay": "every other day"
   },
   "automations": {
     "title": "Automations",

@@ -319,6 +319,12 @@ export default function ShowsPage() {
   const [batchText, setBatchText] = useState("");
   const [batchMode, setBatchMode] = useState<"url" | "text">("text");
   const [batchCount, setBatchCount] = useState(10);
+  // Optional release period: one episode per day (or every other day) across
+  // the range, each generated with its own air date — a whole September grid
+  // can be produced in August.
+  const [batchStartDate, setBatchStartDate] = useState("");
+  const [batchEndDate, setBatchEndDate] = useState("");
+  const [batchEveryDays, setBatchEveryDays] = useState(1);
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchResult, setBatchResult] = useState<{ created: number; total: number; errors: string[] } | null>(null);
   const [batchProgress, setBatchProgress] = useState(0);
@@ -940,28 +946,46 @@ export default function ShowsPage() {
     });
   };
 
+  // Dates for the period mode: one slot per step-day across the range.
+  const batchPeriodDates = (): string[] => {
+    if (!batchStartDate || !batchEndDate || batchEndDate < batchStartDate) return [];
+    const dates: string[] = [];
+    const end = new Date(batchEndDate + "T12:00:00Z").getTime();
+    let cur = new Date(batchStartDate + "T12:00:00Z").getTime();
+    while (cur <= end && dates.length < 62) {
+      dates.push(new Date(cur).toISOString().split("T")[0]);
+      cur += batchEveryDays * 86400000;
+    }
+    return dates;
+  };
+
   const startBatchGeneration = async () => {
     if (!activeTab) return;
     setBatchGenerating(true);
     setBatchResult(null);
     setBatchProgress(0);
     try {
-      const results: { created: number; total: number; errors: string[] } = { created: 0, total: batchCount, errors: [] };
+      const periodDates = batchPeriodDates();
+      const slots: (string | null)[] = periodDates.length > 0
+        ? periodDates
+        : Array.from({ length: batchCount }, () => null);
+      const results: { created: number; total: number; errors: string[] } = { created: 0, total: slots.length, errors: [] };
 
       const activeType = programTypes?.find(p => p.id === activeTab);
-      const batchBody: Record<string, any> = {};
-      if (activeType?.isWeatherForecast) {
-        batchBody.forecastDays = Math.min(7, Math.max(1, activeType.defaultForecastDays || 1));
-      }
 
-      for (let i = 0; i < batchCount; i++) {
+      for (let i = 0; i < slots.length; i++) {
         setBatchProgress(i + 1);
+        const batchBody: Record<string, any> = {};
+        if (activeType?.isWeatherForecast) {
+          batchBody.forecastDays = Math.min(7, Math.max(1, activeType.defaultForecastDays || 1));
+        }
+        if (slots[i]) batchBody.scheduledDate = slots[i];
         try {
           const response = await apiRequest("POST", `/api/programs/auto-create/${activeTab}`, batchBody);
           await response.json();
           results.created++;
         } catch (err: any) {
-          results.errors.push(`#${i + 1}: ${err.message || t("shows.error")}`);
+          results.errors.push(`${slots[i] || `#${i + 1}`}: ${err.message || t("shows.error")}`);
         }
       }
 
@@ -984,6 +1008,9 @@ export default function ShowsPage() {
     setBatchText("");
     setBatchMode("text");
     setBatchCount(10);
+    setBatchStartDate("");
+    setBatchEndDate("");
+    setBatchEveryDays(1);
     setBatchResult(null);
     setBatchGenerating(false);
   };
@@ -2641,28 +2668,67 @@ export default function ShowsPage() {
           ) : (
             <div className="space-y-5 py-4">
               <div className="space-y-2">
-                <Label>{t("shows.batchHowMany")}</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={30}
-                  value={batchCount}
-                  onChange={(e) => setBatchCount(Math.min(30, Math.max(1, Number(e.target.value) || 1)))}
-                  disabled={batchGenerating}
-                  data-testid="input-batch-count"
-                />
+                <Label>{t("shows.batchPeriodLabel")}</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={batchStartDate}
+                    min={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => setBatchStartDate(e.target.value)}
+                    disabled={batchGenerating}
+                    data-testid="input-batch-start-date"
+                  />
+                  <span className="text-muted-foreground">—</span>
+                  <Input
+                    type="date"
+                    value={batchEndDate}
+                    min={batchStartDate || new Date().toISOString().split("T")[0]}
+                    onChange={(e) => setBatchEndDate(e.target.value)}
+                    disabled={batchGenerating}
+                    data-testid="input-batch-end-date"
+                  />
+                  <Select value={String(batchEveryDays)} onValueChange={(v) => setBatchEveryDays(Number(v))} disabled={batchGenerating}>
+                    <SelectTrigger className="w-40 shrink-0" data-testid="select-batch-every">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">{t("shows.batchEveryDay")}</SelectItem>
+                      <SelectItem value="2">{t("shows.batchEveryOtherDay")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  {t("shows.batchPromptHint")}{currentType?.useFirecrawl ? t("shows.batchFirecrawlHint") : ""}
+                  {batchPeriodDates().length > 0
+                    ? t("shows.batchPeriodCount", { count: batchPeriodDates().length })
+                    : t("shows.batchPeriodHint")}
                 </p>
               </div>
+
+              {batchPeriodDates().length === 0 && (
+                <div className="space-y-2">
+                  <Label>{t("shows.batchHowMany")}</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={batchCount}
+                    onChange={(e) => setBatchCount(Math.min(30, Math.max(1, Number(e.target.value) || 1)))}
+                    disabled={batchGenerating}
+                    data-testid="input-batch-count"
+                  />
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {t("shows.batchPromptHint")}{currentType?.useFirecrawl ? t("shows.batchFirecrawlHint") : ""}
+              </p>
 
               {batchGenerating && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm">{t("shows.batchCreating", { progress: batchProgress, count: batchCount })}</span>
+                    <span className="text-sm">{t("shows.batchCreating", { progress: batchProgress, count: batchPeriodDates().length || batchCount })}</span>
                   </div>
-                  <Progress value={(batchProgress / batchCount) * 100} className="h-2" />
+                  <Progress value={(batchProgress / (batchPeriodDates().length || batchCount)) * 100} className="h-2" />
                 </div>
               )}
 
@@ -2678,12 +2744,12 @@ export default function ShowsPage() {
                   {batchGenerating ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {batchProgress} / {batchCount}
+                      {batchProgress} / {batchPeriodDates().length || batchCount}
                     </>
                   ) : (
                     <>
                       <PackagePlus className="mr-2 h-4 w-4" />
-                      {t("shows.batchCreateBtn", { count: batchCount })}
+                      {t("shows.batchCreateBtn", { count: batchPeriodDates().length || batchCount })}
                     </>
                   )}
                 </Button>

@@ -81,6 +81,18 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // The build script does NOT push the drizzle schema (its syncSchema() is
+  // never invoked), so a new column in shared/schema.ts silently breaks every
+  // SELECT on that table in production — drizzle lists columns explicitly.
+  // Guarantee additive columns idempotently here until a real migration step
+  // exists in the deploy pipeline.
+  try {
+    const { pool } = await import("./db");
+    await pool.query(`ALTER TABLE programs ADD COLUMN IF NOT EXISTS downloaded_at timestamp`);
+  } catch (err: any) {
+    console.error("Schema guard failed (queries on programs may fail):", err?.message);
+  }
+
   registerJobHandlers();
   registerVoiceAgentRoutes(app);
   await registerRoutes(httpServer, app);
