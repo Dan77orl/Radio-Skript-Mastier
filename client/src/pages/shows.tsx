@@ -337,6 +337,12 @@ export default function ShowsPage() {
   const [importSelected, setImportSelected] = useState<Set<number>>(new Set());
   const [importCreating, setImportCreating] = useState(false);
   const [viewScriptProgram, setViewScriptProgram] = useState<Program | null>(null);
+  // Re-voice a single word or phrase (e.g. with a corrected stress mark) as a
+  // standalone clip the user splices into the finished render by hand.
+  const [snippetText, setSnippetText] = useState("");
+  const [snippetVoiceId, setSnippetVoiceId] = useState<string | null>(null);
+  const [snippetUrl, setSnippetUrl] = useState<string | null>(null);
+  const [isSnippetLoading, setIsSnippetLoading] = useState(false);
   const [editingBlocks, setEditingBlocks] = useState<{ text: string; speaker: string }[] | null>(null);
   const [editingText, setEditingText] = useState<string | null>(null);
   const [savingScript, setSavingScript] = useState(false);
@@ -899,6 +905,24 @@ export default function ShowsPage() {
     const assigned = voices?.filter(v => v.isActive && v.assignedProgramTypeIds?.includes(typeId)) || [];
     if (assigned.length > 0) return assigned;
     return voices?.filter(v => v.isActive) || [];
+  };
+
+  const snippetStreamUrl = (url: string) => `/api/stream-audio/${encodeURIComponent(url.replace(/^\/?audio\//, ""))}`;
+
+  const synthesizeSnippet = async (voiceId: string | null) => {
+    const text = snippetText.trim();
+    if (!text || !voiceId) return;
+    setIsSnippetLoading(true);
+    setSnippetUrl(null);
+    try {
+      const res = await apiRequest("POST", "/api/synthesize-snippet", { text, voiceId });
+      const data = await res.json();
+      setSnippetUrl(data.audioUrl);
+    } catch (error) {
+      toast({ title: t("shows.error", "Error"), description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+    } finally {
+      setIsSnippetLoading(false);
+    }
   };
 
   const openSettingsDialog = (type: ProgramType) => {
@@ -3002,6 +3026,53 @@ export default function ShowsPage() {
                   </Button>
                 )}
               </div>
+
+              {viewScriptProgram && (
+                <div className="mt-4 border rounded-lg p-4 space-y-3">
+                  <p className="text-sm font-medium">{t("shows.snippetTitle")}</p>
+                  <p className="text-xs text-muted-foreground">{t("shows.snippetDesc")}</p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Input
+                      value={snippetText}
+                      onChange={(e) => setSnippetText(e.target.value)}
+                      placeholder={t("shows.snippetPlaceholder")}
+                      className="flex-1"
+                      data-testid="input-show-snippet-text"
+                    />
+                    <Select
+                      value={snippetVoiceId || getAssignedVoicesForType(viewScriptProgram.programTypeId)[0]?.elevenLabsVoiceId || ""}
+                      onValueChange={setSnippetVoiceId}
+                    >
+                      <SelectTrigger className="sm:w-52" data-testid="select-show-snippet-voice">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {voices?.filter(v => v.isActive).map(v => (
+                          <SelectItem key={v.id} value={v.elevenLabsVoiceId}>{getCleanVoiceName(v)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      onClick={() => synthesizeSnippet(snippetVoiceId || getAssignedVoicesForType(viewScriptProgram.programTypeId)[0]?.elevenLabsVoiceId || null)}
+                      disabled={isSnippetLoading || !snippetText.trim()}
+                      data-testid="button-show-synthesize-snippet"
+                    >
+                      {isSnippetLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Volume2 className="mr-2 h-4 w-4" />}
+                      {t("shows.snippetButton")}
+                    </Button>
+                  </div>
+                  {snippetUrl && (
+                    <div className="flex items-center gap-2 rounded-lg bg-muted p-2.5">
+                      <audio controls src={snippetStreamUrl(snippetUrl)} className="h-9 flex-1 min-w-0" data-testid="audio-show-snippet" />
+                      <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" asChild>
+                        <a href={snippetStreamUrl(snippetUrl)} download="snippet.mp3" data-testid="button-download-show-snippet">
+                          <Download className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

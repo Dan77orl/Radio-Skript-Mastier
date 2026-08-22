@@ -104,7 +104,8 @@ interface PromptStrings {
 function getRuStrings(): PromptStrings {
   return {
     langDirective: `ЯЗЫК: Весь контент ОБЯЗАТЕЛЬНО на русском языке.
-ИНОЯЗЫЧНЫЕ НАЗВАНИЯ — ВАЖНО ДЛЯ ОЗВУЧКИ: слова из других языков (названия блюд, заведений, песен, специфические термины) пиши в их ОРИГИНАЛЬНОЙ графике — künefe, kokoreç, meze, dondurma — а НЕ кириллицей («кюнефе», «кокореч»). Синтез речи ставит правильное ударение (в турецком — на последний слог) только когда видит родное написание; кириллическая транслитерация ломает произношение. Исключение: слова с давно устоявшимся русским написанием (Стамбул, Анталия, кебаб, айран) пиши по-русски.`,
+ИНОЯЗЫЧНЫЕ НАЗВАНИЯ — ВАЖНО ДЛЯ ОЗВУЧКИ: слова из других языков (названия блюд, заведений, песен, специфические термины) пиши в их ОРИГИНАЛЬНОЙ графике — künefe, kokoreç, meze, dondurma — а НЕ кириллицей («кюнефе», «кокореч»). Синтез речи ставит правильное ударение (в турецком — на последний слог) только когда видит родное написание; кириллическая транслитерация ломает произношение. Исключение: слова с давно устоявшимся русским написанием (Стамбул, Анталия, кебаб, айран) пиши по-русски.
+УДАРЕНИЯ — ВАЖНО ДЛЯ ОЗВУЧКИ: в словах, где синтез может ошибиться с ударением (омографы вроде «замо́к/за́мок», глаголы типа «звони́т», имена собственные, топонимы, редкие слова), ставь знак ударения — символ ́ (U+0301) сразу после ударной гласной: звони́т, Илу́зион, Дине́к. Обычные слова с очевидным ударением НЕ размечай.`,
     scriptWriter: "Ты - сценарист для радио",
     aboutStation: (desc) => `О станции: ${desc}`,
     dialogTask: (male, female) => `Твоя задача - написать короткий диалог между ведущими: ${male} (мужчина) и ${female} (женщина).`,
@@ -237,7 +238,8 @@ ${getRuStrings().emotionTags}
 function getEnStrings(): PromptStrings {
   return {
     langDirective: `LANGUAGE: ALL content MUST be written in English.
-FOREIGN NAMES — MATTERS FOR VOICE-OVER: words from other languages (dish names, venues, songs, specific terms) must keep their ORIGINAL spelling — künefe, kokoreç, meze — never a phonetic transliteration. The speech synthesizer only places the stress correctly (Turkish stresses the last syllable) when it sees the native spelling. Exception: words with a long-established English form (Istanbul, kebab) stay in English.`,
+FOREIGN NAMES — MATTERS FOR VOICE-OVER: words from other languages (dish names, venues, songs, specific terms) must keep their ORIGINAL spelling — künefe, kokoreç, meze — never a phonetic transliteration. The speech synthesizer only places the stress correctly (Turkish stresses the last syllable) when it sees the native spelling. Exception: words with a long-established English form (Istanbul, kebab) stay in English.
+STRESS MARKS — MATTERS FOR VOICE-OVER: when writing Russian-language content, mark the stressed vowel with the combining acute accent ́ (U+0301) in words where TTS may misplace the stress — homographs (замо́к/за́мок), verbs like звони́т, proper names, rare words. Leave ordinary words unmarked.`,
     scriptWriter: "You are a scriptwriter for the radio station",
     aboutStation: (desc) => `About the station: ${desc}`,
     dialogTask: (male, female) => `Your task is to write a short dialog between hosts: ${male} (male) and ${female} (female).`,

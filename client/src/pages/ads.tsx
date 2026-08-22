@@ -667,6 +667,29 @@ export default function AdsPage() {
     },
   });
 
+  // Re-voice a single word or phrase (e.g. with a corrected stress mark) as a
+  // standalone clip the user splices into the finished render by hand.
+  const [snippetText, setSnippetText] = useState("");
+  const [snippetVoiceId, setSnippetVoiceId] = useState<string | null>(null);
+  const [snippetUrl, setSnippetUrl] = useState<string | null>(null);
+  const [isSnippetLoading, setIsSnippetLoading] = useState(false);
+
+  const synthesizeSnippet = async (voiceId: string | null) => {
+    const text = snippetText.trim();
+    if (!text || !voiceId) return;
+    setIsSnippetLoading(true);
+    setSnippetUrl(null);
+    try {
+      const res = await apiRequest("POST", "/api/synthesize-snippet", { text, voiceId });
+      const data = await res.json();
+      setSnippetUrl(data.audioUrl);
+    } catch (error) {
+      toast({ title: t("common.error"), description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+    } finally {
+      setIsSnippetLoading(false);
+    }
+  };
+
   // Downloads go through plain <a download> links straight to the stream URL,
   // so the server can't see them — stamp the mark explicitly on click.
   const markAdDownloaded = (adId: string) => {
@@ -1682,6 +1705,54 @@ export default function AdsPage() {
                     </div>
                   );
                 })()}
+              </div>
+
+              <div className="border rounded-lg p-4 space-y-3">
+                <p className="text-sm font-medium">{t("ads.snippetTitle")}</p>
+                <p className="text-xs text-muted-foreground">{t("ads.snippetDesc")}</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    value={snippetText}
+                    onChange={(e) => setSnippetText(e.target.value)}
+                    placeholder={t("ads.snippetPlaceholder")}
+                    className="flex-1"
+                    data-testid="input-snippet-text"
+                  />
+                  <Select
+                    value={snippetVoiceId || currentAd.voiceIds?.[0] || selectedVoiceId || ""}
+                    onValueChange={setSnippetVoiceId}
+                  >
+                    <SelectTrigger className="sm:w-52" data-testid="select-snippet-voice">
+                      <SelectValue placeholder={t("ads.selectVoice")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {voices?.filter(v => v.isActive).map(v => (
+                        <SelectItem key={v.id} value={v.elevenLabsVoiceId}>{getCleanVoiceName(v)}</SelectItem>
+                      ))}
+                      {elevenLabsVoices?.voices?.filter(v => !voices?.some(sv => sv.isActive && sv.elevenLabsVoiceId === v.voice_id)).map(v => (
+                        <SelectItem key={v.voice_id} value={v.voice_id}>{v.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    onClick={() => synthesizeSnippet(snippetVoiceId || currentAd.voiceIds?.[0] || selectedVoiceId)}
+                    disabled={isSnippetLoading || !snippetText.trim() || !(snippetVoiceId || currentAd.voiceIds?.[0] || selectedVoiceId)}
+                    data-testid="button-synthesize-snippet"
+                  >
+                    {isSnippetLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Volume2 className="mr-2 h-4 w-4" />}
+                    {t("ads.snippetButton")}
+                  </Button>
+                </div>
+                {snippetUrl && (
+                  <div className="flex items-center gap-2 rounded-lg bg-muted p-2.5">
+                    <audio controls src={resolveAudioUrl(snippetUrl)} className="h-9 flex-1 min-w-0" data-testid="audio-snippet" />
+                    <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" asChild>
+                      <a href={resolveAudioUrl(snippetUrl)} download="snippet.mp3" data-testid="button-download-snippet">
+                        <Download className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div className="border rounded-lg p-4 space-y-3">

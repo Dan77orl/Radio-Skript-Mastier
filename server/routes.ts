@@ -4484,6 +4484,8 @@ ${clientInfoBlock}
 ${styleExamplesBlock}
 ${multiSpeakerInstructions}
 
+УДАРЕНИЯ — ВАЖНО ДЛЯ ОЗВУЧКИ: в словах, где синтез может ошибиться с ударением (имена собственные, названия, омографы, редкие слова), ставь знак ударения — символ ́ (U+0301) сразу после ударной гласной: звони́т, Илу́зион. Обычные слова не размечай.
+
 Каждый вариант должен быть уникальным по стилю и подаче:
 1. Вариант с юмором
 2. Эмоциональный вариант
@@ -4514,6 +4516,8 @@ ${ad.clientName ? `- Client: ${ad.clientName}` : ""}
 ${clientInfoBlock}
 ${styleExamplesBlock}
 ${multiSpeakerInstructions}
+
+STRESS MARKS: for Russian-language text, mark the stressed vowel with the combining acute accent ́ (U+0301) in words where TTS may misplace the stress (proper names, homographs, rare words), e.g. звони́т, Илу́зион. Leave ordinary words unmarked.
 
 Each variant should be unique in style and delivery:
 1. Humorous variant
@@ -4654,6 +4658,7 @@ ${baseText}
 Инструкции по изменению:
 ${instructions || "Создай альтернативный вариант с другой подачей"}
 ${multiSpeakerNote}
+УДАРЕНИЯ: в словах с неоднозначным ударением (имена, названия, омографы) ставь знак ударения ́ (U+0301) после ударной гласной, как в исходном тексте.
 
 ВАЖНО: Верни только новый текст рекламы без JSON обертки.`
         : `You are a creative copywriter for radio station "${ctx.stationName}".
@@ -5035,6 +5040,53 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
     } catch (error) {
       console.error("Error streaming audio:", error);
       res.status(500).json({ error: "Failed to stream audio" });
+    }
+  });
+
+  // Re-voice a single word or phrase as a standalone file the user splices
+  // into an existing render by hand — far cheaper than re-synthesizing the
+  // whole spot over one mispronounced word.
+  app.post("/api/synthesize-snippet", async (req, res) => {
+    try {
+      const { text, voiceId } = req.body || {};
+      if (!text || typeof text !== "string" || !text.trim()) {
+        return res.status(400).json({ error: "Text is required" });
+      }
+      if (text.length > 600) {
+        return res.status(400).json({ error: "Text is too long" });
+      }
+      if (!voiceId || typeof voiceId !== "string") {
+        return res.status(400).json({ error: "Voice is required" });
+      }
+
+      const settings = await storage.getSettings(req.session.userId);
+      if (!settings?.elevenLabsApiKey) {
+        return res.status(400).json({ error: "ElevenLabs API key not configured" });
+      }
+
+      const cleanText = stripEmotionTags(text.trim()) || text.trim();
+      const buffer = await synthesizeSpeech({
+        apiKey: settings.elevenLabsApiKey,
+        voiceId,
+        text: cleanText,
+        stability: settings.ttsStability ?? 0.75,
+        similarityBoost: settings.ttsSimilarityBoost ?? 0.75,
+      });
+
+      const audioDir = path.join(process.cwd(), "public", "audio");
+      await fs.mkdir(audioDir, { recursive: true });
+      const fileName = `snippet_${Date.now()}.mp3`;
+      await fs.writeFile(path.join(audioDir, fileName), buffer);
+
+      void archiveAudio({ userId: req.session.userId!, audioUrl: `/audio/${fileName}`, folder: "/radio/snippets" }).then(archived => {
+        if (archived.error) console.error(`[archive] snippet: ${archived.error}`);
+      });
+
+      logUsage(req.session.userId!, "audio_generation", "snippet");
+      res.json({ audioUrl: `/audio/${fileName}` });
+    } catch (error) {
+      console.error("Error synthesizing snippet:", error);
+      res.status(500).json({ error: describeTtsError(error) });
     }
   });
 
