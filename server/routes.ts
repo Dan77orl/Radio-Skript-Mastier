@@ -3950,6 +3950,121 @@ Create exactly ${dailyCount} dialogs.`;
     }
   });
 
+  // Build a client card from free-form text and/or a screenshot (e.g. a
+  // WhatsApp message from the client) — the user reviews the prefilled form
+  // instead of typing every field by hand.
+  app.post("/api/ad-clients/parse", upload.single("image"), async (req, res) => {
+    try {
+      const text = (req.body?.text || "").trim();
+      if (!req.file && !text) {
+        return res.status(400).json({ error: "Text or image is required" });
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      const userLang = user?.language || "en";
+      const ps = getPromptStrings(userLang);
+
+      const systemPrompt = `${ps.langDirective}
+You are an assistant that builds a profile card for a RECURRING advertising client (a business that orders radio ads regularly) from free-form text and/or an image such as a WhatsApp screenshot.
+Extract everything about the client: business name, website, Instagram, booking/contact phone, services, address, atmosphere — anything that should be mentioned in every radio ad for them.
+
+Return a JSON object with these fields (empty string "" if not found):
+{
+  "name": "business name",
+  "websiteUrl": "website URL if present",
+  "instagramUrl": "Instagram handle if present (with @)",
+  "phone": "booking/contact phone number",
+  "defaultCategory": "one of: general, restaurant, real_estate, services, shop, events",
+  "defaultTargetDurationSeconds": 30,
+  "description": "standing information for every ad: services, address, atmosphere, what to always mention (booking phone etc.) — concise, a few sentences"
+}
+
+Do NOT include one-off event details (specific dates, artist names) in the description — only the standing facts about the business.
+Return ONLY valid JSON, no extra text.`;
+
+      const sanitizeClient = (raw: Record<string, unknown>) => {
+        const dur = typeof raw.defaultTargetDurationSeconds === "number"
+          ? raw.defaultTargetDurationSeconds
+          : parseInt(String(raw.defaultTargetDurationSeconds), 10) || 30;
+        const cat = typeof raw.defaultCategory === "string" && validAdCategories.has(raw.defaultCategory)
+          ? raw.defaultCategory : "general";
+        return {
+          name: typeof raw.name === "string" ? raw.name.trim() : "",
+          websiteUrl: typeof raw.websiteUrl === "string" ? raw.websiteUrl.trim() : "",
+          instagramUrl: typeof raw.instagramUrl === "string" ? raw.instagramUrl.trim() : "",
+          phone: typeof raw.phone === "string" ? raw.phone.trim() : "",
+          defaultCategory: cat,
+          defaultTargetDurationSeconds: Math.max(10, Math.min(120, dur)),
+          description: typeof raw.description === "string" ? raw.description.trim() : "",
+        };
+      };
+
+      const anthropic = await getAnthropicClient(req.session.userId);
+      if (anthropic) {
+        const userContent: Array<{ type: string; source?: any; text?: string }> = [];
+        if (req.file) {
+          const imageBuffer = await fs.readFile(req.file.path);
+          userContent.push({
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: req.file.mimetype as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+              data: imageBuffer.toString("base64"),
+            },
+          });
+        }
+        userContent.push({ type: "text", text: text || "Extract the client card from the image." });
+
+        const response = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: aiMaxTokens(1024),
+          system: systemPrompt,
+          messages: [{ role: "user", content: userContent as any }],
+        });
+
+        const textContent = response.content.find(c => c.type === "text");
+        if (!textContent || textContent.type !== "text") {
+          return res.status(500).json({ error: "No response from AI" });
+        }
+        const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          return res.status(500).json({ error: "Invalid response format" });
+        }
+        const parsed = JSON.parse(jsonMatch[0]);
+        logUsage(req.session.userId!, "ad_client_parse", "Claude");
+        if (req.file) await fs.unlink(req.file.path).catch(() => {});
+        return res.json(sanitizeClient(parsed));
+      }
+
+      const openaiContent: any[] = [];
+      if (req.file) {
+        const imageBuffer = await fs.readFile(req.file.path);
+        openaiContent.push({ type: "image_url", image_url: { url: `data:${req.file.mimetype};base64,${imageBuffer.toString("base64")}` } });
+      }
+      openaiContent.push({ type: "text", text: text ? `${text}\n\n${systemPrompt}` : systemPrompt });
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4.1",
+        messages: [{ role: "user", content: openaiContent }],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 1024,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "No response from AI" });
+      }
+      const parsed = JSON.parse(content);
+      logUsage(req.session.userId!, "ad_client_parse", "OpenAI");
+      if (req.file) await fs.unlink(req.file.path).catch(() => {});
+      res.json(sanitizeClient(parsed));
+    } catch (error) {
+      console.error("Error parsing client card:", error);
+      if (req.file) await fs.unlink(req.file.path).catch(() => {});
+      res.status(500).json({ error: "Failed to parse client card" });
+    }
+  });
+
   app.get("/api/ad-presets", async (req, res) => {
     try {
       const presets = await storage.getAdPresets(req.session.userId!);

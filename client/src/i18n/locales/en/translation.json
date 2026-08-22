@@ -588,6 +588,8 @@
     "newAdForClient": "New ad",
     "clientPromptPlaceholder": "Paste the client's info: dates, events, names — as text or a WhatsApp screenshot",
     "clientPromptHint": "The AI uses the client's standing info and the style of their past ads",
+    "clientSmartPlaceholder": "Paste the client's text or a screenshot — AI fills the card: name, Instagram, phone, description...",
+    "clientSmartHint": "Type, dictate or attach a screenshot. Review the card, pick a voice and save.",
     "createAndGenerate": "Create ad and generate script",
     "adsCount": "Ads: {{count}}",
     "noClients": "No clients yet",

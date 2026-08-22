@@ -2378,6 +2378,65 @@ export default function AdsPage() {
     reader.readAsDataURL(file);
   };
 
+  // Free-form client card creation: paste text or a WhatsApp screenshot, the
+  // AI fills the card fields, the user reviews the prefilled dialog and saves.
+  const [clientParseText, setClientParseText] = useState("");
+  const [clientParseImage, setClientParseImage] = useState<File | null>(null);
+  const [clientParseImagePreview, setClientParseImagePreview] = useState<string | null>(null);
+  const [isParsingClient, setIsParsingClient] = useState(false);
+  const clientParseImageInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleClientParseImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setClientParseImage(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setClientParseImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleClientCardParse = async () => {
+    const hasText = clientParseText.trim().length >= 5;
+    const hasImage = !!clientParseImage;
+    if (!hasText && !hasImage) return;
+
+    setIsParsingClient(true);
+    try {
+      const formData = new FormData();
+      if (clientParseImage) formData.append("image", clientParseImage);
+      if (clientParseText.trim()) formData.append("text", clientParseText.trim());
+      const res = await fetch("/api/ad-clients/parse", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to parse");
+      const parsed = await res.json();
+
+      setEditingClient(null);
+      clientForm.reset({
+        name: parsed.name || "",
+        websiteUrl: parsed.websiteUrl || "",
+        instagramUrl: parsed.instagramUrl || "",
+        phone: parsed.phone || "",
+        description: parsed.description || "",
+        defaultCategory: parsed.defaultCategory || "general",
+        defaultTargetDurationSeconds: parsed.defaultTargetDurationSeconds || 30,
+        defaultVoiceId: "",
+        isActive: true,
+      });
+      setIsClientDialogOpen(true);
+      setClientParseText("");
+      setClientParseImage(null);
+      setClientParseImagePreview(null);
+      toast({ title: t("ads.smartParsed") });
+    } catch {
+      toast({ title: t("common.error"), variant: "destructive" });
+    } finally {
+      setIsParsingClient(false);
+    }
+  };
+
   const openAdFromClient = (ad: Ad) => {
     const voiceId = ad.voiceIds?.[0];
     if (voiceId) {
@@ -3129,6 +3188,72 @@ export default function AdsPage() {
                   {t("ads.newClient")}
                 </Button>
               </div>
+
+              <Card className="mb-6">
+                <CardContent className="pt-6">
+                  <div className="flex gap-2 items-start">
+                    <div className="flex-1 space-y-2">
+                      <Textarea
+                        placeholder={t("ads.clientSmartPlaceholder")}
+                        value={clientParseText}
+                        onChange={(e) => setClientParseText(e.target.value)}
+                        rows={2}
+                        className="resize-none"
+                        data-testid="textarea-client-smart"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleClientCardParse();
+                          }
+                        }}
+                      />
+                      {clientParseImagePreview && (
+                        <div className="relative inline-block">
+                          <img src={clientParseImagePreview} alt="preview" className="h-16 rounded-md border" />
+                          <button
+                            type="button"
+                            className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs"
+                            onClick={() => { setClientParseImage(null); setClientParseImagePreview(null); }}
+                            data-testid="button-remove-client-smart-image"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <VoiceInput onTranscript={(text) => setClientParseText((prev) => (prev ? prev + " " : "") + text)} />
+                      <input
+                        ref={clientParseImageInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onChange={handleClientParseImageSelect}
+                        className="hidden"
+                        data-testid="input-client-smart-image"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => clientParseImageInputRef.current?.click()}
+                        data-testid="button-upload-client-smart-image"
+                      >
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleClientCardParse}
+                        disabled={isParsingClient || (clientParseText.trim().length < 5 && !clientParseImage)}
+                        size="icon"
+                        data-testid="button-client-smart-parse"
+                      >
+                        {isParsingClient ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">{t("ads.clientSmartHint")}</p>
+                </CardContent>
+              </Card>
 
               {adClients && adClients.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
