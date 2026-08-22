@@ -6078,13 +6078,22 @@ ${existingList}
       const reqScheduledDate = typeof rawScheduledDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawScheduledDate)
         ? rawScheduledDate
         : null;
+      // Regular shows can be produced months ahead (a September grid recorded
+      // in August); weather stays capped at the forecast horizon — beyond it
+      // there is simply no data to script from.
+      let daysAhead = 0;
       if (reqScheduledDate) {
         const reqDateMs = new Date(reqScheduledDate + "T12:00:00Z").getTime();
         const todayMs = new Date(todayStr + "T12:00:00Z").getTime();
         const dayMs = 86400000;
-        const diffDays = Math.round((reqDateMs - todayMs) / dayMs);
-        if (Number.isNaN(diffDays) || diffDays < 0 || diffDays > 7) {
-          return res.status(400).json({ error: "scheduledDate must be within today..today+7 days" });
+        daysAhead = Math.round((reqDateMs - todayMs) / dayMs);
+        const maxAheadDays = programType.isWeatherForecast ? 7 : 366;
+        if (Number.isNaN(daysAhead) || daysAhead < 0 || daysAhead > maxAheadDays) {
+          return res.status(400).json({
+            error: programType.isWeatherForecast
+              ? "scheduledDate must be within today..today+7 days"
+              : "scheduledDate must be within today..today+366 days",
+          });
         }
       }
       const dateStr = reqScheduledDate || todayStr;
@@ -6216,7 +6225,9 @@ ${existingList}
           userId: req.session.userId,
           dateStr,
           lang: userLang,
-          includeWeather: true,
+          // Weather facts only exist within the forecast horizon; for an
+          // episode dated weeks ahead they would describe the wrong day.
+          includeWeather: daysAhead <= 7,
         });
       }
 
@@ -7080,6 +7091,10 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
       }
 
       const remuxed = await ensureRemuxed(audioPath);
+
+      // Mark before streaming: the list highlights already-downloaded episodes.
+      storage.updateProgram(program.id, req.session.userId!, { downloadedAt: new Date() })
+        .catch(err => console.error("Could not mark program downloaded:", err?.message));
 
       const filename = path.basename(audioPath);
       res.setHeader("Content-Type", "audio/mpeg");

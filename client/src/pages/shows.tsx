@@ -110,10 +110,12 @@ function ScheduleScriptPopover({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const todayStr = new Date().toISOString().split("T")[0];
-  const maxDate = new Date(Date.now() + 6 * 86400000).toISOString().split("T")[0];
+  const isWeather = !!type.isWeatherForecast;
+  // Weather is capped at the forecast horizon; other shows can be produced
+  // months ahead (a September grid recorded in August).
+  const maxDate = new Date(Date.now() + (isWeather ? 6 : 365) * 86400000).toISOString().split("T")[0];
   const [date, setDate] = useState(todayStr);
   const [days, setDays] = useState<number>(type.defaultForecastDays || 3);
-  const isWeather = !!type.isWeatherForecast;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -1556,6 +1558,12 @@ export default function ShowsPage() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="font-medium truncate" data-testid={`text-program-title-${program.id}`}>{program.title}</h3>
                               {getStatusBadge(program.status)}
+                              {program.downloadedAt && (
+                                <Badge className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border-transparent" data-testid={`badge-downloaded-${program.id}`}>
+                                  <Download className="h-3 w-3 mr-1" />
+                                  {t("shows.downloadedBadge")}
+                                </Badge>
+                              )}
                               {program.slotNumber && (
                                 <Badge variant="outline" className="text-xs">
                                   #{program.slotNumber}
@@ -1674,8 +1682,21 @@ export default function ShowsPage() {
                                   </Button>
                                 </HintTooltip>
                                 <HintTooltip hint={t("hints.shows.downloadAudio")}>
-                                  <a href={`/api/programs/${program.id}/download-audio`} download>
-                                    <Button size="icon" variant="outline" data-testid={`button-download-${program.id}`}>
+                                  <a
+                                    href={`/api/programs/${program.id}/download-audio`}
+                                    download
+                                    onClick={() => {
+                                      // The server stamps downloadedAt while streaming;
+                                      // refetch shortly after so the badge appears.
+                                      setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] }), 1500);
+                                    }}
+                                  >
+                                    <Button
+                                      size="icon"
+                                      variant="outline"
+                                      className={program.downloadedAt ? "border-emerald-500 text-emerald-600 dark:text-emerald-400" : ""}
+                                      data-testid={`button-download-${program.id}`}
+                                    >
                                       <Download className="h-4 w-4" />
                                     </Button>
                                   </a>

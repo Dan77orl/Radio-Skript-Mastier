@@ -907,7 +907,8 @@
     "importCreateBtn": "Create {{count}} episodes",
     "importDone": "Import finished",
     "importCreated": "{{count}} episodes created. Scripts are ready for voicing.",
-    "importFailed": "Could not create episodes"
+    "importFailed": "Could not create episodes",
+    "downloadedBadge": "Downloaded"
   },
   "automations": {
     "title": "Automations",

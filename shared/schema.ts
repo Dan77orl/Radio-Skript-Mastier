@@ -341,6 +341,9 @@ export const programs = pgTable("programs", {
   audioDurationSeconds: real("audio_duration_seconds"),
   scriptGeneratedAt: timestamp("script_generated_at"),
   audioGeneratedAt: timestamp("audio_generated_at"),
+  // Set when the operator downloads the audio — the list highlights these so
+  // it's obvious which episodes have already been taken to the broadcast desk.
+  downloadedAt: timestamp("downloaded_at"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 }, (table) => [
   index("programs_user_idx").on(table.userId),

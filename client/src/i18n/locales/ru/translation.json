@@ -926,7 +926,8 @@
     "importCreateBtn": "Создать выпуски: {{count}}",
     "importDone": "Импорт завершён",
     "importCreated": "Создано выпусков: {{count}}. Скрипты готовы — можно озвучивать.",
-    "importFailed": "Не удалось создать выпуски"
+    "importFailed": "Не удалось создать выпуски",
+    "downloadedBadge": "Скачан"
   },
   "automations": {
     "title": "Автоматизации",
