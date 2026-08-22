@@ -26,7 +26,6 @@ import AutomationsPage from "@/pages/automations";
 import SettingsPage from "@/pages/settings";
 import AdminPage from "@/pages/admin";
 import NotFound from "@/pages/not-found";
-import { VoiceAgentWidget } from "@/components/voice-agent-widget";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { HintsProvider } from "@/contexts/hints-context";
 
@@ -127,7 +126,6 @@ function App() {
         <TooltipProvider>
           <HintsProvider>
             <AppContent />
-            <VoiceAgentWidget />
             <Toaster />
           </HintsProvider>
         </TooltipProvider>

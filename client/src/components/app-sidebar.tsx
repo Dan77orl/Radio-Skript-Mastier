@@ -16,6 +16,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/use-auth";
+import { VoiceAgentMenuItem } from "@/components/voice-agent-widget";
 import type { Settings as SettingsType } from "@shared/schema";
 
 export function AppSidebar() {
@@ -86,6 +87,7 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              <VoiceAgentMenuItem />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
