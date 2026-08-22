@@ -15,7 +15,7 @@ import { parseImportedScripts } from "./script-import";
 import { createRateLimiter } from "./rate-limit";
 import { getJob, listJobs, enqueueJob, registerJobHandler } from "./jobs/queue";
 import { archiveAudio, restoreAudio } from "./storage-providers";
-import { mixVoiceWithMusic, downloadToFile } from "./audio/mix";
+import { mixVoiceWithMusic, downloadToFile, FFMPEG_BIN } from "./audio/mix";
 import { buildAuthUrl, exchangeCodeForTokens, isGoogleDriveConfigured, ensureRootFolder as googleDriveEnsureRootFolder } from "./storage-providers/google-drive";
 import { z } from "zod";
 import { promises as fs } from "fs";
@@ -771,7 +771,7 @@ async function generateSilence(durationMs: number, outputPath: string): Promise<
   const { promisify } = await import("util");
   const execFileAsync = promisify(execFile);
   const durationSec = durationMs / 1000;
-  await execFileAsync("ffmpeg", [
+  await execFileAsync(FFMPEG_BIN, [
     "-y", "-f", "lavfi", "-i", `anullsrc=r=44100:cl=mono`,
     "-t", String(durationSec),
     "-c:a", "libmp3lame", "-b:a", "192k",
@@ -839,7 +839,7 @@ async function concatMp3WithFfmpeg(
 
     const filterComplex = filterParts.join(";");
 
-    await execFileAsync("ffmpeg", [
+    await execFileAsync(FFMPEG_BIN, [
       "-y",
       ...inputArgs,
       "-filter_complex", filterComplex,
@@ -855,7 +855,7 @@ async function concatMp3WithFfmpeg(
     const listContent = allFiles.map(f => `file '${f}'`).join("\n");
     await fs.writeFile(listFile, listContent);
     try {
-      await execFileAsync("ffmpeg", [
+      await execFileAsync(FFMPEG_BIN, [
         "-y",
         "-f", "concat",
         "-safe", "0",
@@ -895,7 +895,7 @@ async function ensureRemuxed(filePath: string): Promise<string> {
     const dir = path.dirname(filePath);
     const base = path.basename(filePath, ".mp3");
     const tmpFile = path.join(dir, `_remux_${base}_${Date.now()}.mp3`);
-    await execFileAsync("ffmpeg", ["-y", "-i", filePath, "-c:a", "libmp3lame", "-b:a", "192k", "-write_xing", "1", tmpFile], { timeout: 60000 });
+    await execFileAsync(FFMPEG_BIN, ["-y", "-i", filePath, "-c:a", "libmp3lame", "-b:a", "192k", "-write_xing", "1", tmpFile], { timeout: 60000 });
     await fs.rename(tmpFile, filePath);
     remuxedCache.add(filePath);
     console.log(`Remuxed: ${path.basename(filePath)}`);

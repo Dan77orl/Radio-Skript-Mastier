@@ -1,9 +1,18 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { promises as fs } from "fs";
+import { existsSync } from "fs";
 import path from "path";
+import ffmpegStatic from "ffmpeg-static";
+import ffprobeInstaller from "@ffprobe-installer/ffprobe";
 
 const execFileAsync = promisify(execFile);
+
+// The autoscale deployment image ships no system ffmpeg/ffprobe (the dev
+// workspace has them, which is why this only ever broke in production) —
+// prefer the npm-bundled static binaries, fall back to PATH lookup.
+export const FFMPEG_BIN = ffmpegStatic && existsSync(ffmpegStatic) ? ffmpegStatic : "ffmpeg";
+export const FFPROBE_BIN = ffprobeInstaller?.path && existsSync(ffprobeInstaller.path) ? ffprobeInstaller.path : "ffprobe";
 
 export interface MixOptions {
   /** Music level relative to the voice, 0..1. */
@@ -24,14 +33,23 @@ const DEFAULTS: Required<MixOptions> = {
 };
 
 export async function probeDurationSeconds(filePath: string): Promise<number> {
-  const { stdout } = await execFileAsync(
-    "ffprobe",
-    ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", filePath],
-    { timeout: 30000 },
-  );
-  const value = parseFloat(stdout.trim());
-  if (!Number.isFinite(value)) throw new Error(`Could not read duration of ${path.basename(filePath)}`);
-  return value;
+  try {
+    const { stdout } = await execFileAsync(
+      FFPROBE_BIN,
+      ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", filePath],
+      { timeout: 30000 },
+    );
+    const value = parseFloat(stdout.trim());
+    if (!Number.isFinite(value)) throw new Error(`Could not read duration of ${path.basename(filePath)}`);
+    return value;
+  } catch (err: any) {
+    // Degrade to a bitrate estimate rather than failing the whole mix —
+    // fades land slightly off, the spot still ships.
+    const stat = await fs.stat(filePath);
+    const estimate = stat.size / 24000; // 192 kbps mp3 ≈ 24000 bytes/s
+    console.warn(`[mix] ffprobe unavailable for ${path.basename(filePath)} (${err?.message}); using size estimate ${estimate.toFixed(1)}s`);
+    return estimate;
+  }
 }
 
 /**
@@ -71,7 +89,7 @@ export async function mixVoiceWithMusic(
   const tmpOutput = path.join(path.dirname(outputPath), `_mix_${path.basename(outputPath)}`);
 
   await execFileAsync(
-    "ffmpeg",
+    FFMPEG_BIN,
     [
       "-y",
       "-i", voicePath,
