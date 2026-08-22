@@ -2254,6 +2254,30 @@ export async function registerRoutes(
     }
   });
 
+  // One-click storage self-test: upload a tiny file through the exact same
+  // archive path renders use and return the full result — surfaces token and
+  // permission problems in the UI instead of burying them in deploy logs.
+  app.post("/api/storage/test-upload", async (req, res) => {
+    const audioDir = path.join(process.cwd(), "public", "audio");
+    const fileName = `storage_test_${Date.now()}.txt`;
+    const localPath = path.join(audioDir, fileName);
+    try {
+      await fs.mkdir(audioDir, { recursive: true });
+      await fs.writeFile(localPath, Buffer.from(`RadioFlow storage test ${new Date().toISOString()}`));
+      const result = await archiveAudio({
+        userId: req.session.userId!,
+        audioUrl: `/audio/${fileName}`,
+        folder: "/radio/test",
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Storage test-upload failed:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Test failed" });
+    } finally {
+      await fs.unlink(localPath).catch(() => {});
+    }
+  });
+
   app.post("/api/storage/provider", async (req, res) => {
     try {
       const { provider } = req.body || {};

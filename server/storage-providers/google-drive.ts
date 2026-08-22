@@ -116,7 +116,9 @@ async function findOrCreateFolder(accessToken: string, name: string, parentId?: 
     }),
   });
   if (!create.ok) {
-    throw new Error(`Could not create Drive folder "${name}": ${create.status}`);
+    // 403 here almost always means the drive.file permission checkbox was
+    // left unchecked on Google's consent screen — reconnect and tick it.
+    throw new Error(`Could not create Drive folder "${name}": ${create.status} ${(await create.text()).slice(0, 200)}`);
   }
   return ((await create.json()) as any).id;
 }

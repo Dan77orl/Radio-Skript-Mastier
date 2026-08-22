@@ -66,6 +66,25 @@ export function StorageSettings() {
     },
   });
 
+  // Runs a real upload through the same path renders use; the exact provider
+  // error (expired token, missing Drive permission) lands in the toast.
+  const testUpload = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/storage/test-upload", {})).json(),
+    onSuccess: (result: { provider: string; uploaded: boolean; error?: string }) => {
+      if (result.uploaded) {
+        toast({ title: t("settings.testUploadOk", { provider: result.provider === "google_drive" ? "Google Drive" : "Яндекс.Диск" }) });
+        queryClient.invalidateQueries({ queryKey: ["/api/storage/status"] });
+      } else {
+        toast({
+          title: t("settings.testUploadFailed"),
+          description: result.error || result.provider,
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (e: Error) => toast({ title: t("settings.testUploadFailed"), description: e.message, variant: "destructive" }),
+  });
+
   if (!status) return null;
 
   return (
@@ -144,6 +163,23 @@ export function StorageSettings() {
             )}
           </div>
         </div>
+
+        <Separator />
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => testUpload.mutate()}
+          disabled={testUpload.isPending || status.provider === "none"}
+          data-testid="button-test-upload"
+        >
+          {testUpload.isPending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Check className="mr-2 h-4 w-4" />
+          )}
+          {t("settings.testUpload")}
+        </Button>
       </CardContent>
     </Card>
   );
