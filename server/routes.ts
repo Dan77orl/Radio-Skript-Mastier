@@ -4484,7 +4484,8 @@ ${clientInfoBlock}
 ${styleExamplesBlock}
 ${multiSpeakerInstructions}
 
-УДАРЕНИЯ — ВАЖНО ДЛЯ ОЗВУЧКИ: в словах, где синтез может ошибиться с ударением (имена собственные, названия, омографы, редкие слова), ставь знак ударения — символ ́ (U+0301) сразу после ударной гласной: звони́т, Илу́зион. Обычные слова не размечай.
+ИНОЯЗЫЧНЫЕ НАЗВАНИЯ — ВАЖНО ДЛЯ ОЗВУЧКИ: пиши каждое иностранное слово в графике ИМЕННО его языка — турецкие в турецкой латинице со всеми диакритиками (Dinek Limanı, künefe, Kadıköy), английские по-английски (Next Level, Summer Garden). НЕ транслитерируй кириллицей — синтез произносит слово по-турецки или по-английски только когда видит родное написание. Слова с устоявшимся русским написанием (Стамбул, кебаб) пиши по-русски.
+УДАРЕНИЯ — ВАЖНО ДЛЯ ОЗВУЧКИ: в русских словах, где синтез может ошибиться с ударением (имена собственные, названия, омографы, редкие слова), ставь знак ударения — символ ́ (U+0301) сразу после ударной гласной: звони́т, Илу́зион. Обычные слова не размечай.
 
 Каждый вариант должен быть уникальным по стилю и подаче:
 1. Вариант с юмором
@@ -4517,6 +4518,7 @@ ${clientInfoBlock}
 ${styleExamplesBlock}
 ${multiSpeakerInstructions}
 
+FOREIGN NAMES — MATTERS FOR VOICE-OVER: write each foreign word in ITS OWN language's script — Turkish words in Turkish Latin with all diacritics (Dinek Limanı, künefe), English words in English spelling (Next Level). Never transliterate — the synthesizer only pronounces a word as Turkish or English when it sees the native spelling.
 STRESS MARKS: for Russian-language text, mark the stressed vowel with the combining acute accent ́ (U+0301) in words where TTS may misplace the stress (proper names, homographs, rare words), e.g. звони́т, Илу́зион. Leave ordinary words unmarked.
 
 Each variant should be unique in style and delivery:
@@ -4659,6 +4661,7 @@ ${baseText}
 ${instructions || "Создай альтернативный вариант с другой подачей"}
 ${multiSpeakerNote}
 УДАРЕНИЯ: в словах с неоднозначным ударением (имена, названия, омографы) ставь знак ударения ́ (U+0301) после ударной гласной, как в исходном тексте.
+ИНОЯЗЫЧНЫЕ НАЗВАНИЯ: сохраняй написание в родной графике — турецкие турецкой латиницей (Dinek Limanı), английские по-английски (Next Level), без транслитерации кириллицей.
 
 ВАЖНО: Верни только новый текст рекламы без JSON обертки.`
         : `You are a creative copywriter for radio station "${ctx.stationName}".
