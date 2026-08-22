@@ -4,6 +4,7 @@ import { registerJobHandler, getJobHandler } from "./queue";
 import { internalAuthHeaders } from "../auth";
 import { storage } from "../storage";
 import { mixVoiceWithMusic, downloadToFile, probeDurationSeconds } from "../audio/mix";
+import { archiveAudio } from "../storage-providers";
 
 export interface ProduceAdPayload {
   userId: string;
@@ -148,6 +149,10 @@ export function registerAdProducer() {
         status: "ready",
       });
       steps.push(`сведено с музыкой${trackName ? ` «${trackName}»` : ""}`);
+
+      void archiveAudio({ userId, audioUrl: `/audio/${mixedName}`, folder: "/radio/ads" }).then(archived => {
+        if (archived.error) console.error(`[archive] ad mix ${adId}: ${archived.error}`);
+      });
 
       return {
         adId,

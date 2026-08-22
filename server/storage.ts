@@ -1,4 +1,4 @@
-import { users, settings, dialogs, newsSources, newsItems, ads, adClients, adPresets, voices, programTypes, programs, automations, automationRuns, scheduleTemplates, hostShifts, customHolidays, usageLogs, supportMessages, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdClient, type InsertAdClient, type AdPreset, type InsertAdPreset, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun, type ScheduleTemplate, type InsertScheduleTemplate, type HostShift, type InsertHostShift, type CustomHoliday, type InsertCustomHoliday, type UsageLog, type InsertUsageLog, type SupportMessage, type InsertSupportMessage } from "@shared/schema";
+import { users, settings, dialogs, newsSources, newsItems, ads, adClients, adPresets, audioArchive, voices, programTypes, programs, automations, automationRuns, scheduleTemplates, hostShifts, customHolidays, usageLogs, supportMessages, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdClient, type InsertAdClient, type AdPreset, type InsertAdPreset, type AudioArchiveEntry, type InsertAudioArchive, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun, type ScheduleTemplate, type InsertScheduleTemplate, type HostShift, type InsertHostShift, type CustomHoliday, type InsertCustomHoliday, type UsageLog, type InsertUsageLog, type SupportMessage, type InsertSupportMessage } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql, and, or, isNull } from "drizzle-orm";
 
@@ -194,6 +194,9 @@ export interface IStorage {
   updateAdPreset(id: string, userId: string, preset: Partial<InsertAdPreset>): Promise<AdPreset | undefined>;
   deleteAdPreset(id: string, userId: string): Promise<boolean>;
   
+  getAudioArchiveEntry(userId: string, fileName: string): Promise<AudioArchiveEntry | undefined>;
+  upsertAudioArchiveEntry(entry: InsertAudioArchive): Promise<AudioArchiveEntry>;
+
   getVoices(userId: string): Promise<Voice[]>;
   getVoice(id: string, userId?: string): Promise<Voice | undefined>;
   createVoice(voice: InsertVoice): Promise<Voice>;
@@ -593,6 +596,28 @@ export class DatabaseStorage implements IStorage {
   async deleteAdPreset(id: string, userId: string): Promise<boolean> {
     const result = await db.delete(adPresets).where(and(eq(adPresets.id, id), eq(adPresets.userId, userId))).returning();
     return result.length > 0;
+  }
+
+  async getAudioArchiveEntry(userId: string, fileName: string): Promise<AudioArchiveEntry | undefined> {
+    const [entry] = await db.select().from(audioArchive)
+      .where(and(eq(audioArchive.userId, userId), eq(audioArchive.fileName, fileName)))
+      .orderBy(desc(audioArchive.createdAt));
+    return entry || undefined;
+  }
+
+  async upsertAudioArchiveEntry(entry: InsertAudioArchive): Promise<AudioArchiveEntry> {
+    if (entry.userId && entry.fileName) {
+      const existing = await this.getAudioArchiveEntry(entry.userId, entry.fileName);
+      if (existing) {
+        const [updated] = await db.update(audioArchive)
+          .set(entry)
+          .where(eq(audioArchive.id, existing.id))
+          .returning();
+        return updated;
+      }
+    }
+    const [created] = await db.insert(audioArchive).values(entry).returning();
+    return created;
   }
 
   async getVoices(userId: string): Promise<Voice[]> {

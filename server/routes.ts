@@ -14,7 +14,7 @@ import { synthesizeSpeech, describeTtsError } from "./tts";
 import { parseImportedScripts } from "./script-import";
 import { createRateLimiter } from "./rate-limit";
 import { getJob, listJobs, enqueueJob, registerJobHandler } from "./jobs/queue";
-import { archiveAudio } from "./storage-providers";
+import { archiveAudio, restoreAudio } from "./storage-providers";
 import { buildAuthUrl, exchangeCodeForTokens, isGoogleDriveConfigured, ensureRootFolder as googleDriveEnsureRootFolder } from "./storage-providers/google-drive";
 import { z } from "zod";
 import { promises as fs } from "fs";
@@ -2976,6 +2976,18 @@ ${ps.minReplicas(dialogReplicas)}`;
         yandexPath: null,
       });
 
+      void archiveAudio({
+        userId: req.session.userId!,
+        audioUrl: `/audio/dialog_${timestamp}.mp3`,
+        folder: "/radio/dialogs",
+      }).then(archived => {
+        if (archived.uploaded) {
+          storage.updateDialog(dialog.id, req.session.userId!, { uploadedToYandex: true, yandexPath: archived.remotePath }).catch(() => {});
+        } else if (archived.error) {
+          console.error(`[archive] dialog ${dialog.id}: ${archived.error}`);
+        }
+      });
+
       logUsage(req.session.userId!, "audio_generation", "dialog");
       res.json(dialog);
     } catch (error) {
@@ -4839,6 +4851,10 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
             stage: "audio",
           });
 
+          void archiveAudio({ userId, audioUrl: newAudioUrl, folder: "/radio/ads" }).then(archived => {
+            if (archived.error) console.error(`[archive] ad ${id}: ${archived.error}`);
+          });
+
           console.log(`Audio generated for ad ${id} (version ${existingVersions.length})${isMultiSpeaker ? " [multi-speaker]" : ""}`);
         } catch (error) {
           console.error(`Error generating audio for ad ${id}:`, error);
@@ -4984,8 +5000,13 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
       try {
         await fs.access(audioPath);
       } catch {
-        console.error(`Audio file not found: ${audioPath}`);
-        return res.status(404).json({ error: "Audio file not found", path: decodedPath });
+        // A republish recreates the deploy filesystem, losing generated files —
+        // try to pull the file back from the cloud archive before giving up.
+        const restored = await restoreAudio({ userId: req.session.userId!, audioUrl: decodedPath });
+        if (!restored) {
+          console.error(`Audio file not found: ${audioPath}`);
+          return res.status(404).json({ error: "Audio file not found", path: decodedPath });
+        }
       }
       const fileStat = await fs.stat(audioPath);
       const fileSize = fileStat.size;
@@ -5033,7 +5054,10 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
       try {
         await fs.access(audioPath);
       } catch {
-        return res.status(404).json({ error: "Audio file not found on disk" });
+        const restored = await restoreAudio({ userId: req.session.userId!, audioUrl: ad.audioUrl });
+        if (!restored) {
+          return res.status(404).json({ error: "Audio file not found on disk" });
+        }
       }
 
       const remuxed = await ensureRemuxed(audioPath);
@@ -7147,6 +7171,20 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
           audioGeneratedAt: new Date(),
         });
 
+        // Archive in the background: the deploy filesystem is wiped on every
+        // republish, so the cloud copy is the only durable one.
+        void archiveAudio({
+          userId: req.session.userId!,
+          audioUrl: `/audio/${filename}`,
+          folder: programType?.uploadFolder || `/radio/${programType?.slug || "programs"}`,
+        }).then(archived => {
+          if (archived.uploaded) {
+            storage.updateProgram(program.id, req.session.userId!, { uploadedToYandex: true, yandexPath: archived.remotePath }).catch(() => {});
+          } else if (archived.error) {
+            console.error(`[archive] program ${program.id}: ${archived.error}`);
+          }
+        });
+
         logUsage(req.session.userId!, "audio_generation", "program_multi_speaker");
         res.json({ ...updated, segmentCount: segmentFiles.length, totalSegments: totalExpected, errors: segmentErrors });
       } else {
@@ -7183,6 +7221,18 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
           audioGeneratedAt: new Date(),
         });
 
+        void archiveAudio({
+          userId: req.session.userId!,
+          audioUrl: `/audio/${filename}`,
+          folder: programType?.uploadFolder || `/radio/${programType?.slug || "programs"}`,
+        }).then(archived => {
+          if (archived.uploaded) {
+            storage.updateProgram(program.id, req.session.userId!, { uploadedToYandex: true, yandexPath: archived.remotePath }).catch(() => {});
+          } else if (archived.error) {
+            console.error(`[archive] program ${program.id}: ${archived.error}`);
+          }
+        });
+
         logUsage(req.session.userId!, "audio_generation", "program_single_speaker");
         res.json(updated);
       }
@@ -7208,7 +7258,10 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
       try {
         await fs.access(audioPath);
       } catch {
-        return res.status(404).json({ error: "Audio file not found on disk" });
+        const restored = await restoreAudio({ userId: req.session.userId!, audioUrl: program.audioUrl });
+        if (!restored) {
+          return res.status(404).json({ error: "Audio file not found on disk" });
+        }
       }
 
       const remuxed = await ensureRemuxed(audioPath);
@@ -7247,6 +7300,11 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
 
       const normalizedUrl = program.audioUrl.startsWith("/") ? program.audioUrl.slice(1) : program.audioUrl;
       const audioPath = path.join(process.cwd(), "public", normalizedUrl);
+      try {
+        await fs.access(audioPath);
+      } catch {
+        await restoreAudio({ userId: req.session.userId!, audioUrl: program.audioUrl });
+      }
       const audioData = await fs.readFile(audioPath);
 
       const FormData = (await import("form-data")).default;
@@ -7282,6 +7340,19 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
 
       const updated = await storage.updateProgram(program.id, req.session.userId!, {
         audioUrl: `/audio/${isolatedFilename}`,
+      });
+
+      const isolateProgramType = await storage.getProgramType(program.programTypeId, req.session.userId!);
+      void archiveAudio({
+        userId: req.session.userId!,
+        audioUrl: `/audio/${isolatedFilename}`,
+        folder: isolateProgramType?.uploadFolder || `/radio/${isolateProgramType?.slug || "programs"}`,
+      }).then(archived => {
+        if (archived.uploaded) {
+          storage.updateProgram(program.id, req.session.userId!, { uploadedToYandex: true, yandexPath: archived.remotePath }).catch(() => {});
+        } else if (archived.error) {
+          console.error(`[archive] program ${program.id}: ${archived.error}`);
+        }
       });
 
       console.log(`Voice isolation complete for program ${program.id}: /audio/${isolatedFilename}`);

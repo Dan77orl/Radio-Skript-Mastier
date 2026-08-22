@@ -141,6 +141,18 @@ export async function resolveFolderPath(accessToken: string, folderPath: string,
   return parent;
 }
 
+/** Fetch a file's bytes back from Drive (files this app uploaded via drive.file scope). */
+export async function downloadFile(refreshToken: string, fileId: string): Promise<Buffer> {
+  const accessToken = await getAccessToken(refreshToken);
+  const res = await fetch(`${FILES_URL}/${encodeURIComponent(fileId)}?alt=media`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    throw new Error(`Google Drive download failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  }
+  return Buffer.from(await res.arrayBuffer());
+}
+
 export async function uploadFile(opts: {
   refreshToken: string;
   localPath: string;

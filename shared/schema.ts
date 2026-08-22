@@ -273,6 +273,30 @@ export const insertAdPresetSchema = createInsertSchema(adPresets).omit({
 export type InsertAdPreset = z.infer<typeof insertAdPresetSchema>;
 export type AdPreset = typeof adPresets.$inferSelect;
 
+// Registry of audio files uploaded to the tenant's cloud storage. The deploy
+// filesystem is wiped on every republish, so this is what lets the app find
+// and restore a file whose local copy no longer exists.
+export const audioArchive = pgTable("audio_archive", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  provider: text("provider").notNull(),
+  fileId: text("file_id"),
+  remotePath: text("remote_path"),
+  link: text("link"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+}, (table) => [
+  index("audio_archive_user_file_idx").on(table.userId, table.fileName),
+]);
+
+export const insertAudioArchiveSchema = createInsertSchema(audioArchive).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAudioArchive = z.infer<typeof insertAudioArchiveSchema>;
+export type AudioArchiveEntry = typeof audioArchive.$inferSelect;
+
 export const voices = pgTable("voices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),

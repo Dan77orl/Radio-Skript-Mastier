@@ -67,6 +67,23 @@ export async function archiveAudio(opts: {
     return { provider, uploaded: false, remotePath: null, link: null, error: "Local audio file is missing" };
   }
 
+  // The registry is what makes restore possible after a redeploy wipes the
+  // local files; losing a registry write must not fail the archive itself.
+  const recordEntry = async (fileId: string | null, remotePath: string | null, link: string | null, entryProvider: StorageProvider) => {
+    try {
+      await storage.upsertAudioArchiveEntry({
+        userId,
+        fileName,
+        provider: entryProvider,
+        fileId,
+        remotePath,
+        link,
+      });
+    } catch (err: any) {
+      console.error(`[archive] could not record registry entry for ${fileName}:`, err?.message);
+    }
+  };
+
   try {
     if (provider === "google_drive") {
       if (!settings?.googleDriveRefreshToken) {
@@ -79,15 +96,69 @@ export async function archiveAudio(opts: {
         folderPath: folder,
         rootFolderId: settings.googleDriveFolderId || undefined,
       });
+      await recordEntry(result.fileId, result.path, result.webViewLink, "google_drive");
       return { provider, uploaded: true, remotePath: result.path, link: result.webViewLink };
     }
 
     if (!settings?.yandexDiskToken) {
       return { provider: "yandex", uploaded: false, remotePath: null, link: null, error: "Yandex Disk token is not set" };
     }
-    return await uploadToYandex(settings.yandexDiskToken, localPath, folder, fileName);
+    const yandexResult = await uploadToYandex(settings.yandexDiskToken, localPath, folder, fileName);
+    if (yandexResult.uploaded) {
+      await recordEntry(null, yandexResult.remotePath, null, "yandex");
+    }
+    return yandexResult;
   } catch (err: any) {
     console.error(`[archive] ${provider} upload failed for ${audioUrl}:`, err?.message);
     return { provider, uploaded: false, remotePath: null, link: null, error: err?.message || "Upload failed" };
+  }
+}
+
+/**
+ * Bring a missing local audio file back from the cloud archive.
+ *
+ * The deployment filesystem is recreated on every republish, so any file
+ * generated before the last deploy is gone locally while its DB record still
+ * points at it. If the registry knows where the file was archived, download it
+ * back into public/audio so the normal streaming/download path can proceed.
+ *
+ * Returns true when the local file exists again.
+ */
+export async function restoreAudio(opts: { userId: string; audioUrl: string }): Promise<boolean> {
+  const fileName = opts.audioUrl.split("/").pop();
+  if (!fileName) return false;
+
+  const entry = await storage.getAudioArchiveEntry(opts.userId, fileName);
+  if (!entry) return false;
+
+  const settings = await storage.getSettings(opts.userId);
+  const localPath = path.join(process.cwd(), "public", "audio", fileName);
+
+  try {
+    let data: Buffer | null = null;
+
+    if (entry.provider === "google_drive" && entry.fileId && settings?.googleDriveRefreshToken) {
+      data = await googleDrive.downloadFile(settings.googleDriveRefreshToken, entry.fileId);
+    } else if (entry.provider === "yandex" && entry.remotePath && settings?.yandexDiskToken) {
+      const hrefRes = await fetch(
+        `https://cloud-api.yandex.net/v1/disk/resources/download?path=${encodeURIComponent(entry.remotePath)}`,
+        { headers: { Authorization: `OAuth ${settings.yandexDiskToken}` } },
+      );
+      if (!hrefRes.ok) throw new Error(`Yandex Disk refused the download: ${hrefRes.status}`);
+      const { href } = await hrefRes.json() as any;
+      const dl = await fetch(href);
+      if (!dl.ok) throw new Error(`Yandex Disk download failed: ${dl.status}`);
+      data = Buffer.from(await dl.arrayBuffer());
+    }
+
+    if (!data) return false;
+
+    await fs.mkdir(path.dirname(localPath), { recursive: true });
+    await fs.writeFile(localPath, data);
+    console.log(`[restore] brought back ${fileName} from ${entry.provider}`);
+    return true;
+  } catch (err: any) {
+    console.error(`[restore] ${entry.provider} download failed for ${fileName}:`, err?.message);
+    return false;
   }
 }
