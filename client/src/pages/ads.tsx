@@ -812,6 +812,55 @@ export default function AdsPage() {
     }
   };
 
+  // Mixing with a chosen track or the user's own uploaded music bed.
+  const [customMusicFile, setCustomMusicFile] = useState<File | null>(null);
+  const [isMixing, setIsMixing] = useState(false);
+  const musicFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleMixMusic = async () => {
+    if (!currentAd) return;
+    setIsMixing(true);
+    try {
+      let res: Response;
+      if (customMusicFile) {
+        const fd = new FormData();
+        fd.append("music", customMusicFile);
+        fd.append("trackName", customMusicFile.name);
+        res = await fetch(`/api/ads/${currentAd.id}/mix-music`, {
+          method: "POST",
+          body: fd,
+          credentials: "include",
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to mix");
+        }
+      } else {
+        const track = musicSearchResults.find(tr => tr.id === selectedMusicTrack);
+        let url = track?.audioUrl;
+        if (!url && selectedMusicTrack) {
+          const r = await fetch(`/api/music/track/${selectedMusicTrack}/stream`);
+          if (r.ok) url = (await r.json()).url;
+        }
+        if (!url) throw new Error("No track selected");
+        res = await apiRequest("POST", `/api/ads/${currentAd.id}/mix-music`, {
+          trackUrl: url,
+          trackName: track?.title || "",
+        });
+      }
+      const updated = await res.json();
+      setCurrentAd(updated);
+      setWithMusic(true);
+      setCustomMusicFile(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
+      toast({ title: t("ads.mixDone") });
+    } catch (error) {
+      toast({ title: t("common.error"), description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+    } finally {
+      setIsMixing(false);
+    }
+  };
+
   const formatMusicDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -2150,6 +2199,50 @@ export default function AdsPage() {
                   </HintTooltip>
                 </div>
 
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    ref={musicFileInputRef}
+                    type="file"
+                    accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/ogg"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        setCustomMusicFile(f);
+                        setSelectedMusicTrack(null);
+                      }
+                      if (musicFileInputRef.current) musicFileInputRef.current.value = "";
+                    }}
+                    data-testid="input-custom-music"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => musicFileInputRef.current?.click()}
+                    data-testid="button-upload-music"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {t("ads.uploadOwnTrack")}
+                  </Button>
+                  {customMusicFile && (
+                    <Badge variant="secondary" className="gap-1 pr-1 max-w-[260px]">
+                      <Music className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{customMusicFile.name}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4 ml-1"
+                        onClick={() => setCustomMusicFile(null)}
+                        data-testid="button-remove-custom-music"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  )}
+                </div>
+
                 {musicSearchResults.length > 0 && (
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {musicSearchResults.map((track) => (
@@ -2194,15 +2287,20 @@ export default function AdsPage() {
                   </div>
                 )}
 
-                {selectedMusicTrack && (
+                {(selectedMusicTrack || customMusicFile) && (
                   <HintTooltip hint={t("hints.ads.mixAudio")}>
                     <Button
                       className="w-full"
-                      disabled
+                      onClick={handleMixMusic}
+                      disabled={isMixing}
                       data-testid="button-mix-audio"
                     >
-                      <Music className="mr-2 h-4 w-4" />
-                      {t("ads.mixComingSoon")}
+                      {isMixing ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Music className="mr-2 h-4 w-4" />
+                      )}
+                      {isMixing ? t("ads.mixing") : t("ads.mixButton")}
                     </Button>
                   </HintTooltip>
                 )}

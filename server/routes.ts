@@ -15,6 +15,7 @@ import { parseImportedScripts } from "./script-import";
 import { createRateLimiter } from "./rate-limit";
 import { getJob, listJobs, enqueueJob, registerJobHandler } from "./jobs/queue";
 import { archiveAudio, restoreAudio } from "./storage-providers";
+import { mixVoiceWithMusic, downloadToFile } from "./audio/mix";
 import { buildAuthUrl, exchangeCodeForTokens, isGoogleDriveConfigured, ensureRootFolder as googleDriveEnsureRootFolder } from "./storage-providers/google-drive";
 import { z } from "zod";
 import { promises as fs } from "fs";
@@ -5096,6 +5097,75 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
     } catch (error) {
       console.error("Error deleting audio version:", error);
       res.status(500).json({ error: "Failed to delete audio version" });
+    }
+  });
+
+  // Mix the ad's voice track with a music bed — either a track picked from
+  // the search results (trackUrl) or the user's own uploaded file. Same
+  // ffmpeg mix (looping, ducking, fades) the auto-produce pipeline uses.
+  app.post("/api/ads/:id/mix-music", upload.single("music"), async (req, res) => {
+    let tempMusicPath: string | null = null;
+    try {
+      const ad = await storage.getAd(req.params.id, req.session.userId!);
+      if (!ad) {
+        return res.status(404).json({ error: "Ad not found" });
+      }
+      if (!ad.audioUrl) {
+        return res.status(400).json({ error: "No voice track — synthesize audio first" });
+      }
+
+      const trackUrl = (req.body?.trackUrl || "").trim();
+      const trackName = (req.body?.trackName || "").trim() || req.file?.originalname || "";
+      if (!req.file && !trackUrl) {
+        return res.status(400).json({ error: "Track file or URL is required" });
+      }
+
+      const audioDir = path.join(process.cwd(), "public", "audio");
+      await fs.mkdir(audioDir, { recursive: true });
+
+      const voicePath = path.join(process.cwd(), "public", ad.audioUrl.replace(/^\//, ""));
+      try {
+        await fs.access(voicePath);
+      } catch {
+        const restored = await restoreAudio({ userId: req.session.userId!, audioUrl: ad.audioUrl });
+        if (!restored) {
+          return res.status(404).json({ error: "Voice audio not found on disk" });
+        }
+      }
+
+      let musicPath: string;
+      if (req.file) {
+        musicPath = req.file.path;
+      } else {
+        tempMusicPath = path.join(audioDir, `_music_${ad.id}_${Date.now()}.mp3`);
+        await downloadToFile(trackUrl, tempMusicPath);
+        musicPath = tempMusicPath;
+      }
+
+      const mixedName = `ad_${ad.id}_mixed_${Date.now()}.mp3`;
+      const mixedPath = path.join(audioDir, mixedName);
+      const { durationSeconds } = await mixVoiceWithMusic(voicePath, musicPath, mixedPath);
+
+      const updated = await storage.updateAd(ad.id, req.session.userId!, {
+        musicTrackUrl: trackUrl || null,
+        musicTrackName: trackName || null,
+        audioWithMusicUrl: `/audio/${mixedName}`,
+        duration: Math.round(durationSeconds),
+        status: "ready",
+      });
+
+      void archiveAudio({ userId: req.session.userId!, audioUrl: `/audio/${mixedName}`, folder: "/radio/ads" }).then(archived => {
+        if (archived.error) console.error(`[archive] ad mix ${ad.id}: ${archived.error}`);
+      });
+
+      logUsage(req.session.userId!, "audio_generation", "ad_mix");
+      res.json(updated);
+    } catch (error) {
+      console.error("Error mixing ad music:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to mix" });
+    } finally {
+      if (tempMusicPath) await fs.unlink(tempMusicPath).catch(() => {});
+      if (req.file) await fs.unlink(req.file.path).catch(() => {});
     }
   });
 
