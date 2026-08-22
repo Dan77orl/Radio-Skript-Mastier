@@ -174,11 +174,39 @@ export const insertPromptTemplateSchema = createInsertSchema(promptTemplates).om
 export type InsertPromptTemplate = z.infer<typeof insertPromptTemplateSchema>;
 export type PromptTemplate = typeof promptTemplates.$inferSelect;
 
+export const adClients = pgTable("ad_clients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  websiteUrl: text("website_url"),
+  instagramUrl: text("instagram_url"),
+  phone: text("phone"),
+  description: text("description"),
+  defaultCategory: text("default_category").default("general"),
+  defaultTargetDurationSeconds: integer("default_target_duration_seconds").default(30),
+  defaultVoiceId: text("default_voice_id"),
+  defaultVoiceName: text("default_voice_name"),
+  isActive: boolean("is_active").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+}, (table) => [
+  index("ad_clients_user_idx").on(table.userId),
+]);
+
+export const insertAdClientSchema = createInsertSchema(adClients).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAdClient = z.infer<typeof insertAdClientSchema>;
+export type AdClient = typeof adClients.$inferSelect;
+
 export const ads = pgTable("ads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   clientName: text("client_name"),
+  clientId: varchar("client_id").references(() => adClients.id, { onDelete: "set null" }),
   prompt: text("prompt").notNull(),
   websiteUrl: text("website_url"),
   instagramUrl: text("instagram_url"),
@@ -197,6 +225,7 @@ export const ads = pgTable("ads", {
   musicTrackUrl: text("music_track_url"),
   musicTrackName: text("music_track_name"),
   duration: integer("duration"),
+  downloadedAt: timestamp("downloaded_at"),
   status: text("status").notNull().default("draft"),
   stage: text("stage").default("prompt"),
   category: text("category").default("general"),

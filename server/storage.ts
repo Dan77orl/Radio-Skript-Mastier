@@ -1,4 +1,4 @@
-import { users, settings, dialogs, newsSources, newsItems, ads, adPresets, voices, programTypes, programs, automations, automationRuns, scheduleTemplates, hostShifts, customHolidays, usageLogs, supportMessages, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdPreset, type InsertAdPreset, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun, type ScheduleTemplate, type InsertScheduleTemplate, type HostShift, type InsertHostShift, type CustomHoliday, type InsertCustomHoliday, type UsageLog, type InsertUsageLog, type SupportMessage, type InsertSupportMessage } from "@shared/schema";
+import { users, settings, dialogs, newsSources, newsItems, ads, adClients, adPresets, voices, programTypes, programs, automations, automationRuns, scheduleTemplates, hostShifts, customHolidays, usageLogs, supportMessages, type User, type InsertUser, type Settings, type InsertSettings, type Dialog, type InsertDialog, type NewsSource, type InsertNewsSource, type NewsItem, type InsertNewsItem, type Ad, type InsertAd, type AdClient, type InsertAdClient, type AdPreset, type InsertAdPreset, type Voice, type InsertVoice, type ProgramType, type InsertProgramType, type Program, type InsertProgram, type Automation, type InsertAutomation, type AutomationRun, type InsertAutomationRun, type ScheduleTemplate, type InsertScheduleTemplate, type HostShift, type InsertHostShift, type CustomHoliday, type InsertCustomHoliday, type UsageLog, type InsertUsageLog, type SupportMessage, type InsertSupportMessage } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, sql, and, or, isNull } from "drizzle-orm";
 
@@ -181,6 +181,13 @@ export interface IStorage {
   updateAd(id: string, userId: string, ad: Partial<InsertAd>): Promise<Ad | undefined>;
   deleteAd(id: string, userId: string): Promise<boolean>;
   
+  getAdClients(userId: string): Promise<AdClient[]>;
+  getAdClient(id: string, userId?: string): Promise<AdClient | undefined>;
+  createAdClient(client: InsertAdClient): Promise<AdClient>;
+  updateAdClient(id: string, userId: string, client: Partial<InsertAdClient>): Promise<AdClient | undefined>;
+  deleteAdClient(id: string, userId: string): Promise<boolean>;
+  getAdsByClient(clientId: string, userId: string): Promise<Ad[]>;
+
   getAdPresets(userId: string): Promise<AdPreset[]>;
   getAdPreset(id: string, userId?: string): Promise<AdPreset | undefined>;
   createAdPreset(preset: InsertAdPreset): Promise<AdPreset>;
@@ -520,6 +527,42 @@ export class DatabaseStorage implements IStorage {
   async deleteAd(id: string, userId: string): Promise<boolean> {
     const result = await db.delete(ads).where(and(eq(ads.id, id), eq(ads.userId, userId))).returning();
     return result.length > 0;
+  }
+
+  async getAdClients(userId: string): Promise<AdClient[]> {
+    return db.select().from(adClients)
+      .where(eq(adClients.userId, userId))
+      .orderBy(asc(adClients.sortOrder), asc(adClients.name));
+  }
+
+  async getAdClient(id: string, userId?: string): Promise<AdClient | undefined> {
+    const conditions = userId ? and(eq(adClients.id, id), eq(adClients.userId, userId)) : eq(adClients.id, id);
+    const [client] = await db.select().from(adClients).where(conditions);
+    return client || undefined;
+  }
+
+  async createAdClient(insertClient: InsertAdClient): Promise<AdClient> {
+    const [client] = await db.insert(adClients).values(insertClient).returning();
+    return client;
+  }
+
+  async updateAdClient(id: string, userId: string, updates: Partial<InsertAdClient>): Promise<AdClient | undefined> {
+    const [updated] = await db.update(adClients)
+      .set(updates)
+      .where(and(eq(adClients.id, id), eq(adClients.userId, userId)))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteAdClient(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(adClients).where(and(eq(adClients.id, id), eq(adClients.userId, userId))).returning();
+    return result.length > 0;
+  }
+
+  async getAdsByClient(clientId: string, userId: string): Promise<Ad[]> {
+    return db.select().from(ads)
+      .where(and(eq(ads.clientId, clientId), eq(ads.userId, userId)))
+      .orderBy(desc(ads.createdAt));
   }
 
   async getAdPresets(userId: string): Promise<AdPreset[]> {

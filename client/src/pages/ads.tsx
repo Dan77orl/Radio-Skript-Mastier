@@ -58,9 +58,9 @@ import {
   Sparkles, Wand2, Loader2, Trash2, Play, Building2, ChevronRight, 
   Check, RefreshCw, Volume2, Music, FileText, Link, Instagram,
   Clock, PauseCircle, PlayCircle, ArrowLeft, Upload, X, File,
-  Plus, Pencil, Users, User, Mic, Settings2, FileStack, Download
+  Plus, Pencil, Users, User, Mic, Settings2, FileStack, Download, Phone
 } from "lucide-react";
-import type { Ad, Voice, AdPreset } from "@shared/schema";
+import type { Ad, Voice, AdPreset, AdClient } from "@shared/schema";
 import { HintTooltip } from "@/components/hint-tooltip";
 
 interface ExtractedFile {
@@ -232,6 +232,10 @@ export default function AdsPage() {
 
   const { data: adPresets } = useQuery<AdPreset[]>({
     queryKey: ["/api/ad-presets"],
+  });
+
+  const { data: adClients } = useQuery<AdClient[]>({
+    queryKey: ["/api/ad-clients"],
   });
 
   const voiceSearchUrl = `/api/elevenlabs/voices/search?q=${encodeURIComponent(voiceSearchQuery)}&gender=${voiceSearchGender}&language=${encodeURIComponent(voiceSearchLanguage)}`;
@@ -662,6 +666,18 @@ export default function AdsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
     },
   });
+
+  // Downloads go through plain <a download> links straight to the stream URL,
+  // so the server can't see them — stamp the mark explicitly on click.
+  const markAdDownloaded = (adId: string) => {
+    apiRequest("POST", `/api/ads/${adId}/mark-downloaded`)
+      .then(async (res) => {
+        const updated = await res.json();
+        setCurrentAd(prev => (prev && prev.id === adId ? { ...prev, downloadedAt: updated.downloadedAt } : prev));
+        queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
+      })
+      .catch(() => {});
+  };
 
   const searchMusic = async () => {
     if (!musicSearchQuery.trim()) return;
@@ -1553,7 +1569,7 @@ export default function AdsPage() {
                           </div>
                           <div className="flex items-center gap-0.5 shrink-0">
                             <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-                              <a href={version.url} download={`${currentAd.title || "ad"}_v${idx + 1}.mp3`} data-testid={`download-version-${idx}`}>
+                              <a href={version.url} download={`${currentAd.title || "ad"}_v${idx + 1}.mp3`} onClick={() => markAdDownloaded(currentAd.id)} data-testid={`download-version-${idx}`}>
                                 <Download className="h-3.5 w-3.5" />
                               </a>
                             </Button>
@@ -1647,10 +1663,16 @@ export default function AdsPage() {
                             {withMusic && mixedUrl ? t("ads.versionWithMusic") : t("ads.versionVoiceOnly")}
                           </p>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`h-7 w-7 ${currentAd.downloadedAt ? "text-emerald-600 dark:text-emerald-400" : ""}`}
+                          asChild
+                        >
                           <a
                             href={activeUrl}
                             download={`${currentAd.title || "ad"}${withMusic && mixedUrl ? "_music" : ""}.mp3`}
+                            onClick={() => markAdDownloaded(currentAd.id)}
                             data-testid="button-download-audio"
                           >
                             <Download className="h-3.5 w-3.5" />
@@ -2145,6 +2167,217 @@ export default function AdsPage() {
     return contentTypes.find(t => t.value === type) || contentTypes[0];
   };
 
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [editingClient, setEditingClient] = useState<AdClient | null>(null);
+  const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
+  const [clientPrompt, setClientPrompt] = useState("");
+  const [clientImage, setClientImage] = useState<File | null>(null);
+  const [clientImagePreview, setClientImagePreview] = useState<string | null>(null);
+  const [isCreatingFromClient, setIsCreatingFromClient] = useState(false);
+  const clientImageInputRef = useRef<HTMLInputElement | null>(null);
+
+  const selectedClient = adClients?.find(c => c.id === selectedClientId) || null;
+  const selectedClientAds = selectedClient ? (ads?.filter(a => a.clientId === selectedClient.id) || []) : [];
+
+  const clientFormSchema = z.object({
+    name: z.string().min(2),
+    websiteUrl: z.string().optional(),
+    instagramUrl: z.string().optional(),
+    phone: z.string().optional(),
+    description: z.string().optional(),
+    defaultCategory: z.string().default("general"),
+    defaultTargetDurationSeconds: z.number().min(10).max(120).default(30),
+    defaultVoiceId: z.string().optional(),
+    isActive: z.boolean().default(true),
+  });
+
+  const clientForm = useForm<z.infer<typeof clientFormSchema>>({
+    resolver: zodResolver(clientFormSchema),
+    defaultValues: {
+      name: "",
+      websiteUrl: "",
+      instagramUrl: "",
+      phone: "",
+      description: "",
+      defaultCategory: "general",
+      defaultTargetDurationSeconds: 30,
+      defaultVoiceId: "",
+      isActive: true,
+    },
+  });
+
+  const clientSavedVoiceIdSet = new Set(voices?.filter(v => v.isActive).map(v => v.elevenLabsVoiceId) || []);
+  const clientVoiceOptions = [
+    ...(voices?.filter(v => v.isActive).map(v => ({ id: v.elevenLabsVoiceId, name: getCleanVoiceName(v), source: "saved" as const })) || []),
+    ...(elevenLabsVoices?.voices?.filter(v => !clientSavedVoiceIdSet.has(v.voice_id)).map(v => ({ id: v.voice_id, name: v.name, source: "elevenlabs" as const })) || []),
+  ];
+
+  const clientPayloadFromForm = (data: z.infer<typeof clientFormSchema>) => ({
+    ...data,
+    defaultVoiceId: data.defaultVoiceId || null,
+    defaultVoiceName: data.defaultVoiceId
+      ? clientVoiceOptions.find(v => v.id === data.defaultVoiceId)?.name || null
+      : null,
+  });
+
+  const createClientMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof clientFormSchema>) => {
+      const response = await apiRequest("POST", "/api/ad-clients", clientPayloadFromForm(data));
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ad-clients"] });
+      setIsClientDialogOpen(false);
+      clientForm.reset();
+      toast({ title: t("ads.clientCreated") });
+    },
+    onError: (error: Error) => {
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateClientMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: z.infer<typeof clientFormSchema> }) => {
+      const response = await apiRequest("PATCH", `/api/ad-clients/${id}`, clientPayloadFromForm(data));
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ad-clients"] });
+      setIsClientDialogOpen(false);
+      setEditingClient(null);
+      clientForm.reset();
+      toast({ title: t("ads.clientUpdated") });
+    },
+    onError: (error: Error) => {
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteClientMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/ad-clients/${id}`);
+    },
+    onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ad-clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
+      if (selectedClientId === id) setSelectedClientId(null);
+      toast({ title: t("ads.clientDeleted") });
+    },
+    onError: (error: Error) => {
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
+    },
+  });
+
+  const onClientSubmit = (data: z.infer<typeof clientFormSchema>) => {
+    if (editingClient) {
+      updateClientMutation.mutate({ id: editingClient.id, data });
+    } else {
+      createClientMutation.mutate(data);
+    }
+  };
+
+  const openEditClientDialog = (client: AdClient) => {
+    setEditingClient(client);
+    clientForm.reset({
+      name: client.name,
+      websiteUrl: client.websiteUrl || "",
+      instagramUrl: client.instagramUrl || "",
+      phone: client.phone || "",
+      description: client.description || "",
+      defaultCategory: client.defaultCategory || "general",
+      defaultTargetDurationSeconds: client.defaultTargetDurationSeconds || 30,
+      defaultVoiceId: client.defaultVoiceId || "",
+      isActive: client.isActive !== false,
+    });
+    setIsClientDialogOpen(true);
+  };
+
+  const openNewClientDialog = () => {
+    setEditingClient(null);
+    clientForm.reset();
+    setIsClientDialogOpen(true);
+  };
+
+  const handleClientImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setClientImage(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setClientImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const openAdFromClient = (ad: Ad) => {
+    const voiceId = ad.voiceIds?.[0];
+    if (voiceId) {
+      setSelectedVoiceId(voiceId);
+      const name = clientVoiceOptions.find(v => v.id === voiceId)?.name;
+      if (name) setSelectedVoiceName(name);
+    }
+    setCurrentAd(ad);
+    setActiveTab("create");
+  };
+
+  // The recurring-client flow: paste fresh info (text or a WhatsApp screenshot),
+  // create the ad pre-filled from the client project and go straight to variants.
+  const handleCreateFromClient = async () => {
+    if (!selectedClient) return;
+    const hasText = clientPrompt.trim().length >= 5;
+    const hasImage = !!clientImage;
+    if (!hasText && !hasImage) return;
+
+    setIsCreatingFromClient(true);
+    try {
+      let description = clientPrompt.trim();
+      if (hasImage) {
+        const formData = new FormData();
+        formData.append("image", clientImage!);
+        if (description) formData.append("text", description);
+        const res = await fetch("/api/ads/parse-prompt-image", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error("Failed to parse image");
+        const parsed = await res.json();
+        if (parsed.description) {
+          description = description ? `${description}\n${parsed.description}` : parsed.description;
+        }
+      }
+      if (!description) throw new Error("Empty description");
+
+      const response = await apiRequest("POST", "/api/ads", {
+        title: selectedClient.name,
+        clientName: selectedClient.name,
+        clientId: selectedClient.id,
+        prompt: description,
+        websiteUrl: selectedClient.websiteUrl || undefined,
+        instagramUrl: selectedClient.instagramUrl || undefined,
+        category: selectedClient.defaultCategory || "general",
+        targetDurationSeconds: selectedClient.defaultTargetDurationSeconds || 30,
+        voiceIds: selectedClient.defaultVoiceId ? [selectedClient.defaultVoiceId] : undefined,
+        status: "draft",
+        stage: "prompt",
+      });
+      const ad = await response.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
+      setClientPrompt("");
+      setClientImage(null);
+      setClientImagePreview(null);
+      if (selectedClient.defaultVoiceId) {
+        setSelectedVoiceId(selectedClient.defaultVoiceId);
+        setSelectedVoiceName(selectedClient.defaultVoiceName || null);
+      }
+      setCurrentAd(ad);
+      setActiveTab("create");
+      generateVariantsMutation.mutate(ad.id);
+    } catch (error) {
+      toast({ title: t("common.error"), variant: "destructive" });
+    } finally {
+      setIsCreatingFromClient(false);
+    }
+  };
+
   return (
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -2161,11 +2394,17 @@ export default function AdsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-xl grid-cols-3">
           <HintTooltip hint={t("hints.ads.createTab")}>
             <TabsTrigger value="create" data-testid="tab-create">
               <Sparkles className="mr-2 h-4 w-4" />
               {t("ads.creation")}
+            </TabsTrigger>
+          </HintTooltip>
+          <HintTooltip hint={t("hints.ads.clientsTab")}>
+            <TabsTrigger value="clients" data-testid="tab-clients">
+              <Building2 className="mr-2 h-4 w-4" />
+              {t("ads.clients")}
             </TabsTrigger>
           </HintTooltip>
           <HintTooltip hint={t("hints.ads.presetsTab")}>
@@ -2563,12 +2802,18 @@ export default function AdsPage() {
                                 {ad.duration} {t("ads.sec")}
                               </Badge>
                             )}
+                            {ad.downloadedAt && (
+                              <Badge className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border-transparent" data-testid={`badge-ad-downloaded-${ad.id}`}>
+                                <Download className="h-3 w-3 mr-1" />
+                                {t("ads.downloadedBadge")}
+                              </Badge>
+                            )}
                           </div>
                           {ad.clientName && (
                             <p className="text-sm text-muted-foreground truncate">{ad.clientName}</p>
                           )}
                           <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                            <span>{t("ads.stage")}: {t(`ads.stages.${ad.stage}`, ad.stage)}</span>
+                            <span>{t("ads.stage")}: {t(`ads.stages.${ad.stage}`, ad.stage || "")}</span>
                             {ad.createdAt && (
                               <span>{new Date(ad.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                             )}
@@ -2623,6 +2868,487 @@ export default function AdsPage() {
           </div>
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="clients" className="mt-6">
+          {selectedClient ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <Button variant="outline" onClick={() => setSelectedClientId(null)} data-testid="button-back-to-clients">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  {t("ads.backToClients")}
+                </Button>
+                <Button variant="outline" onClick={() => openEditClientDialog(selectedClient)} data-testid="button-edit-client">
+                  <Pencil className="mr-2 h-4 w-4" />
+                  {t("common.edit")}
+                </Button>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    {selectedClient.name}
+                  </CardTitle>
+                  {selectedClient.description && (
+                    <CardDescription className="whitespace-pre-wrap">{selectedClient.description}</CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedClient.instagramUrl && (
+                      <Badge variant="outline"><Instagram className="h-3 w-3 mr-1" />{selectedClient.instagramUrl}</Badge>
+                    )}
+                    {selectedClient.websiteUrl && (
+                      <Badge variant="outline"><Link className="h-3 w-3 mr-1" />{selectedClient.websiteUrl}</Badge>
+                    )}
+                    {selectedClient.phone && (
+                      <Badge variant="outline"><Phone className="h-3 w-3 mr-1" />{selectedClient.phone}</Badge>
+                    )}
+                    <Badge variant="secondary">{getCategoryLabel(selectedClient.defaultCategory || "general")}</Badge>
+                    <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />{selectedClient.defaultTargetDurationSeconds || 30} {t("ads.sec")}</Badge>
+                    {selectedClient.defaultVoiceName && (
+                      <Badge variant="secondary"><Volume2 className="h-3 w-3 mr-1" />{selectedClient.defaultVoiceName}</Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Sparkles className="h-4 w-4" />
+                    {t("ads.newAdForClient")}
+                  </CardTitle>
+                  <CardDescription>{t("ads.clientPromptHint")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2 items-start">
+                    <div className="flex-1 space-y-2">
+                      <Textarea
+                        placeholder={t("ads.clientPromptPlaceholder")}
+                        value={clientPrompt}
+                        onChange={(e) => setClientPrompt(e.target.value)}
+                        rows={3}
+                        data-testid="textarea-client-prompt"
+                      />
+                      {clientImagePreview && (
+                        <div className="relative inline-block">
+                          <img src={clientImagePreview} alt="preview" className="h-16 rounded-md border" />
+                          <button
+                            type="button"
+                            className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs"
+                            onClick={() => { setClientImage(null); setClientImagePreview(null); }}
+                            data-testid="button-remove-client-image"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <VoiceInput onTranscript={(text) => setClientPrompt((prev) => (prev ? prev + " " : "") + text)} />
+                      <input
+                        ref={clientImageInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onChange={handleClientImageSelect}
+                        className="hidden"
+                        data-testid="input-client-image"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => clientImageInputRef.current?.click()}
+                        data-testid="button-upload-client-image"
+                      >
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <Button
+                    className="w-full mt-3"
+                    onClick={handleCreateFromClient}
+                    disabled={isCreatingFromClient || (clientPrompt.trim().length < 5 && !clientImage)}
+                    data-testid="button-create-from-client"
+                  >
+                    {isCreatingFromClient ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {t("ads.creating")}
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        {t("ads.createAndGenerate")}
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">{t("ads.clientAds")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {selectedClientAds.length > 0 ? (
+                    <div className="space-y-3">
+                      {selectedClientAds.map((ad) => (
+                        <div
+                          key={ad.id}
+                          className="flex items-center justify-between gap-4 rounded-lg border p-4 cursor-pointer hover-elevate"
+                          onClick={() => openAdFromClient(ad)}
+                          data-testid={`client-ad-item-${ad.id}`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-medium truncate">{ad.title}</h4>
+                              {ad.duration && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  {ad.duration} {t("ads.sec")}
+                                </Badge>
+                              )}
+                              {ad.downloadedAt && (
+                                <Badge className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border-transparent" data-testid={`badge-client-ad-downloaded-${ad.id}`}>
+                                  <Download className="h-3 w-3 mr-1" />
+                                  {t("ads.downloadedBadge")}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                              <span>{t("ads.stage")}: {t(`ads.stages.${ad.stage}`, ad.stage || "")}</span>
+                              {ad.createdAt && (
+                                <span>{new Date(ad.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {ad.status === "ready" ? (
+                              <Badge className="bg-green-500">{t("ads.statusReady")}</Badge>
+                            ) : ad.status === "generating" ? (
+                              <Badge className="bg-yellow-500">{t("ads.statusGenerating")}</Badge>
+                            ) : (
+                              <Badge variant="outline">{t("ads.statusInProgress")}</Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Sparkles className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                      <p>{t("ads.noClientAdsYet")}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+                <div>
+                  <h2 className="text-xl font-semibold">{t("ads.clients")}</h2>
+                  <p className="text-muted-foreground text-sm">{t("ads.clientsSubtitle")}</p>
+                </div>
+                <Button onClick={openNewClientDialog} data-testid="button-new-client">
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t("ads.newClient")}
+                </Button>
+              </div>
+
+              {adClients && adClients.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {adClients.map((client) => {
+                    const count = ads?.filter(a => a.clientId === client.id).length || 0;
+                    return (
+                      <Card
+                        key={client.id}
+                        className={`cursor-pointer hover-elevate ${!client.isActive ? "opacity-60" : ""}`}
+                        onClick={() => setSelectedClientId(client.id)}
+                        data-testid={`card-client-${client.id}`}
+                      >
+                        <CardHeader>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-1 min-w-0">
+                              <CardTitle className="flex items-center gap-2 text-base">
+                                <Building2 className="h-4 w-4 shrink-0" />
+                                <span className="truncate">{client.name}</span>
+                              </CardTitle>
+                              {client.instagramUrl && (
+                                <CardDescription className="flex items-center gap-1 text-sm truncate">
+                                  <Instagram className="h-3 w-3 shrink-0" />
+                                  {client.instagramUrl}
+                                </CardDescription>
+                              )}
+                            </div>
+                            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditClientDialog(client)}
+                                data-testid={`button-edit-client-${client.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" data-testid={`button-delete-client-${client.id}`}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>{t("ads.deleteClientConfirm")}</AlertDialogTitle>
+                                    <AlertDialogDescription>{t("ads.deleteClientDesc")}</AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => deleteClientMutation.mutate(client.id)}>
+                                      {t("common.delete")}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="secondary">{getCategoryLabel(client.defaultCategory || "general")}</Badge>
+                            <Badge variant="secondary">{client.defaultTargetDurationSeconds || 30}{t("ads.sec")}</Badge>
+                            {client.defaultVoiceName && (
+                              <Badge variant="outline"><Volume2 className="h-3 w-3 mr-1" />{client.defaultVoiceName}</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">{t("ads.adsCount", { count })}</p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="py-12">
+                    <div className="flex flex-col items-center justify-center text-center">
+                      <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium mb-2">{t("ads.noClients")}</h3>
+                      <p className="text-muted-foreground mb-4">{t("ads.noClientsDesc")}</p>
+                      <Button onClick={openNewClientDialog}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        {t("ads.newClient")}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          <Dialog open={isClientDialogOpen} onOpenChange={setIsClientDialogOpen}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingClient ? t("ads.editClient") : t("ads.createClient")}</DialogTitle>
+                <DialogDescription>{t("ads.clientDialogDesc")}</DialogDescription>
+              </DialogHeader>
+              <Form {...clientForm}>
+                <form onSubmit={clientForm.handleSubmit(onClientSubmit)} className="space-y-4">
+                  <FormField
+                    control={clientForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("ads.clientName")}</FormLabel>
+                        <FormControl>
+                          <Input placeholder={t("ads.clientNamePlaceholder")} {...field} data-testid="input-client-form-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={clientForm.control}
+                      name="websiteUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("ads.website")}</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Link className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input placeholder="https://..." className="pl-9" {...field} data-testid="input-client-form-website" />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={clientForm.control}
+                      name="instagramUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Instagram</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input placeholder="@username" className="pl-9" {...field} data-testid="input-client-form-instagram" />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={clientForm.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("ads.clientPhone")}</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input placeholder="+90..." className="pl-9" {...field} data-testid="input-client-form-phone" />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={clientForm.control}
+                      name="defaultVoiceId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("ads.defaultVoice")}</FormLabel>
+                          <Select value={field.value || "none"} onValueChange={(v) => field.onChange(v === "none" ? "" : v)}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-client-voice">
+                                <SelectValue placeholder={t("ads.selectVoice")} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">{t("ads.noVoice")}</SelectItem>
+                              {clientVoiceOptions.filter(v => v.source === "saved").length > 0 && (
+                                <div className="px-2 py-1 text-xs text-muted-foreground font-medium">{t("ads.savedVoices")}</div>
+                              )}
+                              {clientVoiceOptions.filter(v => v.source === "saved").map(v => (
+                                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                              ))}
+                              {clientVoiceOptions.filter(v => v.source === "elevenlabs").length > 0 && (
+                                <div className="px-2 py-1 text-xs text-muted-foreground font-medium mt-1 border-t pt-1">ElevenLabs</div>
+                              )}
+                              {clientVoiceOptions.filter(v => v.source === "elevenlabs").map(v => (
+                                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={clientForm.control}
+                      name="defaultCategory"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("ads.category")}</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-client-form-category">
+                                <SelectValue placeholder={t("ads.selectCategory")} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {categoryKeys.map((key) => (
+                                <SelectItem key={key} value={key}>
+                                  {t(`ads.categories.${key}`, key)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={clientForm.control}
+                      name="defaultTargetDurationSeconds"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("ads.duration")}</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                type="number"
+                                min={10}
+                                max={120}
+                                className="pl-9"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 30)}
+                                data-testid="input-client-form-duration"
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={clientForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("ads.clientInfo")}</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder={t("ads.clientInfoPlaceholder")} rows={4} {...field} data-testid="textarea-client-form-info" />
+                        </FormControl>
+                        <FormDescription>{t("ads.clientInfoDesc")}</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={clientForm.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <FormLabel className="mb-0">{t("ads.clientActive")}</FormLabel>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-client-active" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={createClientMutation.isPending || updateClientMutation.isPending}
+                    data-testid="button-save-client"
+                  >
+                    {(createClientMutation.isPending || updateClientMutation.isPending) && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    {editingClient ? t("common.save") : t("ads.createClient")}
+                  </Button>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="presets" className="mt-6">

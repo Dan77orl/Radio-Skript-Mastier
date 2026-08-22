@@ -5,7 +5,7 @@ import { registerUser, loginUser, logoutUser, getCurrentUser, completeOnboarding
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
-import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertAdPresetSchema, insertVoiceSchema, insertScheduleTemplateSchema, insertHostShiftSchema, insertCustomHolidaySchema } from "@shared/schema";
+import { insertSettingsSchema, insertDialogSchema, insertNewsSourceSchema, insertAdSchema, insertAdClientSchema, insertAdPresetSchema, insertVoiceSchema, insertScheduleTemplateSchema, insertHostShiftSchema, insertCustomHolidaySchema } from "@shared/schema";
 import { hasExactScriptDirective, extractDurationSecondsFromPrompt } from "@shared/prompt-length";
 import { getHolidaysForDate, getHolidaysForYear, getHolidaysForMonth, getHolidayInfo, setCustomHolidays } from "./holidays";
 import { getPromptStrings, getGenderLabel, getDefaultHostName, getLanguageDirective, getLanguageName } from "./prompt-locale";
@@ -3870,6 +3870,74 @@ Create exactly ${dailyCount} dialogs.`;
     }
   });
 
+  app.get("/api/ad-clients", async (req, res) => {
+    try {
+      const clients = await storage.getAdClients(req.session.userId!);
+      res.json(clients);
+    } catch (error) {
+      console.error("Error getting ad clients:", error);
+      res.status(500).json({ error: "Failed to get ad clients" });
+    }
+  });
+
+  app.get("/api/ad-clients/:id", async (req, res) => {
+    try {
+      const client = await storage.getAdClient(req.params.id, req.session.userId!);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      res.json(client);
+    } catch (error) {
+      console.error("Error getting ad client:", error);
+      res.status(500).json({ error: "Failed to get ad client" });
+    }
+  });
+
+  app.post("/api/ad-clients", async (req, res) => {
+    try {
+      const parsed = insertAdClientSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const client = await storage.createAdClient({ ...parsed.data, userId: req.session.userId });
+      res.json(client);
+    } catch (error) {
+      console.error("Error creating ad client:", error);
+      res.status(500).json({ error: "Failed to create ad client" });
+    }
+  });
+
+  app.patch("/api/ad-clients/:id", async (req, res) => {
+    try {
+      const partialSchema = insertAdClientSchema.partial();
+      const parsed = partialSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const updated = await storage.updateAdClient(req.params.id, req.session.userId!, parsed.data);
+      if (!updated) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating ad client:", error);
+      res.status(500).json({ error: "Failed to update ad client" });
+    }
+  });
+
+  app.delete("/api/ad-clients/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteAdClient(req.params.id, req.session.userId!);
+      if (!deleted) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting ad client:", error);
+      res.status(500).json({ error: "Failed to delete ad client" });
+    }
+  });
+
   app.get("/api/ad-presets", async (req, res) => {
     try {
       const presets = await storage.getAdPresets(req.session.userId!);
@@ -4338,6 +4406,35 @@ ${ctx.stationDescription ? `О станции: ${ctx.stationDescription}` : ""}
       const speakersCount = ad.speakersCount || 1;
       const isMultiSpeaker = speakersCount > 1;
 
+      // A recurring client carries standing info (services, contacts) and past
+      // scripts that define the voice of their ads — feed both to the model so
+      // this week's spot sounds like last week's.
+      let clientInfoBlock = "";
+      let styleExamplesBlock = "";
+      if (ad.clientId) {
+        const adClient = await storage.getAdClient(ad.clientId, req.session.userId!);
+        if (adClient) {
+          const infoLines = [
+            adClient.description || "",
+            adClient.phone ? (userLang === "ru" ? `Телефон: ${adClient.phone}` : `Phone: ${adClient.phone}`) : "",
+          ].filter(Boolean);
+          if (infoLines.length > 0) {
+            clientInfoBlock = userLang === "ru"
+              ? `\nПостоянная информация о клиенте:\n${infoLines.join("\n")}`
+              : `\nStanding client information:\n${infoLines.join("\n")}`;
+          }
+          const pastScripts = (await storage.getAdsByClient(ad.clientId, req.session.userId!))
+            .filter(a => a.id !== ad.id && a.selectedVariantText)
+            .slice(0, 3)
+            .map(a => (a.selectedVariantText || "").slice(0, 1500));
+          if (pastScripts.length > 0) {
+            styleExamplesBlock = userLang === "ru"
+              ? `\nПрошлые ролики этого клиента — образец стиля. Сохраняй ту же подачу, структуру, форматирование и эмоциональные теги в квадратных скобках:\n${pastScripts.map((s, i) => `--- Пример ${i + 1} ---\n${s}`).join("\n")}`
+              : `\nPast ads for this client — style reference. Keep the same delivery, structure, formatting and bracketed emotion tags:\n${pastScripts.map((s, i) => `--- Example ${i + 1} ---\n${s}`).join("\n")}`;
+          }
+        }
+      }
+
       let multiSpeakerInstructions = "";
       if (isMultiSpeaker) {
         if (userLang === "ru") {
@@ -4371,6 +4468,8 @@ ${ad.websiteUrl ? `- Сайт: ${ad.websiteUrl}` : ""}
 ${ad.instagramUrl ? `- Instagram: ${ad.instagramUrl}` : ""}
 ${ad.clientName ? `- Клиент: ${ad.clientName}` : ""}
 - Целевая длительность: ${ad.targetDurationSeconds || 30} секунд при чтении
+${clientInfoBlock}
+${styleExamplesBlock}
 ${multiSpeakerInstructions}
 
 Каждый вариант должен быть уникальным по стилю и подаче:
@@ -4400,6 +4499,8 @@ ${ad.websiteUrl ? `- Website: ${ad.websiteUrl}` : ""}
 ${ad.instagramUrl ? `- Instagram: ${ad.instagramUrl}` : ""}
 ${ad.clientName ? `- Client: ${ad.clientName}` : ""}
 - Target duration: ${ad.targetDurationSeconds || 30} seconds when read aloud
+${clientInfoBlock}
+${styleExamplesBlock}
 ${multiSpeakerInstructions}
 
 Each variant should be unique in style and delivery:
@@ -4937,6 +5038,10 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
 
       const remuxed = await ensureRemuxed(audioPath);
 
+      // Mark before streaming: the lists highlight already-downloaded ads.
+      storage.updateAd(ad.id, req.session.userId!, { downloadedAt: new Date() })
+        .catch(err => console.error("Could not mark ad downloaded:", err?.message));
+
       const filename = `${ad.title || "ad"}.mp3`;
       res.setHeader("Content-Type", "audio/mpeg");
       res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
@@ -4947,6 +5052,22 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
     } catch (error) {
       console.error("Error downloading ad audio:", error);
       res.status(500).json({ error: "Failed to download audio" });
+    }
+  });
+
+  // The audio-stage download buttons are plain <a download> links straight to the
+  // stream URL, so the download endpoint above never sees those clicks — the
+  // client stamps the mark explicitly through this route.
+  app.post("/api/ads/:id/mark-downloaded", async (req, res) => {
+    try {
+      const updated = await storage.updateAd(req.params.id, req.session.userId!, { downloadedAt: new Date() });
+      if (!updated) {
+        return res.status(404).json({ error: "Ad not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error marking ad downloaded:", error);
+      res.status(500).json({ error: "Failed to mark ad downloaded" });
     }
   });
 
