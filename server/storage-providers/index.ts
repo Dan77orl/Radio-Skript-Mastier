@@ -139,15 +139,24 @@ export async function restoreAudio(opts: { userId: string; audioUrl: string }): 
   if (!fileName) return false;
 
   const entry = await storage.getAudioArchiveEntry(opts.userId, fileName);
-  if (!entry) return false;
-
   const settings = await storage.getSettings(opts.userId);
   const localPath = path.join(process.cwd(), "public", "audio", fileName);
 
   try {
     let data: Buffer | null = null;
 
-    if (entry.provider === "google_drive" && entry.fileId && settings?.googleDriveRefreshToken) {
+    if (!entry) {
+      // Legacy files uploaded before the registry existed (the old pipeline
+      // archived programme audio without recording it) — find them on Drive
+      // by exact name.
+      if (settings?.googleDriveRefreshToken) {
+        const legacyId = await googleDrive.findFileIdByName(settings.googleDriveRefreshToken, fileName);
+        if (legacyId) {
+          data = await googleDrive.downloadFile(settings.googleDriveRefreshToken, legacyId);
+        }
+      }
+      if (!data) return false;
+    } else if (entry.provider === "google_drive" && entry.fileId && settings?.googleDriveRefreshToken) {
       data = await googleDrive.downloadFile(settings.googleDriveRefreshToken, entry.fileId);
     } else if (entry.provider === "yandex" && entry.remotePath && settings?.yandexDiskToken) {
       const hrefRes = await fetch(
@@ -165,10 +174,10 @@ export async function restoreAudio(opts: { userId: string; audioUrl: string }): 
 
     await fs.mkdir(path.dirname(localPath), { recursive: true });
     await fs.writeFile(localPath, data);
-    console.log(`[restore] brought back ${fileName} from ${entry.provider}`);
+    console.log(`[restore] brought back ${fileName} from ${entry?.provider || "google_drive (legacy)"}`);
     return true;
   } catch (err: any) {
-    console.error(`[restore] ${entry.provider} download failed for ${fileName}:`, err?.message);
+    console.error(`[restore] ${entry?.provider || "legacy"} download failed for ${fileName}:`, err?.message);
     return false;
   }
 }

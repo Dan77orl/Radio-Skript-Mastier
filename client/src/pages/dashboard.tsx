@@ -9,8 +9,9 @@ import { Link } from "wouter";
 import {
   Mic, Calendar, CheckCircle, Clock, AlertCircle, PlayCircle, PauseCircle,
   Radio, Zap, Volume2, Upload, AudioLines, TrendingUp, Activity, Podcast,
-  ArrowRight, BarChart3
+  ArrowRight, BarChart3, Download
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { HintTooltip } from "@/components/hint-tooltip";
 import type { Program, ProgramType, Settings } from "@shared/schema";
 
@@ -54,6 +55,7 @@ export default function Dashboard() {
   const [playingId, setPlayingId] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { t } = useTranslation();
+  const { toast } = useToast();
 
   const { data: programs, isLoading: programsLoading } = useQuery<Program[]>({
     queryKey: ["/api/programs"],
@@ -76,6 +78,11 @@ export default function Dashboard() {
     };
   }, []);
 
+  // Stream through the API instead of the static /audio path: the server can
+  // then restore a file from the cloud archive when a republish wiped it.
+  const resolveAudioUrl = (url: string) =>
+    `/api/stream-audio/${encodeURIComponent(url.replace(/^\/?audio\//, ""))}`;
+
   const playAudio = (audioUrl: string, id: number) => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -84,8 +91,12 @@ export default function Dashboard() {
       setPlayingId(null);
       return;
     }
-    const audio = new Audio(audioUrl);
+    const audio = new Audio(resolveAudioUrl(audioUrl));
     audioRef.current = audio;
+    audio.onerror = () => {
+      setPlayingId(null);
+      toast({ title: t("ads.audioFileMissing"), variant: "destructive" });
+    };
     audio.play().catch((err) => console.error("Error playing audio:", err));
     setPlayingId(id);
     audio.onended = () => setPlayingId(null);
@@ -409,6 +420,12 @@ export default function Dashboard() {
                         </span>
                       )}
                       {getStatusBadge(program.status)}
+                      {program.downloadedAt && (
+                        <Badge className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border-transparent" data-testid={`badge-dash-downloaded-${program.id}`}>
+                          <Download className="h-3 w-3 mr-1" />
+                          {t("shows.downloadedBadge")}
+                        </Badge>
+                      )}
                       {program.audioUrl && (
                         <HintTooltip hint={t("hints.dashboard.playAudio")}>
                           <Button

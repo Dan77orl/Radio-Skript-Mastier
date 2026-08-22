@@ -554,6 +554,17 @@ export default function AdsPage() {
     }
   }, [ads, currentAd]);
 
+  // The client's voice travels with the ad (ad.voiceIds is stamped at
+  // creation), so opening any ad pre-selects its attached voice — no hunting
+  // through 200+ voices. Picking another voice in the tabs still overrides it.
+  useEffect(() => {
+    if (!currentAd?.id) return;
+    const attached = currentAd.voiceIds?.[0] || null;
+    setSelectedVoiceId(attached);
+    if (!attached) setSelectedVoiceName(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentAd?.id]);
+
   useEffect(() => {
     if (currentAd?.speakerVoiceMap) {
       try {
@@ -1241,6 +1252,9 @@ export default function AdsPage() {
         const canSynthesize = isMultiSpeakerAd
           ? adSpeakers.every(s => adSpeakerVoiceMap[s])
           : !!selectedVoiceId;
+        const attachedVoiceName = selectedVoiceId
+          ? (allVoiceOptions.find(v => v.id === selectedVoiceId)?.name || selectedVoiceName || selectedVoiceId)
+          : null;
 
         return (
           <Card>
@@ -1301,6 +1315,17 @@ export default function AdsPage() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {!isMultiSpeakerAd && selectedVoiceId && (
+                <div className="rounded-lg border border-primary bg-primary/5 p-3 flex items-center gap-3" data-testid="attached-voice-panel">
+                  <Volume2 className="h-4 w-4 text-primary shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{attachedVoiceName}</p>
+                    <p className="text-xs text-muted-foreground">{t("ads.attachedVoiceHint")}</p>
+                  </div>
+                  <Check className="h-4 w-4 text-green-500 shrink-0" />
                 </div>
               )}
 

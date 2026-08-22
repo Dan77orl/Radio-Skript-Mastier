@@ -5620,9 +5620,20 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
         page_size: String(pageSize),
         page: String(page),
       });
+      // The UI sends readable names ("russian"); the shared-voices API only
+      // understands ISO 639-1 codes — anything else silently matches nothing.
+      const searchLangCodes: Record<string, string> = {
+        arabic: "ar", bulgarian: "bg", chinese: "zh", croatian: "hr", czech: "cs",
+        danish: "da", dutch: "nl", english: "en", filipino: "fil", finnish: "fi",
+        french: "fr", german: "de", greek: "el", hebrew: "he", hindi: "hi",
+        hungarian: "hu", indonesian: "id", italian: "it", japanese: "ja", korean: "ko",
+        malay: "ms", norwegian: "no", polish: "pl", portuguese: "pt", romanian: "ro",
+        russian: "ru", slovak: "sk", spanish: "es", swedish: "sv", tamil: "ta",
+        turkish: "tr", ukrainian: "uk", vietnamese: "vi",
+      };
       if (query) params.append("search", query);
       if (gender && gender !== "all") params.append("gender", gender);
-      if (language && language !== "all") params.append("language", language);
+      if (language && language !== "all") params.append("language", searchLangCodes[language] || language);
       if (accent && accent !== "all") params.append("accent", accent);
       if (age && age !== "all") params.append("age", age);
       if (useCase && useCase !== "all") params.append("use_case", useCase);

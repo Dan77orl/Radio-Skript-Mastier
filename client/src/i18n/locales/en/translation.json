@@ -592,6 +592,7 @@
     "clientSmartHint": "Type, dictate or attach a screenshot. Review the card, pick a voice and save.",
     "editManually": "Edit manually",
     "audioFileMissing": "Audio file is gone from the server and not found in the cloud — re-voice the ad",
+    "attachedVoiceHint": "Voice attached — synthesize right away or pick another below",
     "variantUpdated": "Text updated",
     "createAndGenerate": "Create ad and generate script",
     "adsCount": "Ads: {{count}}",

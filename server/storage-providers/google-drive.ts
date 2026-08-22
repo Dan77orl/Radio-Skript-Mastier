@@ -141,6 +141,22 @@ export async function resolveFolderPath(accessToken: string, folderPath: string,
   return parent;
 }
 
+/**
+ * Find an app-created file by exact name. drive.file scope only sees files
+ * this app uploaded, so a bare name search cannot hit the user's own documents.
+ * Used to restore legacy uploads made before the audio_archive registry existed.
+ */
+export async function findFileIdByName(refreshToken: string, name: string): Promise<string | null> {
+  const accessToken = await getAccessToken(refreshToken);
+  const safeName = name.replace(/'/g, "\\'");
+  const query = `name='${safeName}' and trashed=false`;
+  const res = await fetch(`${FILES_URL}?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=1`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return null;
+  return ((await res.json()) as any).files?.[0]?.id ?? null;
+}
+
 /** Fetch a file's bytes back from Drive (files this app uploaded via drive.file scope). */
 export async function downloadFile(refreshToken: string, fileId: string): Promise<Buffer> {
   const accessToken = await getAccessToken(refreshToken);
