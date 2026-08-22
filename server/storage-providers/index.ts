@@ -52,7 +52,17 @@ export async function archiveAudio(opts: {
 }): Promise<ArchiveResult> {
   const { userId, audioUrl, folder } = opts;
   const settings = await storage.getSettings(userId);
-  const provider = (settings?.storageProvider || "yandex") as StorageProvider;
+
+  // Use whichever cloud is actually connected: the storageProvider field
+  // defaults to "yandex", so a tenant who connected Google Drive but never
+  // touched the selector would otherwise get silent upload skips.
+  let provider = (settings?.storageProvider || "yandex") as StorageProvider;
+  if (provider !== "none") {
+    const hasDrive = !!settings?.googleDriveRefreshToken;
+    const hasYandex = !!settings?.yandexDiskToken;
+    if (provider === "yandex" && !hasYandex && hasDrive) provider = "google_drive";
+    else if (provider === "google_drive" && !hasDrive && hasYandex) provider = "yandex";
+  }
 
   if (provider === "none") {
     return { provider, uploaded: false, remotePath: null, link: null };

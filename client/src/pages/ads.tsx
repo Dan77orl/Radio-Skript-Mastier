@@ -591,6 +591,10 @@ export default function AdsPage() {
     }
     const audio = new Audio(resolveAudioUrl(url));
     audioRef.current = audio;
+    audio.onerror = () => {
+      setPlayingAudio(false);
+      toast({ title: t("ads.audioFileMissing"), variant: "destructive" });
+    };
     audio.play().catch(console.error);
     setPlayingAudio(true);
     audio.onended = () => setPlayingAudio(false);
@@ -615,6 +619,13 @@ export default function AdsPage() {
     const audio = new Audio(resolveAudioUrl(url));
     audio.playbackRate = playbackSpeed;
     versionAudioRef.current = audio;
+    audio.onerror = () => {
+      setPlayingVersionUrl(null);
+      setVersionProgress(0);
+      setVersionCurrentTime(0);
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      toast({ title: t("ads.audioFileMissing"), variant: "destructive" });
+    };
     audio.play().catch(console.error);
     setPlayingVersionUrl(url);
 

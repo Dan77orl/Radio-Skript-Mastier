@@ -591,6 +591,7 @@
     "clientSmartPlaceholder": "Paste the client's text or a screenshot — AI fills the card: name, Instagram, phone, description...",
     "clientSmartHint": "Type, dictate or attach a screenshot. Review the card, pick a voice and save.",
     "editManually": "Edit manually",
+    "audioFileMissing": "Audio file is gone from the server and not found in the cloud — re-voice the ad",
     "variantUpdated": "Text updated",
     "createAndGenerate": "Create ad and generate script",
     "adsCount": "Ads: {{count}}",
