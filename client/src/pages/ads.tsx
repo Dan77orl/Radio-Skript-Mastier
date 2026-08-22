@@ -439,6 +439,29 @@ export default function AdsPage() {
     },
   });
 
+  // Hand-editing a variant right at step 2, before it goes to voicing.
+  const [manualVariantText, setManualVariantText] = useState<string | null>(null);
+  const [isSavingVariant, setIsSavingVariant] = useState(false);
+
+  const saveManualVariant = async () => {
+    if (!currentAd || selectedVariantForEdit === null || manualVariantText === null) return;
+    setIsSavingVariant(true);
+    try {
+      const newVariants = [...(currentAd.variants || [])];
+      newVariants[selectedVariantForEdit] = manualVariantText;
+      const res = await apiRequest("PATCH", `/api/ads/${currentAd.id}`, { variants: newVariants });
+      const updated = await res.json();
+      setCurrentAd(updated);
+      queryClient.invalidateQueries({ queryKey: ["/api/ads"] });
+      setManualVariantText(null);
+      toast({ title: t("ads.variantUpdated") });
+    } catch {
+      toast({ title: t("common.error"), variant: "destructive" });
+    } finally {
+      setIsSavingVariant(false);
+    }
+  };
+
   const synthesizeAudioMutation = useMutation({
     mutationFn: async ({ adId, voiceIds, voiceName, speakerVoiceMap, scriptText }: { adId: string; voiceIds: string[]; voiceName?: string; speakerVoiceMap?: Record<string, string>; scriptText?: string }) => {
       const response = await apiRequest("POST", `/api/ads/${adId}/synthesize-audio`, { voiceIds, voiceName, speakerVoiceMap, scriptText });
@@ -1056,9 +1079,56 @@ export default function AdsPage() {
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
-                  <p className="text-sm text-muted-foreground line-clamp-3">
-                    {currentAd.variants?.[selectedVariantForEdit]}
-                  </p>
+                  {manualVariantText !== null ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-1 items-start">
+                        <Textarea
+                          value={manualVariantText}
+                          onChange={(e) => setManualVariantText(e.target.value)}
+                          rows={10}
+                          className="flex-1 text-sm"
+                          data-testid="textarea-manual-variant"
+                        />
+                        <VoiceInput onTranscript={(text) => setManualVariantText(prev => (prev ? prev + " " : "") + text)} />
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setManualVariantText(null)}
+                          data-testid="button-cancel-manual-variant"
+                        >
+                          {t("common.cancel")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={saveManualVariant}
+                          disabled={isSavingVariant || !manualVariantText.trim()}
+                          data-testid="button-save-manual-variant"
+                        >
+                          {isSavingVariant ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                          {t("common.save")}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted-foreground line-clamp-3">
+                        {currentAd.variants?.[selectedVariantForEdit]}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setManualVariantText(currentAd.variants?.[selectedVariantForEdit] || "")}
+                        data-testid="button-edit-variant-manually"
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        {t("ads.editManually")}
+                      </Button>
+                    </>
+                  )}
+                  {manualVariantText === null && (
+                  <>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">{t("ads.whatToChange")}</label>
                     <div className="flex gap-2">
@@ -1115,6 +1185,8 @@ export default function AdsPage() {
                       </Button>
                     </HintTooltip>
                   </div>
+                  </>
+                  )}
                 </div>
               )}
 
@@ -1126,7 +1198,7 @@ export default function AdsPage() {
                       className={`rounded-lg border p-4 cursor-pointer transition-colors hover-elevate ${
                         selectedVariantForEdit === index ? "border-primary bg-primary/5" : ""
                       }`}
-                      onClick={() => setSelectedVariantForEdit(index)}
+                      onClick={() => { setSelectedVariantForEdit(index); setManualVariantText(null); }}
                       data-testid={`variant-${index}`}
                     >
                       <div className="flex items-center justify-between gap-2 mb-2">
