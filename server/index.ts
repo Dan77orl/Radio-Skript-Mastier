@@ -8,6 +8,7 @@ import { ensureAdminExists, requireAuth } from "./auth";
 import { registerJobHandlers } from "./jobs/handlers";
 import { startJobWorker, stopJobWorker } from "./jobs/queue";
 import { serveStatic } from "./static";
+import { registerLegalPages } from "./legal-pages";
 import { createServer } from "http";
 import path from "path";
 
@@ -93,6 +94,7 @@ app.use((req, res, next) => {
     console.error("Schema guard failed (queries on programs may fail):", err?.message);
   }
 
+  registerLegalPages(app);
   registerJobHandlers();
   registerVoiceAgentRoutes(app);
   await registerRoutes(httpServer, app);
