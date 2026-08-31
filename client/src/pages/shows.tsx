@@ -3032,7 +3032,7 @@ export default function ShowsPage() {
                   ))}
                 </div>
               )}
-              <div className="mt-4 flex justify-end gap-2">
+              <div className="mt-4 flex flex-wrap justify-end gap-2">
                 {viewScriptProgram?.scriptText && (
                   <Button
                     variant="outline"
