@@ -4933,7 +4933,9 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
               const segBuffer = await synthesizeSpeech({
                 apiKey: settings.elevenLabsApiKey!,
                 voiceId: segVoiceId,
-                text: cleanText,
+                // Raw segment text: emotion tags survive for v3 (tts.ts
+                // strips them itself for any non-v3 model).
+                text: seg.text,
                 stability: adTtsStability,
                 similarityBoost: adTtsSimilarityBoost,
               });
@@ -5276,11 +5278,10 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
         return res.status(400).json({ error: "ElevenLabs API key not configured" });
       }
 
-      const cleanText = stripEmotionTags(text.trim()) || text.trim();
       const buffer = await synthesizeSpeech({
         apiKey: settings.elevenLabsApiKey,
         voiceId,
-        text: cleanText,
+        text: text.trim(),
         stability: settings.ttsStability ?? 0.75,
         similarityBoost: settings.ttsSimilarityBoost ?? 0.75,
       });
@@ -7408,7 +7409,9 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
 
           try {
             console.log(`Synthesizing segment ${i + 1}/${segments.length}: [${segment.speaker}] (${cleanText.length} chars)`);
-            const buffer = await generateVoiceSegment(cleanText, voiceId);
+            // Raw segment text: emotion tags survive for v3 (tts.ts strips
+            // them itself for any non-v3 model).
+            const buffer = await generateVoiceSegment(segment.text, voiceId);
             const segFile = path.join(audioDir, `_seg_${timestamp}_${i}.mp3`);
             await fs.writeFile(segFile, buffer);
             segmentFiles.push(segFile);

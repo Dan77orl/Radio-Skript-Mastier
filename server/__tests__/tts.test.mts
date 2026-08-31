@@ -1,7 +1,7 @@
 // TTS contract: stability quantization, error surfacing, bitrate fallback.
 // fetch is mocked — no database or API key needed.
 //   node server/__tests__/tts.test.mts
-const { quantizeStability, ElevenLabsError, describeTtsError, synthesizeSpeech } = await import("../tts.ts");
+const { quantizeStability, ElevenLabsError, describeTtsError, synthesizeSpeech, prepareTtsText } = await import("../tts.ts");
 let bad = 0;
 const check = (n: string, ok: boolean, d = "") => { if (!ok) bad++; console.log(ok ? "  ok  " : "FAIL  ", n, d); };
 
@@ -79,6 +79,12 @@ calls.length = 0;
 mockFetch([{ status: 200 }]);
 await synthesizeSpeech(opts);
 check("успех с первого раза → один запрос", calls.length === 1, String(calls.length));
+
+// v3 keeps emotion tags (they drive its delivery); older models get clean text.
+check("v3 сохраняет теги", prepareTtsText("[excited] Привет!") === "[excited] Привет!", prepareTtsText("[excited] Привет!"));
+check("v3 канонизирует whisper", prepareTtsText("[whisper] тише") === "[whispers] тише", prepareTtsText("[whisper] тише"));
+check("не-v3 вырезает теги", prepareTtsText("[excited] Привет!", "eleven_multilingual_v2") === "Привет!", prepareTtsText("[excited] Привет!", "eleven_multilingual_v2"));
+check("не-v3: несколько тегов", prepareTtsText("[warm] Добрый [slow] вечер", "eleven_flash_v2") === "Добрый вечер");
 
 console.log(bad === 0 ? "\nВСЕ ПРОШЛИ" : `\nПРОВАЛОВ: ${bad}`);
 process.exit(bad ? 1 : 0);

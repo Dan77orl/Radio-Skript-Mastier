@@ -75,6 +75,22 @@ export class ElevenLabsError extends Error {
   }
 }
 
+/** The emotion-tag vocabulary the script generator is instructed to use. */
+const EMOTION_TAG_RE = /\[(energetic|fast|slow|surprised|thoughtful|happy|sad|exclaims|announcer|serious|calm|excited|warm|dramatic|whisper|whispers|loud|gentle|playful|confident|nervous|angry|romantic|mysterious|urgent|casual|formal|ironic|sarcastic|laughs|sighs|curious)\]/gi;
+
+/**
+ * eleven_v3 is steered by bracketed audio tags — [excited], [whispers] — so
+ * stripping them (correct for older models, which read tags aloud) flattens
+ * v3's delivery until it sounds like the previous generation. Keep tags for
+ * v3, canonicalizing the spellings that differ; strip them for anything else.
+ */
+export function prepareTtsText(text: string, modelId: string = ELEVENLABS_MODEL_ID): string {
+  if (modelId === "eleven_v3") {
+    return text.replace(/\[whisper\]/gi, "[whispers]").replace(/\s{2,}/g, " ").trim();
+  }
+  return text.replace(EMOTION_TAG_RE, "").replace(/\s{2,}/g, " ").trim();
+}
+
 export interface SynthesizeOptions {
   apiKey: string;
   voiceId: string;
@@ -108,7 +124,7 @@ async function requestSpeech(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      text,
+      text: prepareTtsText(text, modelId),
       model_id: modelId,
       voice_settings: {
         stability: quantizeStability(stability, modelId),
