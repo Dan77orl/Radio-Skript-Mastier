@@ -982,7 +982,13 @@
     "batchPeriodHint": "Укажите даты «с» и «по» — по выпуску на каждую дату, с темами под её сезон. Или оставьте пустым и задайте количество ниже.",
     "batchPeriodCount": "Будет создано выпусков: {{count}} — по одному на дату, каждый со своей датой эфира",
     "batchEveryDay": "каждый день",
-    "batchEveryOtherDay": "через день"
+    "batchEveryOtherDay": "через день",
+    "annotateEmotions": "Расставить эмоции",
+    "annotateDone": "Эмоции расставлены — текст не изменён",
+    "annotateFailed": "Не удалось расставить эмоции",
+    "importAnnotateOption": "Сразу расставить эмоции (интонации для озвучки v3)",
+    "importAnnotateProgress": "Эмоции: {{done}}/{{total}}",
+    "importAnnotateFailures": "Не размечено выпусков: {{count}} — можно расставить кнопкой в сценарии."
   },
   "automations": {
     "title": "Автоматизации",

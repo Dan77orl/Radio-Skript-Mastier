@@ -336,6 +336,9 @@ export default function ShowsPage() {
   const [importEpisodes, setImportEpisodes] = useState<{ number: number; title: string; scriptText: string; words: number }[] | null>(null);
   const [importSelected, setImportSelected] = useState<Set<number>>(new Set());
   const [importCreating, setImportCreating] = useState(false);
+  const [importAnnotate, setImportAnnotate] = useState(true);
+  const [importAnnotateProgress, setImportAnnotateProgress] = useState<{ done: number; total: number } | null>(null);
+  const [annotatingEmotions, setAnnotatingEmotions] = useState(false);
   const [viewScriptProgram, setViewScriptProgram] = useState<Program | null>(null);
   // Re-voice a single word or phrase (e.g. with a corrected stress mark) as a
   // standalone clip the user splices into the finished render by hand.
@@ -1093,14 +1096,35 @@ export default function ShowsPage() {
     try {
       const res = await apiRequest("POST", `/api/program-types/${activeTab}/import-scripts`, { episodes });
       const data = await res.json();
+
+      // Imported texts carry no emotion tags, and eleven_v3 reads untagged
+      // text flat — annotate each created episode right away when asked.
+      let annotateFailures = 0;
+      if (importAnnotate && Array.isArray(data.programs)) {
+        setImportAnnotateProgress({ done: 0, total: data.programs.length });
+        for (let i = 0; i < data.programs.length; i++) {
+          try {
+            await apiRequest("POST", `/api/programs/${data.programs[i].id}/annotate-emotions`, {});
+          } catch {
+            annotateFailures++;
+          }
+          setImportAnnotateProgress({ done: i + 1, total: data.programs.length });
+        }
+      }
+
       queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
-      toast({ title: t("shows.importDone"), description: t("shows.importCreated", { count: data.created }) });
+      toast({
+        title: t("shows.importDone"),
+        description: t("shows.importCreated", { count: data.created })
+          + (annotateFailures > 0 ? ` ${t("shows.importAnnotateFailures", { count: annotateFailures })}` : ""),
+      });
       setIsImportDialogOpen(false);
       resetImportDialog();
     } catch (e: any) {
       toast({ title: t("shows.importFailed"), description: e.message, variant: "destructive" });
     } finally {
       setImportCreating(false);
+      setImportAnnotateProgress(null);
     }
   };
 
@@ -2840,17 +2864,33 @@ export default function ShowsPage() {
                   </label>
                 ))}
               </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={importAnnotate}
+                  onCheckedChange={(c) => setImportAnnotate(!!c)}
+                  disabled={importCreating}
+                  data-testid="checkbox-import-annotate"
+                />
+                <span className="text-sm">{t("shows.importAnnotateOption")}</span>
+              </label>
               <DialogFooter>
                 <Button variant="outline" onClick={() => { setImportEpisodes(null); setImportSelected(new Set()); }} disabled={importCreating}>
                   {t("shows.importBack")}
                 </Button>
                 <Button onClick={createImported} disabled={importCreating || importSelected.size === 0} data-testid="button-import-create">
                   {importCreating ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {importAnnotateProgress
+                        ? t("shows.importAnnotateProgress", { done: importAnnotateProgress.done, total: importAnnotateProgress.total })
+                        : t("shows.importCreateBtn", { count: importSelected.size })}
+                    </>
                   ) : (
-                    <Plus className="mr-2 h-4 w-4" />
+                    <>
+                      <Plus className="mr-2 h-4 w-4" />
+                      {t("shows.importCreateBtn", { count: importSelected.size })}
+                    </>
                   )}
-                  {t("shows.importCreateBtn", { count: importSelected.size })}
                 </Button>
               </DialogFooter>
             </div>
@@ -2993,6 +3033,35 @@ export default function ShowsPage() {
                 </div>
               )}
               <div className="mt-4 flex justify-end gap-2">
+                {viewScriptProgram?.scriptText && (
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      if (!viewScriptProgram) return;
+                      setAnnotatingEmotions(true);
+                      try {
+                        const res = await apiRequest("POST", `/api/programs/${viewScriptProgram.id}/annotate-emotions`, {});
+                        const updated = await res.json();
+                        setViewScriptProgram(updated);
+                        queryClient.invalidateQueries({ queryKey: ["/api/programs", activeTab] });
+                        toast({ title: t("shows.annotateDone") });
+                      } catch (e: any) {
+                        toast({ title: t("shows.annotateFailed"), description: e.message, variant: "destructive" });
+                      } finally {
+                        setAnnotatingEmotions(false);
+                      }
+                    }}
+                    disabled={annotatingEmotions}
+                    data-testid="button-annotate-emotions"
+                  >
+                    {annotatingEmotions ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-2 h-4 w-4" />
+                    )}
+                    {t("shows.annotateEmotions")}
+                  </Button>
+                )}
                 {viewScriptProgram?.scriptText && (
                   <Button variant="outline" onClick={() => setEditingText(viewScriptProgram.scriptText)} data-testid="button-edit-script-text">
                     <Pencil className="mr-2 h-4 w-4" />

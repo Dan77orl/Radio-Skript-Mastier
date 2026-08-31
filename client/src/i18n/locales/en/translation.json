@@ -963,7 +963,13 @@
     "batchPeriodHint": "Pick \"from\" and \"to\" dates — one episode per date, with topics matching its season. Or leave empty and set a count below.",
     "batchPeriodCount": "{{count}} episodes will be created — one per date, each with its own air date",
     "batchEveryDay": "every day",
-    "batchEveryOtherDay": "every other day"
+    "batchEveryOtherDay": "every other day",
+    "annotateEmotions": "Add emotion tags",
+    "annotateDone": "Emotion tags added — text untouched",
+    "annotateFailed": "Could not add emotion tags",
+    "importAnnotateOption": "Add emotion tags right away (delivery cues for v3 voicing)",
+    "importAnnotateProgress": "Emotions: {{done}}/{{total}}",
+    "importAnnotateFailures": "{{count}} episodes not annotated — use the button inside the script."
   },
   "automations": {
     "title": "Automations",

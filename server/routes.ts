@@ -5972,6 +5972,62 @@ IMPORTANT: Return only the new ad text without any JSON wrapping.`;
     }
   });
 
+  // Insert v3 emotion tags into an existing script without touching the words.
+  // Imported (client-approved) scripts arrive without tags, and eleven_v3
+  // reads untagged text flat — this endpoint annotates them after the fact.
+  app.post("/api/programs/:id/annotate-emotions", async (req, res) => {
+    try {
+      const program = await storage.getProgram(req.params.id, req.session.userId!);
+      if (!program) {
+        return res.status(404).json({ error: "Program not found" });
+      }
+      if (!program.scriptText?.trim()) {
+        return res.status(400).json({ error: "У выпуска нет сценария" });
+      }
+      const anthropic = await getAnthropicClient(req.session.userId);
+      if (!anthropic) {
+        return res.status(400).json({ error: "Anthropic API key not configured" });
+      }
+
+      const user = await storage.getUser(req.session.userId!);
+      const ps = getPromptStrings(user?.language || "ru");
+
+      const response = await anthropic.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: Math.max(4000, Math.ceil(program.scriptText.length / 2)),
+        system: `Ты — режиссёр озвучки. Твоя единственная задача — расставить теги эмоций в готовом, утверждённом сценарии радиопередачи.
+
+ЖЕЛЕЗНЫЕ ПРАВИЛА:
+- НЕ меняй, не добавляй и не удаляй НИ ОДНОГО слова текста. Текст утверждён клиентом дословно.
+- Сохрани каждую строку и формат [Имя]: в начале реплик как есть.
+- Вставляй ТОЛЬКО теги из списка ниже, в начале реплики или перед сменой настроения внутри неё.
+- ${ps.emotionInstructions}
+- ${ps.emotionTags}
+- Верни ТОЛЬКО сценарий с тегами, без пояснений до или после.`,
+        messages: [{ role: "user", content: program.scriptText }],
+      });
+
+      const textBlock = response.content.find(c => c.type === "text");
+      const annotated = (textBlock?.type === "text" ? textBlock.text : "").trim();
+
+      // The words must survive verbatim: compare with tags stripped. A large
+      // drift means the model rewrote the client's text — reject that.
+      const normalize = (s: string) => stripEmotionTags(s).replace(/\s+/g, " ").trim();
+      const before = normalize(program.scriptText);
+      const after = normalize(annotated);
+      const lengthDrift = Math.abs(after.length - before.length) / Math.max(before.length, 1);
+      if (!annotated || lengthDrift > 0.05) {
+        return res.status(422).json({ error: "Модель изменила текст сценария — эмоции не расставлены, текст не тронут" });
+      }
+
+      const updated = await storage.updateProgram(program.id, req.session.userId!, { scriptText: annotated });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error annotating emotions:", error);
+      res.status(500).json({ error: error?.message || "Failed to annotate emotions" });
+    }
+  });
+
   app.patch("/api/programs/:id", async (req, res) => {
     try {
       const updated = await storage.updateProgram(req.params.id, req.session.userId!, req.body);
