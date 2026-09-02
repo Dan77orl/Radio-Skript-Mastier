@@ -658,24 +658,21 @@ export default function ShowsPage() {
       setAudioDuration(audio.duration);
     };
     audio.onended = () => stopAudio();
-    audio.onerror = (e) => {
-      console.error("Audio playback error:", streamUrl, audio.error?.message || audio.error?.code || e);
+    // The browser's own message ("no supported source") hides what actually
+    // happened: the server checked disk AND the cloud archive and found
+    // nothing — typical for episodes voiced before cloud storage was
+    // connected. Say that, and say the way out (re-voice).
+    const reportLostAudio = (detail: unknown) => {
+      console.error("Audio playback error:", streamUrl, detail);
       toast({
-        title: t("shows.error"),
-        description: t("shows.audioPlaybackError", "Audio file could not be played"),
+        title: t("shows.audioLostTitle"),
+        description: t("shows.audioLostDesc"),
         variant: "destructive",
       });
       stopAudio();
     };
-    audio.play().catch((err) => {
-      console.error("Audio play() failed:", streamUrl, err);
-      toast({
-        title: t("shows.error"),
-        description: err.message || t("shows.audioPlaybackError", "Audio file could not be played"),
-        variant: "destructive",
-      });
-      stopAudio();
-    });
+    audio.onerror = (e) => reportLostAudio(audio.error?.message || audio.error?.code || e);
+    audio.play().catch((err) => reportLostAudio(err));
     setPlayingProgramId(programId);
     setAudioCurrentTime(0);
     setAudioDuration(0);

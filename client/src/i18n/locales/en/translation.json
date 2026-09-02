@@ -975,7 +975,9 @@
     "voiceStability": "Stability",
     "voiceStabilityHint": "Lower — livelier and more emotional; higher — steadier and closer to the original voice.",
     "voiceSimilarity": "Similarity to original",
-    "voiceSimilarityHint": "How strictly to keep the source voice's timbre."
+    "voiceSimilarityHint": "How strictly to keep the source voice's timbre.",
+    "audioLostTitle": "Audio lost",
+    "audioLostDesc": "The file is on neither the server nor the cloud — typical for episodes voiced before cloud storage was connected. Press \"Re-voice\": the script is intact, and the new file goes straight to the cloud."
   },
   "automations": {
     "title": "Automations",
