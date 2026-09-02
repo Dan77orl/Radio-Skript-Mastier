@@ -403,6 +403,21 @@ function extractSpeakerFromPrompt(promptText: string): string | null {
   return null;
 }
 
+/**
+ * Continuous episode numbering for a show: "Выпуск 1", "Выпуск 2", ... across
+ * its whole history. Reads the highest number already used in titles (so
+ * deleting old episodes never reuses a number); a show with unnumbered
+ * episodes starts from their count + 1.
+ */
+function nextEpisodeNumber(existing: Array<{ title: string | null }>): number {
+  let maxN = 0;
+  for (const p of existing) {
+    const m = p.title?.match(/(?:Выпуск|Episode)\s*№?\s*(\d+)/i);
+    if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+  }
+  return maxN > 0 ? maxN + 1 : existing.length + 1;
+}
+
 function getCleanVoiceName(voice: { personaName?: string | null; name: string }): string {
   if (voice.personaName) return voice.personaName;
   const name = voice.name;
@@ -6840,9 +6855,13 @@ ${ps.narrativeStyle}`;
         scriptText = scriptText.replace(/^(?:ТЕМА|TOPIC):\s*.+\n*/m, "").trim();
       }
 
-      const finalTitle = extractedTopic 
-        ? `${programType.name}: ${extractedTopic}`
-        : title;
+      // Sequential numbering across the show's history; the topic stays in the
+      // title so the anti-repeat block keeps seeing what was already covered.
+      const episodeWord = userLang === "ru" ? "Выпуск" : "Episode";
+      const episodeNo = nextEpisodeNumber(existingPrograms);
+      const finalTitle = extractedTopic
+        ? `${programType.name}: ${episodeWord} ${episodeNo} — ${extractedTopic}`
+        : `${programType.name}: ${episodeWord} ${episodeNo}`;
 
       const program = await storage.createProgram({
         userId: req.session.userId,
@@ -7901,14 +7920,20 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
             const ctx = await buildStationContext(req.session.userId);
             const stationContext = `Радиостанция: ${ctx.stationName}. ${ctx.stationDescription ? ctx.stationDescription : ""}\n`;
             
+            // Same continuous numbering as manual generation, so automated
+            // episodes slot into the sequence instead of restarting at #1.
+            const priorEpisodes = await storage.getProgramsByType(programType.id, req.session.userId!);
+            const epWord = /[а-яё]/i.test(programType.name) ? "Выпуск" : "Episode";
+            let epNo = nextEpisodeNumber(priorEpisodes);
+
             for (let i = 0; i < itemsCount; i++) {
               const basePrompt = automation.prompt || programType.defaultPrompt;
               const enhancedPrompt = stationContext + basePrompt + contextInfo;
-              
+
               await storage.createProgram({
                 userId: req.session.userId,
                 programTypeId: programType.id,
-                title: `${programType.name} ${tomorrowStr} #${i + 1}`,
+                title: `${programType.name}: ${epWord} ${epNo++} · ${tomorrowStr}`,
                 prompt: enhancedPrompt,
                 status: "pending",
               });
