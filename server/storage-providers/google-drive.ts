@@ -43,7 +43,7 @@ export function buildAuthUrl(state: string): string {
   return `${OAUTH_BASE}?${params.toString()}`;
 }
 
-export async function exchangeCodeForTokens(code: string): Promise<{ refreshToken: string; accessToken: string; email: string | null }> {
+export async function exchangeCodeForTokens(code: string): Promise<{ refreshToken: string; accessToken: string; email: string | null; grantedScopes: string }> {
   const { clientId, clientSecret, redirectUri } = requireConfig();
   const res = await fetch(TOKEN_URL, {
     method: "POST",
@@ -72,7 +72,9 @@ export async function exchangeCodeForTokens(code: string): Promise<{ refreshToke
     if (me.ok) email = ((await me.json()) as any).email ?? null;
   } catch { /* the address is cosmetic — never fail the connection over it */ }
 
-  return { refreshToken: data.refresh_token, accessToken: data.access_token, email };
+  // Google's granular-consent screen lets the user untick individual scopes;
+  // data.scope lists what was actually granted, which can be less than asked.
+  return { refreshToken: data.refresh_token, accessToken: data.access_token, email, grantedScopes: String(data.scope || "") };
 }
 
 export async function getAccessToken(refreshToken: string): Promise<string> {

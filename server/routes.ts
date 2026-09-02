@@ -2338,6 +2338,14 @@ export async function registerRoutes(
 
       const tokens = await exchangeCodeForTokens(code);
 
+      // Granular consent: the user can leave the Drive checkbox unticked, and
+      // the connection then "succeeds" with a token that can't touch Drive —
+      // every upload later dies with 403 insufficient scopes. Refuse it now,
+      // while the user is still looking at the screen that explains why.
+      if (!tokens.grantedScopes.includes("https://www.googleapis.com/auth/drive.file")) {
+        return res.redirect(`/settings?google=no_drive_scope`);
+      }
+
       // Create the app's root folder right away so the first upload and the
       // settings link work without an extra round-trip. Non-fatal: the status
       // endpoint retries this lazily if it fails here.

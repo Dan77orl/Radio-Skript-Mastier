@@ -398,7 +398,8 @@
     "telegramOnlyWayIn": "Cannot unlink: Telegram is your only way in. Set a password first.",
     "telegramTwoFactor": "Require Telegram at sign-in",
     "telegramTwoFactorDesc": "A password alone will not be enough — the sign-in must be confirmed in Telegram.",
-    "openDriveFolder": "Open the Drive folder"
+    "openDriveFolder": "Open the Drive folder",
+    "googleNoDriveScope": "The Drive checkbox was left unticked on Google's consent screen. Press \"Connect\" again and tick the Google Drive permission before continuing."
   },
   "voices": {
     "title": "Voices",

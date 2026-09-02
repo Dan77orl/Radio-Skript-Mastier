@@ -37,6 +37,9 @@ export function StorageSettings() {
     if (result === "connected") {
       toast({ title: t("settings.googleConnected") });
       queryClient.invalidateQueries({ queryKey: ["/api/storage/status"] });
+    } else if (result === "no_drive_scope") {
+      // The user left the Drive checkbox unticked on Google's consent screen.
+      toast({ title: t("settings.googleConnectFailed"), description: t("settings.googleNoDriveScope"), variant: "destructive" });
     } else {
       toast({ title: t("settings.googleConnectFailed"), description: result, variant: "destructive" });
     }
