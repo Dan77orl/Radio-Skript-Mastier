@@ -1,10 +1,10 @@
 /**
  * Single entry point for ElevenLabs text-to-speech.
  *
- * The five call sites in routes.ts each had their own copy of this fetch, and
- * each copy carried the same two contract bugs (output_format in the body, an
- * unquantized stability). Keeping one implementation means a fix lands
- * everywhere at once.
+ * The five call sites in routes.ts each had their own copy of this fetch,
+ * each with the same contract bug (output_format sent in the body, where the
+ * API ignores it). Keeping one implementation means a fix lands everywhere
+ * at once.
  */
 
 export const ELEVENLABS_MODEL_ID = "eleven_v3";
@@ -12,21 +12,18 @@ export const ELEVENLABS_OUTPUT_FORMAT = "mp3_44100_192";
 /** Available on every plan; 192 kbps needs Creator or above. */
 export const ELEVENLABS_FALLBACK_FORMAT = "mp3_44100_128";
 
-/** Stability steps eleven_v3 accepts — Creative / Natural / Robust. */
-const V3_STABILITY_STEPS = [0, 0.5, 1] as const;
-
 /**
- * eleven_v3 rejects any stability outside {0, 0.5, 1}, but the settings slider
- * is continuous and defaults to 0.75 — which the API refuses, failing every
- * segment of a script. Snap to the nearest legal step; a tie (0.25, 0.75)
- * resolves downward, toward the more expressive setting.
+ * Pass the operator's stability through untouched (clamped to [0, 1]).
+ *
+ * An earlier revision snapped it to {0, 0.5, 1} on the belief that eleven_v3
+ * rejects anything else. Production history disproves that: months of
+ * episodes were synthesized on eleven_v3 with stability 0.75 sent verbatim —
+ * and the operator reported the quantized 0.5 as an audible downgrade ("v3
+ * sounds like v2.5"). The failure that prompted the snap turned out to be a
+ * bad API key, not this parameter.
  */
-export function quantizeStability(stability: number, modelId: string = ELEVENLABS_MODEL_ID): number {
-  if (modelId !== "eleven_v3") return stability;
-  const clamped = Math.min(1, Math.max(0, stability));
-  return V3_STABILITY_STEPS.reduce((best, step) =>
-    Math.abs(step - clamped) < Math.abs(best - clamped) ? step : best
-  );
+export function quantizeStability(stability: number, _modelId: string = ELEVENLABS_MODEL_ID): number {
+  return Math.min(1, Math.max(0, stability));
 }
 
 /** Carries the upstream status and body so callers can report the real cause. */

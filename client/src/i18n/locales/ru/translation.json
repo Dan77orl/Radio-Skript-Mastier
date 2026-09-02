@@ -988,7 +988,13 @@
     "annotateFailed": "Не удалось расставить эмоции",
     "importAnnotateOption": "Сразу расставить эмоции (интонации для озвучки v3)",
     "importAnnotateProgress": "Эмоции: {{done}}/{{total}}",
-    "importAnnotateFailures": "Не размечено выпусков: {{count}} — можно расставить кнопкой в сценарии."
+    "importAnnotateFailures": "Не размечено выпусков: {{count}} — можно расставить кнопкой в сценарии.",
+    "voiceTuningTitle": "Голос (ElevenLabs)",
+    "voiceTuningDesc": "Настройки озвучки именно этой передачи. По умолчанию 0.75 — как в проверенных выпусках.",
+    "voiceStability": "Стабильность",
+    "voiceStabilityHint": "Ниже — живее и эмоциональнее, выше — ровнее и ближе к оригинальному голосу.",
+    "voiceSimilarity": "Похожесть на оригинал",
+    "voiceSimilarityHint": "Насколько строго держаться тембра исходного голоса."
   },
   "automations": {
     "title": "Автоматизации",

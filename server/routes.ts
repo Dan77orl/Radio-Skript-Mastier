@@ -7387,8 +7387,9 @@ ${psGen.singleSpeakerFormat(singleSpeakerName)}`;
       const voicesList = await storage.getVoices(req.session.userId!);
       const programType = await storage.getProgramType(program.programTypeId, req.session.userId!);
 
-      const progTtsStability = settings.ttsStability ?? 0.75;
-      const progTtsSimilarityBoost = settings.ttsSimilarityBoost ?? 0.75;
+      // Per-show voice settings win over the global ones; null falls through.
+      const progTtsStability = programType?.ttsStability ?? settings.ttsStability ?? 0.75;
+      const progTtsSimilarityBoost = programType?.ttsSimilarityBoost ?? settings.ttsSimilarityBoost ?? 0.75;
 
       const generateVoiceSegment = async (text: string, voiceId: string): Promise<Buffer> => {
         return synthesizeSpeech({

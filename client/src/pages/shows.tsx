@@ -969,6 +969,8 @@ export default function ShowsPage() {
         promptIsExactScript: settingsType.promptIsExactScript || false,
         useSeasonalContext: settingsType.useSeasonalContext || false,
         researchProfile: settingsType.researchProfile || "local",
+        ttsStability: settingsType.ttsStability ?? null,
+        ttsSimilarityBoost: settingsType.ttsSimilarityBoost ?? null,
       },
     });
   };
@@ -2454,6 +2456,50 @@ export default function ShowsPage() {
                     <SelectItem value="none">{t("shows.researchProfileNone")}</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-4 border rounded-lg p-3 sm:p-4 bg-muted/20 min-w-0">
+                <div className="min-w-0">
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    <AudioLines className="h-4 w-4" />
+                    {t("shows.voiceTuningTitle")}
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">{t("shows.voiceTuningDesc")}</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">{t("shows.voiceStability")}</Label>
+                    <span className="text-sm tabular-nums text-muted-foreground">
+                      {(settingsType.ttsStability ?? 0.75).toFixed(2)}
+                    </span>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={[settingsType.ttsStability ?? 0.75]}
+                    onValueChange={([v]) => setSettingsType(prev => prev ? { ...prev, ttsStability: v } : null)}
+                    data-testid="slider-tts-stability"
+                  />
+                  <p className="text-xs text-muted-foreground">{t("shows.voiceStabilityHint")}</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">{t("shows.voiceSimilarity")}</Label>
+                    <span className="text-sm tabular-nums text-muted-foreground">
+                      {(settingsType.ttsSimilarityBoost ?? 0.75).toFixed(2)}
+                    </span>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={[settingsType.ttsSimilarityBoost ?? 0.75]}
+                    onValueChange={([v]) => setSettingsType(prev => prev ? { ...prev, ttsSimilarityBoost: v } : null)}
+                    data-testid="slider-tts-similarity"
+                  />
+                  <p className="text-xs text-muted-foreground">{t("shows.voiceSimilarityHint")}</p>
+                </div>
               </div>
 
               <div className="space-y-3 border rounded-lg p-3 sm:p-4 bg-muted/20 min-w-0">

@@ -90,6 +90,8 @@ app.use((req, res, next) => {
   try {
     const { pool } = await import("./db");
     await pool.query(`ALTER TABLE programs ADD COLUMN IF NOT EXISTS downloaded_at timestamp`);
+    await pool.query(`ALTER TABLE program_types ADD COLUMN IF NOT EXISTS tts_stability real`);
+    await pool.query(`ALTER TABLE program_types ADD COLUMN IF NOT EXISTS tts_similarity_boost real`);
   } catch (err: any) {
     console.error("Schema guard failed (queries on programs may fail):", err?.message);
   }

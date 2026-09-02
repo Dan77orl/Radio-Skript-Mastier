@@ -361,6 +361,9 @@ export const programTypes = pgTable("program_types", {
   // lifestyle near the station), "academic" (studies, journals, university
   // publications), "none".
   researchProfile: text("research_profile").default("local"),
+  // Per-show ElevenLabs voice settings; null falls back to the global ones.
+  ttsStability: real("tts_stability"),
+  ttsSimilarityBoost: real("tts_similarity_boost"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 }, (table) => [
   uniqueIndex("program_types_user_slug_idx").on(table.userId, table.slug),

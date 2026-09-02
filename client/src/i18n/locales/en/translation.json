@@ -969,7 +969,13 @@
     "annotateFailed": "Could not add emotion tags",
     "importAnnotateOption": "Add emotion tags right away (delivery cues for v3 voicing)",
     "importAnnotateProgress": "Emotions: {{done}}/{{total}}",
-    "importAnnotateFailures": "{{count}} episodes not annotated — use the button inside the script."
+    "importAnnotateFailures": "{{count}} episodes not annotated — use the button inside the script.",
+    "voiceTuningTitle": "Voice (ElevenLabs)",
+    "voiceTuningDesc": "Voicing settings for this show only. Default 0.75 — same as the proven episodes.",
+    "voiceStability": "Stability",
+    "voiceStabilityHint": "Lower — livelier and more emotional; higher — steadier and closer to the original voice.",
+    "voiceSimilarity": "Similarity to original",
+    "voiceSimilarityHint": "How strictly to keep the source voice's timbre."
   },
   "automations": {
     "title": "Automations",
