@@ -2872,8 +2872,12 @@ ${ps.minReplicas(dialogReplicas)}`;
       const Anthropic = (await import("@anthropic-ai/sdk")).default;
       const anthropic = new Anthropic({ apiKey });
       
+      // Test with the exact model generation uses: a key that passes here is
+      // guaranteed to work for real scripts. The previous hardcoded
+      // claude-sonnet-4-20250514 was retired in June 2026 and made every
+      // check fail with "model not found" even for perfectly good keys.
       await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: CLAUDE_MODEL,
         max_tokens: aiMaxTokens(10),
         messages: [{ role: "user", content: "Hi" }],
       });
