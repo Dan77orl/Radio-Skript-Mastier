@@ -165,7 +165,10 @@ function getEffectiveElevenLabsKey(settings: any): string | null {
 }
 
 function getEffectiveAnthropicKey(settings: any): string | null {
-  return process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || settings?.anthropicApiKey || null;
+  // Anthropic is the opposite of ElevenLabs by the operator's request: the
+  // admin-panel key wins, the environment (Replit AI integration) is only the
+  // fallback for installs where the admin left the field empty.
+  return settings?.anthropicApiKey || process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || null;
 }
 
 function withEffectiveKeys(settings: any): any {
@@ -178,14 +181,20 @@ function withEffectiveKeys(settings: any): any {
 }
 
 async function getAnthropicClient(userId?: string): Promise<Anthropic | null> {
+  // Admin-panel key first (raw DB value — getSettings merges env in and would
+  // hide whether the admin actually set one); the Replit AI integration and
+  // plain env key are fallbacks for installs with an empty field.
+  const raw = await storage.getRawSettings(userId);
+  if (raw?.anthropicApiKey) {
+    return new Anthropic({ apiKey: raw.anthropicApiKey });
+  }
   if (process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY && process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL) {
     return new Anthropic({
       apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
       baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
     });
   }
-  const settings = await storage.getSettings(userId);
-  const apiKey = getEffectiveAnthropicKey(settings);
+  const apiKey = process.env.ANTHROPIC_API_KEY || null;
   if (!apiKey) {
     return null;
   }

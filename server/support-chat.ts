@@ -259,19 +259,19 @@ export async function handleSupportChat(req: Request, res: Response) {
 
     let assistantReply = "";
 
+    // Admin-panel key first, same order as getAnthropicClient in routes.ts:
+    // the raw DB value decides, the Replit AI integration is the fallback.
     let anthropic: Anthropic | null = null;
-    if (process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY && process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL) {
+    const rawKey = req.session?.userId
+      ? (await storage.getRawSettings(req.session.userId))?.anthropicApiKey
+      : null;
+    if (rawKey) {
+      anthropic = new Anthropic({ apiKey: rawKey });
+    } else if (process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY && process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL) {
       anthropic = new Anthropic({
         apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
         baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
       });
-    } else {
-      const anthropicKey = req.session?.userId
-        ? (await storage.getSettings(req.session.userId))?.anthropicApiKey
-        : null;
-      if (anthropicKey) {
-        anthropic = new Anthropic({ apiKey: anthropicKey });
-      }
     }
 
     if (anthropic) {

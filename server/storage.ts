@@ -394,8 +394,10 @@ export class DatabaseStorage implements IStorage {
       return {
         ...result,
         elevenLabsApiKey: process.env.ELEVENLABS_API_KEY || result.elevenLabsApiKey || null,
+        // Admin-panel key first for Anthropic (operator's request) — env is
+        // the fallback, unlike ElevenLabs where the environment wins.
         anthropicApiKey:
-          process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || result.anthropicApiKey || null,
+          result.anthropicApiKey || process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || null,
       };
     }
     return result;
