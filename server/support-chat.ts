@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
+import { withGeminiFallback } from "./ai-fallback";
 import { storage } from "./storage";
 
 const openai = new OpenAI({
@@ -261,17 +262,18 @@ export async function handleSupportChat(req: Request, res: Response) {
 
     // Admin-panel key first, same order as getAnthropicClient in routes.ts:
     // the raw DB value decides, the Replit AI integration is the fallback.
+    // Wrapped the same way too: a failing Claude call falls back to Gemini.
     let anthropic: Anthropic | null = null;
     const rawKey = req.session?.userId
       ? (await storage.getRawSettings(req.session.userId))?.anthropicApiKey
       : null;
     if (rawKey) {
-      anthropic = new Anthropic({ apiKey: rawKey });
+      anthropic = withGeminiFallback(new Anthropic({ apiKey: rawKey }));
     } else if (process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY && process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL) {
-      anthropic = new Anthropic({
+      anthropic = withGeminiFallback(new Anthropic({
         apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
         baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
-      });
+      }));
     }
 
     if (anthropic) {

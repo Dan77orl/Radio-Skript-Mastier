@@ -12,6 +12,7 @@ import { getPromptStrings, getGenderLabel, getDefaultHostName, getLanguageDirect
 import { handleSupportChat } from "./support-chat";
 import { synthesizeSpeech, describeTtsError } from "./tts";
 import { parseImportedScripts } from "./script-import";
+import { withGeminiFallback } from "./ai-fallback";
 import { createRateLimiter } from "./rate-limit";
 import { getJob, listJobs, enqueueJob, registerJobHandler } from "./jobs/queue";
 import { archiveAudio, restoreAudio } from "./storage-providers";
@@ -184,21 +185,23 @@ async function getAnthropicClient(userId?: string): Promise<Anthropic | null> {
   // Admin-panel key first (raw DB value — getSettings merges env in and would
   // hide whether the admin actually set one); the Replit AI integration and
   // plain env key are fallbacks for installs with an empty field.
+  // Every client is wrapped so a failing Claude call (credits, outage) is
+  // retried against Gemini instead of killing the generation.
   const raw = await storage.getRawSettings(userId);
   if (raw?.anthropicApiKey) {
-    return new Anthropic({ apiKey: raw.anthropicApiKey });
+    return withGeminiFallback(new Anthropic({ apiKey: raw.anthropicApiKey }));
   }
   if (process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY && process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL) {
-    return new Anthropic({
+    return withGeminiFallback(new Anthropic({
       apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
       baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
-    });
+    }));
   }
   const apiKey = process.env.ANTHROPIC_API_KEY || null;
   if (!apiKey) {
     return null;
   }
-  return new Anthropic({ apiKey });
+  return withGeminiFallback(new Anthropic({ apiKey }));
 }
 
 function resolveStationCountry(stationLocation: string | null | undefined): string {
