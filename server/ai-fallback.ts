@@ -14,16 +14,29 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 
-/** gemini-2.5-flash is already proven against this deploy's AI gateway (the
- * transcription endpoint uses it); override with GEMINI_FALLBACK_MODEL, e.g.
- * gemini-2.5-pro for higher quality at a higher price. */
-const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash";
+/**
+ * Best-available ladder, tried top-down; the first model the gateway accepts
+ * is cached and used from then on. As of September 2026: gemini-3.1-pro is
+ * the flagship, gemini-3.8-flash the newest fast model; gemini-2.5-flash is
+ * the safety net already proven against this deploy's AI gateway (the
+ * transcription endpoint runs on it). GEMINI_FALLBACK_MODEL pins the top of
+ * the ladder explicitly.
+ */
+const MODEL_LADDER = [
+  ...(process.env.GEMINI_FALLBACK_MODEL ? [process.env.GEMINI_FALLBACK_MODEL] : []),
+  "gemini-3.1-pro",
+  "gemini-3.8-flash",
+  "gemini-2.5-flash",
+].filter((m, i, a) => a.indexOf(m) === i);
+
+let workingModel: string | null = null;
 
 let gemini: GoogleGenAI | null | undefined;
 
 /** Test seam: replace the Gemini client with a fake. Not for production use. */
 export function __setGeminiForTests(client: unknown) {
   gemini = client as GoogleGenAI | null;
+  workingModel = null;
 }
 
 function getGemini(): GoogleGenAI | null {
@@ -53,6 +66,12 @@ function blockText(content: unknown): string {
   return "";
 }
 
+/** "This gateway doesn't know that model" — the only error worth walking the ladder over. */
+function isUnknownModelError(err: any): boolean {
+  const msg = String(err?.message || err || "").toLowerCase();
+  return /not[ _]?found|unknown model|invalid model|unsupported model|no such model|does not exist/.test(msg) && /model/.test(msg);
+}
+
 async function geminiCreate(params: any): Promise<any> {
   const client = getGemini();
   if (!client) throw new Error("Gemini fallback is not configured");
@@ -63,33 +82,67 @@ async function geminiCreate(params: any): Promise<any> {
     parts: [{ text: blockText(m.content) }],
   }));
 
-  const res = await client.models.generateContent({
-    model: GEMINI_FALLBACK_MODEL,
-    contents,
-    config: {
-      ...(systemInstruction ? { systemInstruction } : {}),
-      maxOutputTokens: Math.min(params.max_tokens ?? 4096, 65536),
-      ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
-    },
-  });
+  const candidates = workingModel ? [workingModel] : MODEL_LADDER;
+  let lastErr: any = null;
+  for (const model of candidates) {
+    try {
+      const res = await client.models.generateContent({
+        model,
+        contents,
+        config: {
+          ...(systemInstruction ? { systemInstruction } : {}),
+          maxOutputTokens: Math.min(params.max_tokens ?? 4096, 65536),
+          ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
+        },
+      });
 
-  const text =
-    (res as any).text ||
-    (res as any).candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") ||
-    "";
-  if (!text.trim()) throw new Error("Gemini fallback returned an empty response");
+      const text =
+        (res as any).text ||
+        (res as any).candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") ||
+        "";
+      if (!text.trim()) throw new Error("Gemini fallback returned an empty response");
 
-  // The Anthropic Message shape the app actually reads: content[].text.
+      if (workingModel !== model) {
+        workingModel = model;
+        console.log(`[ai-fallback] Gemini model in use: ${model}`);
+      }
+
+      // The Anthropic Message shape the app actually reads: content[].text.
+      return {
+        id: `gemini-fallback-${Date.now()}`,
+        type: "message",
+        role: "assistant",
+        model,
+        content: [{ type: "text", text }],
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: { input_tokens: 0, output_tokens: 0 },
+      };
+    } catch (err: any) {
+      lastErr = err;
+      if (!isUnknownModelError(err)) throw err;
+      // The gateway hasn't heard of this model yet — try the next rung.
+    }
+  }
+  throw lastErr || new Error("No Gemini model available");
+}
+
+/**
+ * An Anthropic-shaped client backed entirely by Gemini — used when no Claude
+ * key is configured at all, so generation still works instead of dying with
+ * "no API key". Null when Gemini isn't configured either.
+ */
+export function geminiDirectClient(): Anthropic | null {
+  if (!getGemini()) return null;
   return {
-    id: `gemini-fallback-${Date.now()}`,
-    type: "message",
-    role: "assistant",
-    model: GEMINI_FALLBACK_MODEL,
-    content: [{ type: "text", text }],
-    stop_reason: "end_turn",
-    stop_sequence: null,
-    usage: { input_tokens: 0, output_tokens: 0 },
-  };
+    messages: {
+      create: async (params: any) => {
+        const res = await geminiCreate(params);
+        console.warn(`[ai-fallback] no Claude key — answered directly by ${res.model}`);
+        return res;
+      },
+    },
+  } as unknown as Anthropic;
 }
 
 /**
@@ -119,7 +172,7 @@ export function withGeminiFallback<T extends Anthropic>(client: T): T {
               const reason = err?.message?.slice(0, 200) || String(err);
               try {
                 const fallback = await geminiCreate(params);
-                console.warn(`[ai-fallback] Claude failed (${reason}) — answered by ${GEMINI_FALLBACK_MODEL}`);
+                console.warn(`[ai-fallback] Claude failed (${reason}) — answered by ${fallback.model}`);
                 return fallback;
               } catch (geminiErr: any) {
                 console.error(`[ai-fallback] Gemini fallback also failed: ${geminiErr?.message}`);

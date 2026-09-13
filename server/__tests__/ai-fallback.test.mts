@@ -1,7 +1,7 @@
 // Claude→Gemini fallback: shape conversion and when it fires. No network —
 // both clients are fakes.
 //   node server/__tests__/ai-fallback.test.mts
-const { withGeminiFallback, __setGeminiForTests } = await import("../ai-fallback.ts");
+const { withGeminiFallback, geminiDirectClient, __setGeminiForTests } = await import("../ai-fallback.ts");
 let bad = 0;
 const check = (n: string, ok: boolean, d = "") => { if (!ok) bad++; console.log(ok ? "  ok  " : "FAIL  ", n, d); };
 
@@ -61,6 +61,36 @@ geminiAnswer = { text: "" };
 thrown = "";
 try { await withGeminiFallback(failingClaude).messages.create({ model: "m", max_tokens: 10, messages: [] }); } catch (e: any) { thrown = e.message; }
 check("пустой ответ Gemini не подменяет ошибку", thrown.includes("credit balance"), thrown);
+
+// 5. Model ladder: unknown-model errors walk down; the working rung is cached.
+const laddered: string[] = [];
+__setGeminiForTests({
+  models: { generateContent: async (req: any) => {
+    laddered.push(req.model);
+    if (req.model !== "gemini-2.5-flash") throw new Error(`models/${req.model} is not found for API version v1`);
+    return { text: "ок" };
+  } },
+});
+const first = await withGeminiFallback(failingClaude).messages.create({ model: "m", max_tokens: 10, messages: [{ role: "user", content: "а" }] });
+check("лесенка дошла до рабочей модели", first.model === "gemini-2.5-flash", first.model);
+check("порядок: 3.1-pro → 3.8-flash → 2.5-flash", laddered.join(",") === "gemini-3.1-pro,gemini-3.8-flash,gemini-2.5-flash", laddered.join(","));
+await withGeminiFallback(failingClaude).messages.create({ model: "m", max_tokens: 10, messages: [{ role: "user", content: "б" }] });
+check("рабочая модель закэширована", laddered.length === 4, String(laddered.length));
+
+// 6. Real errors (не «модель не найдена») лесенку не запускают.
+__setGeminiForTests({
+  models: { generateContent: async () => { throw new Error("429 rate limit exceeded"); } },
+});
+thrown = "";
+try { await withGeminiFallback(failingClaude).messages.create({ model: "m", max_tokens: 10, messages: [] }); } catch (e: any) { thrown = e.message; }
+check("рейт-лимит не гоняет лесенку, наружу ошибка Claude", thrown.includes("credit balance"), thrown);
+
+// 7. Прямой клиент без Claude: та же форма ответа.
+__setGeminiForTests({ models: { generateContent: async () => ({ text: "без Клода" }) } });
+const direct = geminiDirectClient();
+check("прямой клиент существует", !!direct);
+const dres = await (direct as any).messages.create({ model: "m", max_tokens: 10, messages: [{ role: "user", content: "х" }] });
+check("прямой клиент отвечает в форме Anthropic", dres.content[0].text === "без Клода");
 
 console.log(bad === 0 ? "\nВСЕ ПРОШЛИ" : `\nПРОВАЛОВ: ${bad}`);
 process.exit(bad ? 1 : 0);

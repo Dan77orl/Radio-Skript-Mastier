@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import { withGeminiFallback } from "./ai-fallback";
+import { withGeminiFallback, geminiDirectClient } from "./ai-fallback";
 import { storage } from "./storage";
 
 const openai = new OpenAI({
@@ -274,6 +274,9 @@ export async function handleSupportChat(req: Request, res: Response) {
         apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
         baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
       }));
+    } else {
+      // No Claude anywhere — the support chat runs directly on Gemini.
+      anthropic = geminiDirectClient();
     }
 
     if (anthropic) {

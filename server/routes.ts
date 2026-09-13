@@ -12,7 +12,7 @@ import { getPromptStrings, getGenderLabel, getDefaultHostName, getLanguageDirect
 import { handleSupportChat } from "./support-chat";
 import { synthesizeSpeech, describeTtsError } from "./tts";
 import { parseImportedScripts } from "./script-import";
-import { withGeminiFallback } from "./ai-fallback";
+import { withGeminiFallback, geminiDirectClient } from "./ai-fallback";
 import { createRateLimiter } from "./rate-limit";
 import { getJob, listJobs, enqueueJob, registerJobHandler } from "./jobs/queue";
 import { archiveAudio, restoreAudio } from "./storage-providers";
@@ -199,7 +199,10 @@ async function getAnthropicClient(userId?: string): Promise<Anthropic | null> {
   }
   const apiKey = process.env.ANTHROPIC_API_KEY || null;
   if (!apiKey) {
-    return null;
+    // No Claude anywhere — run generation directly on Gemini rather than
+    // failing with "no API key". Claude takes over again the moment a key
+    // appears (admin panel or secrets).
+    return geminiDirectClient();
   }
   return withGeminiFallback(new Anthropic({ apiKey }));
 }
