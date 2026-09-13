@@ -417,7 +417,11 @@
     "telegramTwoFactor": "Требовать Telegram при входе",
     "telegramTwoFactorDesc": "Одного пароля будет недостаточно — вход нужно подтвердить в Telegram.",
     "openDriveFolder": "Открыть папку на Диске",
-    "googleNoDriveScope": "На экране Google не отмечена галочка доступа к Диску. Нажмите «Подключить» ещё раз и отметьте пункт про Google Диск, прежде чем нажать «Продолжить»."
+    "googleNoDriveScope": "На экране Google не отмечена галочка доступа к Диску. Нажмите «Подключить» ещё раз и отметьте пункт про Google Диск, прежде чем нажать «Продолжить».",
+    "geminiKey": "Gemini API Key (резерв)",
+    "geminiPlaceholder": "AIza…",
+    "geminiDescription": "Запасной генератор: включается сам, когда Claude недоступен. Ключ:",
+    "geminiTestOk": "Работает — отвечает модель {{model}}"
   },
   "voices": {
     "title": "Голоса",

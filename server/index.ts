@@ -92,6 +92,7 @@ app.use((req, res, next) => {
     await pool.query(`ALTER TABLE programs ADD COLUMN IF NOT EXISTS downloaded_at timestamp`);
     await pool.query(`ALTER TABLE program_types ADD COLUMN IF NOT EXISTS tts_stability real`);
     await pool.query(`ALTER TABLE program_types ADD COLUMN IF NOT EXISTS tts_similarity_boost real`);
+    await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS gemini_api_key text`);
   } catch (err: any) {
     console.error("Schema guard failed (queries on programs may fail):", err?.message);
   }

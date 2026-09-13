@@ -399,7 +399,11 @@
     "telegramTwoFactor": "Require Telegram at sign-in",
     "telegramTwoFactorDesc": "A password alone will not be enough — the sign-in must be confirmed in Telegram.",
     "openDriveFolder": "Open the Drive folder",
-    "googleNoDriveScope": "The Drive checkbox was left unticked on Google's consent screen. Press \"Connect\" again and tick the Google Drive permission before continuing."
+    "googleNoDriveScope": "The Drive checkbox was left unticked on Google's consent screen. Press \"Connect\" again and tick the Google Drive permission before continuing.",
+    "geminiKey": "Gemini API Key (reserve)",
+    "geminiPlaceholder": "AIza…",
+    "geminiDescription": "Reserve generator: takes over automatically when Claude is unavailable. Get a key:",
+    "geminiTestOk": "Working — answered by {{model}}"
   },
   "voices": {
     "title": "Voices",

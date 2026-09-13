@@ -26,6 +26,7 @@ import { HintTooltip } from "@/components/hint-tooltip";
 const settingsFormSchema = z.object({
   elevenLabsApiKey: z.string().optional(),
   anthropicApiKey: z.string().optional(),
+  geminiApiKey: z.string().optional(),
   yandexDiskToken: z.string().optional(),
   freesoundApiKey: z.string().optional(),
   maleVoiceId: z.string().min(1),
@@ -63,6 +64,7 @@ export default function SettingsPage() {
 
   const [showApiKey, setShowApiKey] = useState(false);
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showYandexToken, setShowYandexToken] = useState(false);
   const [showFreesoundKey, setShowFreesoundKey] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -78,6 +80,7 @@ export default function SettingsPage() {
     defaultValues: {
       elevenLabsApiKey: "",
       anthropicApiKey: "",
+      geminiApiKey: "",
       yandexDiskToken: "",
       freesoundApiKey: "",
       maleVoiceId: "onwK4e9ZLuTAKqWW03F9",
@@ -100,6 +103,7 @@ export default function SettingsPage() {
       form.reset({
         elevenLabsApiKey: settings.elevenLabsApiKey || "",
         anthropicApiKey: settings.anthropicApiKey || "",
+        geminiApiKey: (settings as any).geminiApiKey || "",
         yandexDiskToken: settings.yandexDiskToken || "",
         freesoundApiKey: settings.freesoundApiKey || "",
         maleVoiceId: settings.maleVoiceId || "onwK4e9ZLuTAKqWW03F9",
@@ -203,6 +207,28 @@ export default function SettingsPage() {
       toast({
         title: t("common.success"),
         description: t("settings.connectionSuccess"),
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: t("settings.connectionError"),
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const testGeminiMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/test-gemini", {
+        apiKey: form.getValues("geminiApiKey"),
+      });
+      return res.json();
+    },
+    onSuccess: (data: { model?: string }) => {
+      toast({
+        title: t("common.success"),
+        description: t("settings.geminiTestOk", { model: data.model || "Gemini" }),
       });
     },
     onError: (error: Error) => {
@@ -579,6 +605,80 @@ export default function SettingsPage() {
                           {t("settings.anthropicDescription")}{" "}
                           <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" className="text-primary underline">
                             console.anthropic.com
+                          </a>
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Separator />
+
+                  <FormField
+                    control={form.control}
+                    name="geminiApiKey"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4" />
+                          {t("settings.geminiKey")}
+                        </FormLabel>
+                        <div className="flex gap-2 items-center">
+                          <FormControl>
+                            <Input
+                              type={showGeminiKey ? "text" : "password"}
+                              placeholder={t("settings.geminiPlaceholder")}
+                              {...field}
+                              data-testid="input-gemini-key"
+                              className="flex-1"
+                            />
+                          </FormControl>
+                          <HintTooltip hint={t("hints.settings.toggleApiVisibility")}>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setShowGeminiKey(!showGeminiKey)}
+                            >
+                              {showGeminiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                          </HintTooltip>
+                          <HintTooltip hint={t("hints.settings.saveApiKey")}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => saveFieldMutation.mutate({ geminiApiKey: field.value })}
+                              disabled={saveFieldMutation.isPending || !field.value}
+                              data-testid="button-save-gemini"
+                            >
+                              {saveFieldMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Save className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </HintTooltip>
+                          <HintTooltip hint={t("hints.settings.checkApi")}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => testGeminiMutation.mutate()}
+                              disabled={testGeminiMutation.isPending || !field.value}
+                              data-testid="button-test-gemini"
+                            >
+                              {testGeminiMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                t("common.check")
+                              )}
+                            </Button>
+                          </HintTooltip>
+                        </div>
+                        <FormDescription>
+                          {t("settings.geminiDescription")}{" "}
+                          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                            aistudio.google.com
                           </a>
                         </FormDescription>
                         <FormMessage />

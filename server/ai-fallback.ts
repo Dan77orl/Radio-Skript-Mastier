@@ -29,30 +29,41 @@ const MODEL_LADDER = [
   "gemini-2.5-flash",
 ].filter((m, i, a) => a.indexOf(m) === i);
 
-let workingModel: string | null = null;
+/** Working model per source ("admin" key vs "env" gateway — their model sets differ). */
+const workingModels = new Map<string, string>();
 
-let gemini: GoogleGenAI | null | undefined;
+let testOverride: unknown;
+let envGemini: GoogleGenAI | undefined;
 
 /** Test seam: replace the Gemini client with a fake. Not for production use. */
 export function __setGeminiForTests(client: unknown) {
-  gemini = client as GoogleGenAI | null;
-  workingModel = null;
+  testOverride = client;
+  workingModels.clear();
 }
 
-function getGemini(): GoogleGenAI | null {
-  if (gemini !== undefined) return gemini;
-  if (!process.env.AI_INTEGRATIONS_GEMINI_API_KEY) {
-    gemini = null;
-    return gemini;
+/**
+ * The admin-panel key talks to Google's public API directly; the Replit
+ * integration secret goes through the deploy's AI gateway. Admin key wins —
+ * same rule as the Anthropic key.
+ */
+function getGemini(adminKey?: string | null): { client: GoogleGenAI; source: string } | null {
+  if (testOverride !== undefined) {
+    return testOverride ? { client: testOverride as GoogleGenAI, source: "test" } : null;
   }
-  gemini = new GoogleGenAI({
-    apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
-    httpOptions: {
-      apiVersion: "",
-      baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
-    },
-  });
-  return gemini;
+  if (adminKey) {
+    return { client: new GoogleGenAI({ apiKey: adminKey }), source: "admin" };
+  }
+  if (!process.env.AI_INTEGRATIONS_GEMINI_API_KEY) return null;
+  if (envGemini === undefined) {
+    envGemini = new GoogleGenAI({
+      apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+      httpOptions: {
+        apiVersion: "",
+        baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+      },
+    });
+  }
+  return { client: envGemini, source: "env" };
 }
 
 function blockText(content: unknown): string {
@@ -72,9 +83,10 @@ function isUnknownModelError(err: any): boolean {
   return /not[ _]?found|unknown model|invalid model|unsupported model|no such model|does not exist/.test(msg) && /model/.test(msg);
 }
 
-async function geminiCreate(params: any): Promise<any> {
-  const client = getGemini();
-  if (!client) throw new Error("Gemini fallback is not configured");
+async function geminiCreate(params: any, adminKey?: string | null): Promise<any> {
+  const resolved = getGemini(adminKey);
+  if (!resolved) throw new Error("Gemini fallback is not configured");
+  const { client, source } = resolved;
 
   const systemInstruction = blockText(params.system) || undefined;
   const contents = (params.messages || []).map((m: any) => ({
@@ -82,7 +94,8 @@ async function geminiCreate(params: any): Promise<any> {
     parts: [{ text: blockText(m.content) }],
   }));
 
-  const candidates = workingModel ? [workingModel] : MODEL_LADDER;
+  const cached = workingModels.get(source);
+  const candidates = cached ? [cached] : MODEL_LADDER;
   let lastErr: any = null;
   for (const model of candidates) {
     try {
@@ -102,9 +115,9 @@ async function geminiCreate(params: any): Promise<any> {
         "";
       if (!text.trim()) throw new Error("Gemini fallback returned an empty response");
 
-      if (workingModel !== model) {
-        workingModel = model;
-        console.log(`[ai-fallback] Gemini model in use: ${model}`);
+      if (workingModels.get(source) !== model) {
+        workingModels.set(source, model);
+        console.log(`[ai-fallback] Gemini model in use (${source}): ${model}`);
       }
 
       // The Anthropic Message shape the app actually reads: content[].text.
@@ -132,12 +145,12 @@ async function geminiCreate(params: any): Promise<any> {
  * key is configured at all, so generation still works instead of dying with
  * "no API key". Null when Gemini isn't configured either.
  */
-export function geminiDirectClient(): Anthropic | null {
-  if (!getGemini()) return null;
+export function geminiDirectClient(adminKey?: string | null): Anthropic | null {
+  if (!getGemini(adminKey)) return null;
   return {
     messages: {
       create: async (params: any) => {
-        const res = await geminiCreate(params);
+        const res = await geminiCreate(params, adminKey);
         console.warn(`[ai-fallback] no Claude key — answered directly by ${res.model}`);
         return res;
       },
@@ -146,11 +159,23 @@ export function geminiDirectClient(): Anthropic | null {
 }
 
 /**
+ * Verify an admin-entered Gemini key end-to-end: real call, walking the model
+ * ladder. Returns the model that answered — the check button shows it.
+ */
+export async function testGeminiKey(apiKey: string): Promise<string> {
+  const res = await geminiCreate(
+    { max_tokens: 20, messages: [{ role: "user", content: "Привет" }] },
+    apiKey,
+  );
+  return res.model;
+}
+
+/**
  * Wrap an Anthropic client so messages.create falls back to Gemini on failure.
  * Requests the fallback can't faithfully translate (streaming, tools) are
  * passed through untouched and fail as they would have.
  */
-export function withGeminiFallback<T extends Anthropic>(client: T): T {
+export function withGeminiFallback<T extends Anthropic>(client: T, adminGeminiKey?: string | null): T {
   return new Proxy(client as any, {
     get(target, prop, receiver) {
       if (prop !== "messages") {
@@ -171,7 +196,7 @@ export function withGeminiFallback<T extends Anthropic>(client: T): T {
               if (params?.stream || params?.tools) throw err;
               const reason = err?.message?.slice(0, 200) || String(err);
               try {
-                const fallback = await geminiCreate(params);
+                const fallback = await geminiCreate(params, adminGeminiKey);
                 console.warn(`[ai-fallback] Claude failed (${reason}) — answered by ${fallback.model}`);
                 return fallback;
               } catch (geminiErr: any) {

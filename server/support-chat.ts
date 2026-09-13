@@ -264,19 +264,18 @@ export async function handleSupportChat(req: Request, res: Response) {
     // the raw DB value decides, the Replit AI integration is the fallback.
     // Wrapped the same way too: a failing Claude call falls back to Gemini.
     let anthropic: Anthropic | null = null;
-    const rawKey = req.session?.userId
-      ? (await storage.getRawSettings(req.session.userId))?.anthropicApiKey
-      : null;
-    if (rawKey) {
-      anthropic = withGeminiFallback(new Anthropic({ apiKey: rawKey }));
+    const raw = req.session?.userId ? await storage.getRawSettings(req.session.userId) : null;
+    const geminiKey = raw?.geminiApiKey || null;
+    if (raw?.anthropicApiKey) {
+      anthropic = withGeminiFallback(new Anthropic({ apiKey: raw.anthropicApiKey }), geminiKey);
     } else if (process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY && process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL) {
       anthropic = withGeminiFallback(new Anthropic({
         apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
         baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
-      }));
+      }), geminiKey);
     } else {
       // No Claude anywhere — the support chat runs directly on Gemini.
-      anthropic = geminiDirectClient();
+      anthropic = geminiDirectClient(geminiKey);
     }
 
     if (anthropic) {

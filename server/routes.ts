@@ -12,7 +12,7 @@ import { getPromptStrings, getGenderLabel, getDefaultHostName, getLanguageDirect
 import { handleSupportChat } from "./support-chat";
 import { synthesizeSpeech, describeTtsError } from "./tts";
 import { parseImportedScripts } from "./script-import";
-import { withGeminiFallback, geminiDirectClient } from "./ai-fallback";
+import { withGeminiFallback, geminiDirectClient, testGeminiKey } from "./ai-fallback";
 import { createRateLimiter } from "./rate-limit";
 import { getJob, listJobs, enqueueJob, registerJobHandler } from "./jobs/queue";
 import { archiveAudio, restoreAudio } from "./storage-providers";
@@ -188,23 +188,24 @@ async function getAnthropicClient(userId?: string): Promise<Anthropic | null> {
   // Every client is wrapped so a failing Claude call (credits, outage) is
   // retried against Gemini instead of killing the generation.
   const raw = await storage.getRawSettings(userId);
+  const geminiKey = raw?.geminiApiKey || null;
   if (raw?.anthropicApiKey) {
-    return withGeminiFallback(new Anthropic({ apiKey: raw.anthropicApiKey }));
+    return withGeminiFallback(new Anthropic({ apiKey: raw.anthropicApiKey }), geminiKey);
   }
   if (process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY && process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL) {
     return withGeminiFallback(new Anthropic({
       apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
       baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
-    }));
+    }), geminiKey);
   }
   const apiKey = process.env.ANTHROPIC_API_KEY || null;
   if (!apiKey) {
     // No Claude anywhere — run generation directly on Gemini rather than
     // failing with "no API key". Claude takes over again the moment a key
     // appears (admin panel or secrets).
-    return geminiDirectClient();
+    return geminiDirectClient(geminiKey);
   }
-  return withGeminiFallback(new Anthropic({ apiKey }));
+  return withGeminiFallback(new Anthropic({ apiKey }), geminiKey);
 }
 
 function resolveStationCountry(stationLocation: string | null | undefined): string {
@@ -2479,11 +2480,12 @@ export async function registerRoutes(
       if (!settings) return res.json({});
       const user = await storage.getUser(req.session.userId!);
       if (user?.role !== "admin") {
-        const { elevenLabsApiKey, anthropicApiKey, yandexDiskToken, freesoundApiKey, ...safeSettings } = settings;
+        const { elevenLabsApiKey, anthropicApiKey, geminiApiKey, yandexDiskToken, freesoundApiKey, ...safeSettings } = settings;
         return res.json({
           ...safeSettings,
           elevenLabsApiKey: elevenLabsApiKey ? "••••••••" : "",
           anthropicApiKey: anthropicApiKey ? "••••••••" : "",
+          geminiApiKey: geminiApiKey ? "••••••••" : "",
           yandexDiskToken: yandexDiskToken ? "••••••••" : "",
           freesoundApiKey: freesoundApiKey ? "••••••••" : "",
         });
@@ -2502,17 +2504,18 @@ export async function registerRoutes(
         return res.status(400).json({ error: parsed.error.message });
       }
       const user = await storage.getUser(req.session.userId!);
-      const { elevenLabsApiKey, anthropicApiKey, yandexDiskToken, freesoundApiKey, ...safeData } = parsed.data;
+      const { elevenLabsApiKey, anthropicApiKey, geminiApiKey, yandexDiskToken, freesoundApiKey, ...safeData } = parsed.data;
       const data = user?.role === "admin"
         ? parsed.data
         : safeData;
       const settings = await storage.saveSettings(data, req.session.userId);
       if (user?.role !== "admin") {
-        const { elevenLabsApiKey, anthropicApiKey, yandexDiskToken, freesoundApiKey, ...safe } = settings;
+        const { elevenLabsApiKey, anthropicApiKey, geminiApiKey, yandexDiskToken, freesoundApiKey, ...safe } = settings;
         return res.json({
           ...safe,
           elevenLabsApiKey: elevenLabsApiKey ? "••••••••" : "",
           anthropicApiKey: anthropicApiKey ? "••••••••" : "",
+          geminiApiKey: geminiApiKey ? "••••••••" : "",
           yandexDiskToken: yandexDiskToken ? "••••••••" : "",
           freesoundApiKey: freesoundApiKey ? "••••••••" : "",
         });
@@ -2895,6 +2898,26 @@ ${ps.minReplicas(dialogReplicas)}`;
         return res.status(401).json({ error: "Неверный API ключ" });
       }
       res.status(500).json({ error: error?.message || "Ошибка подключения" });
+    }
+  });
+
+  app.post("/api/test-gemini", async (req, res) => {
+    try {
+      const { apiKey } = req.body;
+      if (!apiKey) {
+        return res.status(400).json({ error: "API key is required" });
+      }
+      // Real end-to-end call, walking the model ladder — the answer names
+      // the model that will actually serve as the reserve.
+      const model = await testGeminiKey(apiKey);
+      res.json({ success: true, model });
+    } catch (error: any) {
+      console.error("Error testing Gemini:", error);
+      const msg = String(error?.message || "");
+      if (/api key not valid|invalid api key|401|permission/i.test(msg)) {
+        return res.status(401).json({ error: "Неверный API ключ" });
+      }
+      res.status(500).json({ error: msg || "Ошибка подключения" });
     }
   });
 

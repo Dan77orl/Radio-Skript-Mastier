@@ -47,6 +47,9 @@ export const settings = pgTable("settings", {
   userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
   elevenLabsApiKey: text("eleven_labs_api_key"),
   anthropicApiKey: text("anthropic_api_key"),
+  // Reserve generator: used when Claude is unavailable (admin key first,
+  // the Replit integration secret is the fallback).
+  geminiApiKey: text("gemini_api_key"),
   yandexDiskToken: text("yandex_disk_token"),
   maleVoiceId: text("male_voice_id").default("onwK4e9ZLuTAKqWW03F9"),
   femaleVoiceId: text("female_voice_id").default("EXAVITQu4vr4xnSDxMaL"),
